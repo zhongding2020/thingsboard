@@ -23,9 +23,9 @@
           <el-icon><DocumentCopy /></el-icon>
           <span>原始数据</span>
         </el-menu-item>
-        <el-menu-item index="/spc">
+        <el-menu-item index="/lines">
           <el-icon><TrendCharts /></el-icon>
-          <span>设备监控</span>
+          <span>线体监控</span>
         </el-menu-item>
         <el-menu-item index="/analysis">
           <el-icon><DataAnalysis /></el-icon>

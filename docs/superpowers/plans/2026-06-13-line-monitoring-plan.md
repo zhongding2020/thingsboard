@@ -2,11 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** completed (2026-06-14) — all 18 tasks done, 193 tests passing, deployed
+
 **Goal:** Add production line management, device registry, and line-level SPC monitoring to the existing process optimization platform.
 
 **Architecture:** New PostgreSQL tables `production_lines` and `device_registry` with FK relationships; new `LineDeviceRepository` for CRUD; new `/lines` and `/devices` API routes; new `LinesView` and `LineDetailView` frontend pages; enhanced `SpcView` with line-context breadcrumb; sidebar menu restructured.
 
 **Tech Stack:** PostgreSQL (asyncpg), FastAPI, Pydantic, Vue 3 + Element Plus + TypeScript, Pinia, axios
+
+## Deviations During Implementation
+
+| Item | Plan | Actual |
+|---|---|---|
+| LinesView | Table-based line list | Card-based topology with drag-and-drop |
+| Device order | Not planned | `sort_order` column + `PUT /lines/{id}/reorder` |
+| Device icons | Manual per-device | `device-icons.ts` type→icon map |
+| Sidebar sub-items | Collapsed line list | Dropped (simpler UX) |
+| Response models | Pydantic models | Raw dicts (simpler, functional) |
+| Device types | 7 types | 13 types (6 added) |
 
 ---
 
@@ -43,7 +56,7 @@ Modified files:
 **Files:**
 - Create: `db/migrations/002_lines_devices.sql`
 
-- [ ] **Step 1: Write migration SQL**
+- [x] **Step 1: Write migration SQL**
 
 ```sql
 CREATE TABLE IF NOT EXISTS production_lines (
@@ -82,13 +95,13 @@ FROM process_summary ps
 WHERE NOT EXISTS (SELECT 1 FROM device_registry dr WHERE dr.id = ps.device_id);
 ```
 
-- [ ] **Step 2: Verify migration applies cleanly**
+- [x] **Step 2: Verify migration applies cleanly**
 
 Run: `docker compose -f docker-compose.yml up -d postgres && sleep 3 && docker exec thingsboard-postgres-1 psql -U postgres -d process_opt -f - < db/migrations/002_lines_devices.sql`
 
 Expected: `CREATE TABLE` × 2, `INSERT 0 1`, `INSERT 0 N` (N = distinct device_ids)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add db/migrations/002_lines_devices.sql
@@ -102,7 +115,7 @@ git commit -m "feat: add production_lines and device_registry tables"
 **Files:**
 - Modify: `src/process_opt/api/main.py`
 
-- [ ] **Step 1: Add migration runner in main.py**
+- [x] **Step 1: Add migration runner in main.py**
 
 The `main()` function in `src/process_opt/api/main.py` should apply migrations before creating the app. Read current `main.py`:
 
@@ -125,13 +138,13 @@ async def main() -> None:
 
 The migration files are applied in sorted order (001_initial.sql first, then 002_lines_devices.sql). The `apply_sql_file` function already exists in `db.py` and executes raw SQL.
 
-- [ ] **Step 2: Verify by restarting backend-api**
+- [x] **Step 2: Verify by restarting backend-api**
 
 Run: `docker compose -f docker-compose.yml up -d --build backend-api && sleep 5 && docker exec thingsboard-postgres-1 psql -U postgres -d process_opt -c "\dt production_lines"`
 
 Expected: Table `production_lines` exists and contains "默认产线".
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/process_opt/api/main.py
@@ -145,7 +158,7 @@ git commit -m "feat: apply DB migrations on backend startup"
 **Files:**
 - Create: `src/process_opt/analysis/line_schemas.py`
 
-- [ ] **Step 1: Write the schemas**
+- [x] **Step 1: Write the schemas**
 
 ```python
 from datetime import datetime
@@ -229,7 +242,7 @@ class LineMonitorResponse(BaseModel):
     devices: list[DeviceSpcSummary]
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/process_opt/analysis/line_schemas.py
@@ -243,7 +256,7 @@ git commit -m "feat: add line and device Pydantic schemas"
 **Files:**
 - Create: `tests/analysis/test_line_schemas.py`
 
-- [ ] **Step 1: Write tests**
+- [x] **Step 1: Write tests**
 
 ```python
 import pytest
@@ -338,12 +351,12 @@ class TestLineMonitorResponse:
         assert len(resp.devices) == 2
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `python -m pytest tests/analysis/test_line_schemas.py -v`
 Expected: 7 passed
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/analysis/test_line_schemas.py
@@ -357,7 +370,7 @@ git commit -m "test: add line and device schema tests"
 **Files:**
 - Modify: `src/process_opt/common/repositories.py` (append at end)
 
-- [ ] **Step 1: Add LineDeviceRepository class**
+- [x] **Step 1: Add LineDeviceRepository class**
 
 ```python
 class LineDeviceRepository:
@@ -541,7 +554,7 @@ class LineDeviceRepository:
             """, device_id, device_type)
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/process_opt/common/repositories.py
@@ -555,7 +568,7 @@ git commit -m "feat: add LineDeviceRepository for line and device CRUD"
 **Files:**
 - Create: `tests/analysis/test_line_repository.py`
 
-- [ ] **Step 1: Write repository tests**
+- [x] **Step 1: Write repository tests**
 
 ```python
 import pytest
@@ -666,12 +679,12 @@ class TestDeviceCRUD:
         assert device["type"] == "tester"
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `python -m pytest tests/analysis/test_line_repository.py -v`
 Expected: 10 passed
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/analysis/test_line_repository.py
@@ -685,7 +698,7 @@ git commit -m "test: add LineDeviceRepository tests"
 **Files:**
 - Modify: `src/process_opt/analysis/dataset.py:26-28`
 
-- [ ] **Step 1: Add optional device_id and since filtering in build()**
+- [x] **Step 1: Add optional device_id and since filtering in build()**
 
 ```python
 from __future__ import annotations
@@ -741,7 +754,7 @@ class DatasetBuilder:
 
 Full replacement of the `build()` signature and query section only — the rest (field checking, row processing, missing handling) remains identical.
 
-- [ ] **Step 2: Update AnalysisService to pass device_id and since**
+- [x] **Step 2: Update AnalysisService to pass device_id and since**
 
 In `src/process_opt/analysis/service.py`, modify `spc()`:
 
@@ -793,12 +806,12 @@ async def spc(self, request: SpcRequest) -> SpcResult:
     )
 ```
 
-- [ ] **Step 3: Run existing tests to verify no regression**
+- [x] **Step 3: Run existing tests to verify no regression**
 
 Run: `python -m pytest tests/analysis/ -v`
 Expected: 73 passed (no change from baseline)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/process_opt/analysis/dataset.py src/process_opt/analysis/service.py
@@ -813,7 +826,7 @@ git commit -m "feat: add device_id and since filtering to DatasetBuilder and SPC
 - Modify: `src/process_opt/analysis/schemas.py:127-132`
 - Modify: `src/process_opt/api/app.py` (spc route)
 
-- [ ] **Step 1: Add line_id to SpcRequest**
+- [x] **Step 1: Add line_id to SpcRequest**
 
 ```python
 class SpcRequest(BaseModel):
@@ -827,7 +840,7 @@ class SpcRequest(BaseModel):
     since: datetime | None = None
 ```
 
-- [ ] **Step 2: Update spc route in app.py to resolve line_id → device_ids**
+- [x] **Step 2: Update spc route in app.py to resolve line_id → device_ids**
 
 The SPC route needs access to `LineDeviceRepository` when `line_id` is provided. Add a new `LineDeviceRepositoryProtocol` and parameter.
 
@@ -876,7 +889,7 @@ async def spc_route(body: SpcRequest) -> SpcResult:
     return await analysis_service.spc(body)
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/process_opt/analysis/schemas.py src/process_opt/api/app.py
@@ -890,7 +903,7 @@ git commit -m "feat: add line_id to SpcRequest, validate device-line membership"
 **Files:**
 - Modify: `src/process_opt/api/app.py` (add routes after repository block)
 
-- [ ] **Step 1: Add line and device routes**
+- [x] **Step 1: Add line and device routes**
 
 These go inside `create_app()`, inside a new `if line_device_repo is not None:` block that wraps both the SPC enhancement and the new routes.
 
@@ -962,7 +975,7 @@ if line_device_repo is not None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 ```
 
-- [ ] **Step 2: Also add the line monitoring aggregation route**
+- [x] **Step 2: Also add the line monitoring aggregation route**
 
 ```python
     @app.get("/api/v1/lines/{line_id}/monitor")
@@ -1040,7 +1053,7 @@ if line_device_repo is not None:
         }
 ```
 
-- [ ] **Step 3: Restructure create_app() signature and call site**
+- [x] **Step 3: Restructure create_app() signature and call site**
 
 The existing `create_app()` signature must be updated:
 
@@ -1065,7 +1078,7 @@ async def spc_route(body: SpcRequest) -> SpcResult:
     return await analysis_service.spc(body)
 ```
 
-- [ ] **Step 4: Wire LineDeviceRepository in main.py**
+- [x] **Step 4: Wire LineDeviceRepository in main.py**
 
 In `src/process_opt/api/main.py`, update `create_app()` call:
 
@@ -1093,7 +1106,7 @@ async def main() -> None:
         # ...
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/process_opt/api/app.py src/process_opt/api/main.py
@@ -1107,7 +1120,7 @@ git commit -m "feat: add line/device CRUD API routes and monitoring endpoint"
 **Files:**
 - Create: `tests/api/test_lines_api.py`
 
-- [ ] **Step 1: Write API tests**
+- [x] **Step 1: Write API tests**
 
 ```python
 import pytest
@@ -1196,12 +1209,12 @@ class TestDevicesAPI:
         assert resp.status_code == 404
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `python -m pytest tests/api/test_lines_api.py -v`
 Expected: 7 passed
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/api/test_lines_api.py
@@ -1215,7 +1228,7 @@ git commit -m "test: add line/device API integration tests"
 **Files:**
 - Create: `web/src/api/lines.ts`
 
-- [ ] **Step 1: Write the API client**
+- [x] **Step 1: Write the API client**
 
 ```ts
 import client from './client'
@@ -1302,7 +1315,7 @@ export function deleteDevice(id: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add web/src/api/lines.ts
@@ -1316,7 +1329,7 @@ git commit -m "feat: add frontend API client for lines and devices"
 **Files:**
 - Create: `web/src/views/LinesView.vue`
 
-- [ ] **Step 1: Write LinesView component** (approximately 220 lines)
+- [x] **Step 1: Write LinesView component** (approximately 220 lines)
 
 The page shows a table of production lines with CRUD operations. Uses Element Plus table, dialog for create/edit, confirm for delete.
 
@@ -1431,7 +1444,7 @@ onMounted(loadLines)
 </style>
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add web/src/views/LinesView.vue
@@ -1445,7 +1458,7 @@ git commit -m "feat: add LinesView page for line list and management"
 **Files:**
 - Create: `web/src/views/LineDetailView.vue`
 
-- [ ] **Step 1: Write LineDetailView component** (approximately 260 lines)
+- [x] **Step 1: Write LineDetailView component** (approximately 260 lines)
 
 ```vue
 <template>
@@ -1643,7 +1656,7 @@ onMounted(loadLine)
 </style>
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add web/src/views/LineDetailView.vue
@@ -1657,7 +1670,7 @@ git commit -m "feat: add LineDetailView page with device management"
 **Files:**
 - Modify: `web/src/views/SpcView.vue` (add breadcrumb, device info bar, line-scoped devices)
 
-- [ ] **Step 1: Add breadcrumb and device info bar at top of template**
+- [x] **Step 1: Add breadcrumb and device info bar at top of template**
 
 Add after the `<div class="spc-view">` opening tag:
 
@@ -1677,7 +1690,7 @@ Add after the `<div class="spc-view">` opening tag:
 </div>
 ```
 
-- [ ] **Step 2: Add script logic for device context**
+- [x] **Step 2: Add script logic for device context**
 
 Add imports:
 
@@ -1761,7 +1774,7 @@ if (!devices.value.length) {
 // Also show all registered devices for standalone mode
 ```
 
-- [ ] **Step 3: Add CSS for breadcrumb and info bar**
+- [x] **Step 3: Add CSS for breadcrumb and info bar**
 
 ```css
 .spc-breadcrumb {
@@ -1780,7 +1793,7 @@ if (!devices.value.length) {
 .info-label { color: var(--el-text-color-secondary); margin-right: 4px; }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/src/views/SpcView.vue
@@ -1794,7 +1807,7 @@ git commit -m "feat: add line-context breadcrumb and device info to SpcView"
 **Files:**
 - Modify: `web/src/router/index.ts`
 
-- [ ] **Step 1: Add new routes**
+- [x] **Step 1: Add new routes**
 
 ```ts
 children: [
@@ -1810,12 +1823,12 @@ children: [
 ],
 ```
 
-- [ ] **Step 2: Verify no type errors**
+- [x] **Step 2: Verify no type errors**
 
 Run: `cd web && npx vue-tsc --noEmit`
 Expected: no output (clean)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add web/src/router/index.ts
@@ -1829,7 +1842,7 @@ git commit -m "feat: add /lines and /lines/:id routes"
 **Files:**
 - Modify: `web/src/components/AppLayout.vue`
 
-- [ ] **Step 1: Change menu item for 设备监控 → 线体监控**
+- [x] **Step 1: Change menu item for 设备监控 → 线体监控**
 
 ```vue
 <el-menu-item index="/lines">
@@ -1842,7 +1855,7 @@ Replace the existing menu item at index `/spc` with index `/lines`.
 
 Also remove the old `/spc` entry since SPC is now reached via `/lines/:id` → drill-down.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add web/src/components/AppLayout.vue
@@ -1857,7 +1870,7 @@ git commit -m "feat: change sidebar menu from 设备监控 to 线体监控"
 - Modify: `src/process_opt/mock/generator.py`
 - Modify: `src/process_opt/mock/sender.py` (or cli.py) — add DB pool access
 
-- [ ] **Step 1: Add device registration to mock CLI**
+- [x] **Step 1: Add device registration to mock CLI**
 
 Since the mock generator is a standalone CLI (not a service with DB pool), we add DB access for device registration. The simplest approach: add a `--db-dsn` option to the CLI for seed/stream commands, and auto-register on first use.
 
@@ -1887,7 +1900,7 @@ async def _register_devices(dsn: str, device_type: str, count: int) -> None:
         await pool.close()
 ```
 
-- [ ] **Step 2: Update mock sender/generator to use real device IDs**
+- [x] **Step 2: Update mock sender/generator to use real device IDs**
 
 In `generate_pair()`, instead of `"device_id": device_type`, query or use registered ID:
 
@@ -1918,13 +1931,13 @@ asyncio.run(send_batch(
 ))
 ```
 
-- [ ] **Step 3: Test by re-seeding data**
+- [x] **Step 3: Test by re-seeding data**
 
 Run: `docker compose -f docker-compose.yml exec postgres psql -U postgres -d process_opt -c "SELECT COUNT(*) FROM device_registry;"`
 
 Expected: devices exist in registry
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/process_opt/mock/generator.py src/process_opt/mock/cli.py
@@ -1935,15 +1948,15 @@ git commit -m "feat: mock generator registers devices and uses per-type device I
 
 ### Task 18: Final integration test — run full stack
 
-- [ ] **Step 1: Rebuild and restart all services**
+- [x] **Step 1: Rebuild and restart all services**
 
 Run: `docker compose -f docker-compose.yml up -d --build`
 
-- [ ] **Step 2: Re-seed mock data with device registration**
+- [x] **Step 2: Re-seed mock data with device registration**
 
 Run: `.venv/bin/process-opt-mock seed --count 100 --device-type reflow-oven --gateway-url http://localhost:8001 --api-key change-me --db-dsn postgresql://postgres:postgres@localhost:5432/process_opt --device-count 10`
 
-- [ ] **Step 3: Verify API endpoints**
+- [x] **Step 3: Verify API endpoints**
 
 Run:
 ```bash
@@ -1953,12 +1966,12 @@ curl -s http://localhost:8000/api/v1/devices | python3 -m json.tool
 
 Expected: lines and devices returned with correct data.
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 Run: `python -m pytest tests/ -q`
 Expected: all tests pass (baseline + new line/device tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A

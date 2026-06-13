@@ -219,3 +219,20 @@ class DatasetBuilder:
             [targets[i] for i in valid],
             [metadata[i] for i in valid],
         )
+
+    async def build_to_dataset_id(
+        self,
+        device_id: str,
+        since: datetime | None = None,
+    ) -> str:
+        from process_opt.analysis.excel import save_dataset
+
+        request = AnalysisDatasetRequest()
+        ds = await self.build(request, device_id=device_id, since=since)
+        if isinstance(ds, AnalysisError):
+            raise AnalysisError(
+                code=ds.code,
+                message=ds.message,
+                suggestion=ds.suggestion,
+            )
+        return save_dataset(ds)

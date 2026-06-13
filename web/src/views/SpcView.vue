@@ -11,7 +11,7 @@
     </div>
 
     <div v-if="deviceInfo" class="device-info-bar">
-      <span class="info-item"><span class="info-label">类型</span> {{ deviceInfo.type }}</span>
+      <span class="info-item"><span class="info-label">类型</span> {{ deviceLabel(deviceInfo.type) }}</span>
       <span v-if="deviceInfo.description" class="info-item"><span class="info-label">描述</span> {{ deviceInfo.description }}</span>
     </div>
 
@@ -150,6 +150,7 @@ import { fetchSpc, type SpcResult, type ParamOverview } from '@/api/spc'
 import { listDevices } from '@/api/records'
 import { useRoute } from 'vue-router'
 import { getDevice, updateDevice, getLine, type DeviceResponse } from '@/api/lines'
+import { deviceLabel } from '@/utils/device-icons'
 import { useAppStore } from '@/stores/app'
 
 use([

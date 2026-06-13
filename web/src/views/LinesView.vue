@@ -39,11 +39,11 @@
             @drop="onDrop($event, device.id, line.id)"
           >
             <div class="device-icon">
-              <el-icon size="22"><Monitor /></el-icon>
+              <el-icon size="22"><component :is="deviceIcon(device.type)" /></el-icon>
             </div>
             <div class="device-body">
               <span class="device-name">{{ device.name }}</span>
-              <span class="device-type">{{ device.type }}</span>
+              <span class="device-type">{{ deviceLabel(device.type) }}</span>
             </div>
             <div class="device-status">
               <span :class="['status-dot', `status-${device.status || 'normal'}`]" />
@@ -93,7 +93,8 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Edit, Delete, Plus, Monitor } from '@element-plus/icons-vue'
+import { User, Edit, Delete, Plus } from '@element-plus/icons-vue'
+import { deviceIcon, deviceLabel } from '@/utils/device-icons'
 import {
   listLines, createLine, updateLine, deleteLine,
   listDevices, updateDevice, reorderDevices,

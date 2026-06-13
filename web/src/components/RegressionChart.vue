@@ -1,67 +1,85 @@
 <template>
-  <div class="regression-panel">
-    <el-form inline class="regression-form">
-      <el-form-item label="特征参数">
-        <el-select v-model="featureFields" multiple :disabled="!allFields.length" style="width: 240px">
-          <el-option v-for="f in allFields" :key="f" :label="f" :value="f" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="目标结果">
-        <el-select v-model="targetField" :disabled="!allFields.length" style="width: 180px">
-          <el-option v-for="f in allFields" :key="f" :label="f" :value="f" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="handleCompute" :loading="loading">计算</el-button>
-      </el-form-item>
-    </el-form>
+  <div>
+    <div v-if="!autoMode" class="regression-form">
+      <el-form inline>
+        <el-form-item label="目标结果">
+          <el-select v-model="targetField" style="width: 180px">
+            <el-option v-for="f in props.targetFields" :key="f" :label="f" :value="f" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleCompute" :loading="loading">计算</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
     <div class="chart-wrapper">
-      <div v-if="result" class="regression-result">
+      <div v-for="r in results" :key="r.target" class="regression-card">
+        <div class="regression-target">{{ r.target }}</div>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="R²">{{ result.r_squared.toFixed(4) }}</el-descriptions-item>
-          <el-descriptions-item label="RMSE">{{ result.rmse.toFixed(4) }}</el-descriptions-item>
-          <el-descriptions-item label="模型">{{ result.model_type }}</el-descriptions-item>
+          <el-descriptions-item label="R²">{{ r.r_squared.toFixed(4) }}</el-descriptions-item>
+          <el-descriptions-item label="RMSE">{{ r.rmse.toFixed(4) }}</el-descriptions-item>
+          <el-descriptions-item label="模型">{{ r.model_type }}</el-descriptions-item>
         </el-descriptions>
-        <div v-if="result.coefficients" class="regression-coeff">
-          <h4>Coefficients</h4>
-          <div v-for="(v, k) in result.coefficients" :key="k" class="coeff-row">
-            <span class="coeff-name">{{ k }}</span>
-            <span class="coeff-value">{{ v.toFixed(4) }}</span>
-          </div>
-        </div>
       </div>
-      <el-empty v-else description="选择参数后点击计算" />
+      <el-empty v-if="!results.length && !loading" description="选择参数后点击计算" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useAnalysisStore } from '@/stores/analysis'
+import { ref, watch } from 'vue'
 import { regression } from '@/api/analysis'
 
-const analysis = useAnalysisStore()
+const props = defineProps<{
+  datasetId: string
+  featureFields: string[]
+  targetFields: string[]
+  autoMode?: boolean
+}>()
+
 const loading = ref(false)
-const result = ref<{ r_squared: number; rmse: number; coefficients: Record<string, number>; model_type: string } | null>(null)
-
-const featureFields = ref<string[]>([])
 const targetField = ref('')
-
-const allFields = computed<string[]>(() => {
-  const r = analysis.profileResult
-  if (!r || !Array.isArray(r)) return []
-  return (r as { field: string }[]).map((x) => x.field)
-})
+const results = ref<{ target: string; r_squared: number; rmse: number; model_type: string }[]>([])
 
 async function handleCompute() {
-  if (!featureFields.value.length || !targetField.value) return
+  if (!targetField.value || !props.featureFields.length) return
   loading.value = true
   try {
-    result.value = await regression({
-      feature_fields: featureFields.value,
+    const r = await regression({
+      dataset_id: props.datasetId,
+      feature_fields: props.featureFields,
       target_field: targetField.value,
       model_type: 'linear',
-    }) as { r_squared: number; rmse: number; coefficients: Record<string, number>; model_type: string }
+    }) as { r_squared: number; rmse: number; model_type: string }
+    results.value = [{ target: targetField.value, ...r }]
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(() => props.autoMode, (v) => {
+  if (v) autoCompute()
+}, { immediate: true })
+
+watch(() => [props.datasetId, props.featureFields.length, props.targetFields.length], () => {
+  if (props.autoMode) autoCompute()
+})
+
+async function autoCompute() {
+  if (!props.datasetId || !props.featureFields.length || !props.targetFields.length) return
+  loading.value = true
+  const out: { target: string; r_squared: number; rmse: number; model_type: string }[] = []
+  try {
+    for (const t of props.targetFields) {
+      const r = await regression({
+        dataset_id: props.datasetId,
+        feature_fields: props.featureFields,
+        target_field: t,
+        model_type: 'linear',
+      }) as { r_squared: number; rmse: number; model_type: string }
+      out.push({ target: t, ...r })
+    }
+    results.value = out
   } finally {
     loading.value = false
   }
@@ -69,41 +87,20 @@ async function handleCompute() {
 </script>
 
 <style scoped>
-.regression-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.regression-form { margin-bottom: 12px; }
+.chart-wrapper { min-height: 120px; }
+.regression-card {
+  background: var(--el-bg-color);
+  border-radius: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--el-border-color-light);
+  margin-bottom: 8px;
 }
-.regression-form {
-  margin: 0;
-}
-.chart-wrapper {
-  min-height: 200px;
-}
-.regression-result {
-  max-width: 500px;
-}
-.regression-coeff {
-  margin-top: 16px;
-}
-.regression-coeff h4 {
+.regression-target {
+  font-family: 'Fira Code', monospace;
   font-size: 13px;
   font-weight: 500;
-  margin: 0 0 8px;
-}
-.coeff-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--el-border-color-light);
-  font-size: 13px;
-}
-.coeff-name {
-  font-family: 'Fira Code', monospace;
   color: var(--el-color-primary);
-}
-.coeff-value {
-  font-family: 'Fira Code', monospace;
-  font-weight: 500;
+  margin-bottom: 8px;
 }
 </style>

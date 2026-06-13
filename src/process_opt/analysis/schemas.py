@@ -126,6 +126,7 @@ class SpcRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     device_id: str
     field: str | None = None
+    line_id: str | None = None
     usl: float | None = None
     lsl: float | None = None
     target: float | None = None

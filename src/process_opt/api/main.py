@@ -1,6 +1,7 @@
 from datetime import datetime
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -10,7 +11,7 @@ from process_opt.analysis import AnalysisService
 from process_opt.analysis.dataset import DatasetBuilder
 from process_opt.analysis.schemas import AnalysisDataset, AnalysisDatasetRequest, CorrelationRequest, CorrelationResult, ImportanceRequest, ImportanceResult, ProfilingResult, RecommendationRequest, RecommendationResult, RegressionRequest, RegressionResult, SpcRequest, SpcResult
 from process_opt.api.app import create_app
-from process_opt.common.db import create_pool
+from process_opt.common.db import apply_sql_file, create_pool
 from process_opt.common.repositories import DataRepository
 from process_opt.common.settings import Settings
 from process_opt.parameters.repository import ParameterRepository
@@ -140,6 +141,9 @@ def create_api_app_from_settings() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         pool = await create_pool(settings.postgres_dsn)
+        migrations_dir = Path(__file__).resolve().parent.parent.parent.parent / "db" / "migrations"
+        for fpath in sorted(migrations_dir.glob("*.sql")):
+            await apply_sql_file(pool, fpath)
         repository = DataRepository(pool)
         parameter_repo = ParameterRepository(pool)
         parameter_service = ParameterService(parameter_repo)

@@ -234,5 +234,6 @@ class DatasetBuilder:
                 code=ds.code,
                 message=ds.message,
                 suggestion=ds.suggestion,
+                details=ds.details,
             )
         return save_dataset(ds)

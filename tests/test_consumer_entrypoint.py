@@ -34,7 +34,7 @@ async def test_run_once_wires_consumer_dependencies_and_closes_pool(monkeypatch:
         calls["dsn"] = dsn
         return pool
 
-    async def fake_consume_pending_messages(consumed_settings: Settings, handler: FakeHandler) -> int:
+    async def fake_consume_pending_messages(consumed_settings: Settings, handler: FakeHandler, **kwargs: Any) -> int:
         calls["settings"] = consumed_settings
         calls["handler"] = handler
         return 7

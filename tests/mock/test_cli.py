@@ -25,16 +25,16 @@ def test_stream_help_succeeds() -> None:
     assert result.exit_code == 0
 
 
-@patch("process_opt.mock.cli.send_pair", return_value=True)
-def test_seed_sends_messages(mock_send_pair: object) -> None:
+@patch("process_opt.mock.cli.send_batch", return_value=(3, 0))
+def test_seed_sends_messages(mock_send_batch: object) -> None:
     runner = CliRunner()
     result = runner.invoke(main, ["seed", "--count", "3"])
     assert result.exit_code == 0
     assert "3 sent" in result.output
 
 
-@patch("process_opt.mock.cli.send_pair", return_value=True)
-def test_seed_custom_device_type(mock_send_pair: object) -> None:
+@patch("process_opt.mock.cli.send_batch", return_value=(1, 0))
+def test_seed_custom_device_type(mock_send_batch: object) -> None:
     runner = CliRunner()
     result = runner.invoke(main, ["seed", "--count", "1", "--device-type", "injection-molder"])
     assert result.exit_code == 0

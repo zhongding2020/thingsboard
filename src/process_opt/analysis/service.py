@@ -110,6 +110,8 @@ class AnalysisService:
             device_id=request.device_id,
             since=request.since,
         )
+        if isinstance(overview_dataset, AnalysisError):
+            raise overview_dataset
 
         field = request.field
         if field is not None:
@@ -124,6 +126,8 @@ class AnalysisService:
                 device_id=request.device_id,
                 since=request.since,
             )
+            if isinstance(field_dataset, AnalysisError):
+                raise field_dataset
             if field not in {f for feat in field_dataset.features for f in feat}:
                 existing = sorted({f for feat in overview_dataset.features for f in feat})
                 raise AnalysisError(

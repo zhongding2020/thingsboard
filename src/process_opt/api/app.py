@@ -395,8 +395,8 @@ def create_app(
         async def spc_route(body: SpcRequest) -> SpcResult:
             return await analysis_service.spc(body)
 
-        @app.post("/api/v1/analysis/excel/upload")
-        async def excel_upload(file: UploadFile) -> Any:
+        @app.post("/api/v1/analysis/dataset/upload")
+        async def dataset_upload(file: UploadFile) -> Any:
             from process_opt.analysis.excel import parse_excel, save_dataset
             content = await file.read()
             ds = parse_excel(content)
@@ -407,6 +407,26 @@ def create_app(
                 "dataset_id": ds_id,
                 "fields": {"features": feature_fields, "targets": target_fields},
                 "sample_count": ds.sample_count,
+            }
+
+        @app.post("/api/v1/analysis/dataset/query")
+        async def dataset_query_route(body: dict[str, Any]) -> Any:
+            from process_opt.analysis.dataset import DatasetBuilder
+            from process_opt.analysis.excel import get_dataset
+            builder = DatasetBuilder(app.state.pool)
+            device_id = body.get("device_id", "")
+            if not device_id:
+                raise HTTPException(status_code=400, detail="device_id is required")
+            since_raw = body.get("since")
+            since = datetime.fromisoformat(since_raw) if since_raw else None
+            ds_id = await builder.build_to_dataset_id(device_id, since=since)
+            ds = get_dataset(ds_id)
+            feature_fields = sorted({k for f in ds.features for k in f}) if ds else []
+            target_fields = sorted({k for t in ds.targets for k in t}) if ds else []
+            return {
+                "dataset_id": ds_id,
+                "fields": {"features": feature_fields, "targets": target_fields},
+                "sample_count": ds.sample_count if ds else 0,
             }
 
         @app.post("/api/v1/analysis/excel/profile")

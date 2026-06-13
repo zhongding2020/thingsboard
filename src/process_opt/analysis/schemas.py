@@ -46,6 +46,7 @@ class ProfilingResult(BaseModel):
 class CorrelationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    dataset_id: str | None = None
     field_x: str
     field_y: str
     method: str = "pearson"
@@ -79,6 +80,7 @@ class ImportanceResult(BaseModel):
 class RegressionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    dataset_id: str | None = None
     feature_fields: list[str] = Field(min_length=1)
     target_field: str
     model_type: str = "linear"
@@ -104,6 +106,7 @@ class Constraint(BaseModel):
 class RecommendationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    dataset_id: str | None = None
     feature_fields: list[str] = Field(min_length=1)
     target_field: str
     target_value: float

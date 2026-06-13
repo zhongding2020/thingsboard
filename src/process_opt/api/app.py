@@ -383,56 +383,46 @@ def create_app(
             return await analysis_service.profile_from_request(body)
 
         @app.post("/api/v1/analysis/correlation")
-        async def correlation_route(body: dict[str, Any]) -> Any:
-            ds_id = body.get("dataset_id")
-            if ds_id:
+        async def correlation_route(body: CorrelationRequest) -> Any:
+            if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.correlation import compute_correlation
-                ds = get_dataset(ds_id)
+                ds = get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
-                field_x = body.get("field_x")
-                field_y = body.get("field_y")
-                if field_x and field_y:
-                    results = compute_correlation(ds, [field_x], [field_y], body.get("method", "pearson"))
+                if body.field_x and body.field_y:
+                    results = compute_correlation(ds, [body.field_x], [body.field_y], body.method)
                     return results[0]
                 feature_cols = sorted({k for f in ds.features for k in f})
                 target_cols = sorted({k for t in ds.targets for k in t})
-                return compute_correlation(ds, feature_cols, target_cols, body.get("method", "pearson"))
-            req = CorrelationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-            return await analysis_service.correlation(req)
+                return compute_correlation(ds, feature_cols, target_cols, body.method)
+            return await analysis_service.correlation(body)
 
         @app.post("/api/v1/analysis/importance")
         async def importance_route(body: ImportanceRequest) -> ImportanceResult:
             return await analysis_service.importance(body)
 
         @app.post("/api/v1/analysis/regression")
-        async def regression_route(body: dict[str, Any]) -> Any:
-            ds_id = body.get("dataset_id")
-            if ds_id:
+        async def regression_route(body: RegressionRequest) -> Any:
+            if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.regression import fit_regression
-                ds = get_dataset(ds_id)
+                ds = get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
-                req = RegressionRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-                return fit_regression(ds, req.feature_fields, req.target_field, req.model_type)
-            req = RegressionRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-            return await analysis_service.regression(req)
+                return fit_regression(ds, body.feature_fields, body.target_field, body.model_type)
+            return await analysis_service.regression(body)
 
         @app.post("/api/v1/analysis/recommendation")
-        async def recommendation_route(body: dict[str, Any]) -> Any:
-            ds_id = body.get("dataset_id")
-            if ds_id:
+        async def recommendation_route(body: RecommendationRequest) -> Any:
+            if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.recommendation import compute_recommendation
-                ds = get_dataset(ds_id)
+                ds = get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
-                req = RecommendationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-                return compute_recommendation(ds, req.feature_fields, req)
-            req = RecommendationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-            return await analysis_service.recommendation(req)
+                return compute_recommendation(ds, body.feature_fields, body)
+            return await analysis_service.recommendation(body)
 
         @app.post("/api/v1/analysis/spc")
         async def spc_route(body: SpcRequest) -> SpcResult:

@@ -521,45 +521,6 @@ def create_app(
                 "sample_count": ds.sample_count if ds else 0,
             }
 
-        @app.post("/api/v1/analysis/excel/profile")
-        async def excel_profile_route(body: dict[str, Any]) -> list[ProfilingResult]:
-            from process_opt.analysis.excel import get_dataset
-            from process_opt.analysis.profiling import profile_dataset
-            ds = get_dataset(body.get("dataset_id", ""))
-            if ds is None:
-                raise HTTPException(status_code=404, detail="Dataset not found or expired")
-            return profile_dataset(ds)
-
-        @app.post("/api/v1/analysis/excel/correlation")
-        async def excel_correlation_route(body: dict[str, Any]) -> CorrelationResult:
-            from process_opt.analysis.excel import get_dataset
-            from process_opt.analysis.correlation import compute_correlation
-            ds = get_dataset(body.get("dataset_id", ""))
-            if ds is None:
-                raise HTTPException(status_code=404, detail="Dataset not found or expired")
-            results = compute_correlation(ds, [body["field_x"]], [body["field_y"]], body.get("method", "pearson"))
-            return results[0]
-
-        @app.post("/api/v1/analysis/excel/regression")
-        async def excel_regression_route(body: dict[str, Any]) -> RegressionResult:
-            from process_opt.analysis.excel import get_dataset
-            from process_opt.analysis.regression import fit_regression
-            ds = get_dataset(body.get("dataset_id", ""))
-            if ds is None:
-                raise HTTPException(status_code=404, detail="Dataset not found or expired")
-            req = RegressionRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-            return fit_regression(ds, req.feature_fields, req.target_field, req.model_type)
-
-        @app.post("/api/v1/analysis/excel/recommendation")
-        async def excel_recommendation_route(body: dict[str, Any]) -> RecommendationResult:
-            from process_opt.analysis.excel import get_dataset
-            from process_opt.analysis.recommendation import compute_recommendation
-            ds = get_dataset(body.get("dataset_id", ""))
-            if ds is None:
-                raise HTTPException(status_code=404, detail="Dataset not found or expired")
-            req = RecommendationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
-            return compute_recommendation(ds, req.feature_fields, req)
-
         if parameter_service is not None:
 
             @app.post(

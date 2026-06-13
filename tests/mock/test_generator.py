@@ -30,7 +30,7 @@ def test_generate_params_respects_precision() -> None:
                     assert isinstance(value, int), f"{name} should be int"
                 else:
                     multiplier = 10**precision
-                    assert round(value * multiplier) == value * multiplier, (
+                    assert abs(round(value * multiplier) / multiplier - value) < 1e-9, (
                         f"{name} precision mismatch"
                     )
 

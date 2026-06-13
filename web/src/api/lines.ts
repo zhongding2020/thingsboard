@@ -80,3 +80,7 @@ export function updateDevice(id: string, data: UpdateDeviceRequest): Promise<Dev
 export function deleteDevice(id: string): Promise<void> {
   return client.delete(`/devices/${id}`)
 }
+
+export function reorderDevices(lineId: string, deviceIds: string[]): Promise<void> {
+  return client.put(`/lines/${lineId}/reorder`, { device_ids: deviceIds })
+}

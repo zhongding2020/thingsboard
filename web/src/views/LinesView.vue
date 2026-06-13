@@ -30,7 +30,13 @@
             v-for="device in line.devices"
             :key="device.id"
             class="device-node"
-            @click="goToSpc(line.id, device.id)"
+            :class="{ 'device-dragging': dragState.deviceId === device.id }"
+            draggable="true"
+            @click.stop="goToSpc(line.id, device.id)"
+            @dragstart="onDragStart($event, device.id, line.id)"
+            @dragend="onDragEnd"
+            @dragover.prevent="onDragOver($event, line.id)"
+            @drop="onDrop($event, device.id, line.id)"
           >
             <div class="device-icon">
               <el-icon size="22"><Monitor /></el-icon>
@@ -85,12 +91,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Edit, Delete, Plus, Monitor } from '@element-plus/icons-vue'
 import {
   listLines, createLine, updateLine, deleteLine,
-  listDevices, updateDevice,
+  listDevices, updateDevice, reorderDevices,
   type LineResponse, type DeviceResponse,
 } from '@/api/lines'
 
@@ -109,6 +115,58 @@ const manageVisible = ref(false)
 const manageLineId = ref('')
 const editing = ref<LineResponse | null>(null)
 const form = ref({ name: '', responsible: '', location: '' })
+
+const dragState = reactive({ deviceId: '', fromLineId: '' })
+
+function onDragStart(e: DragEvent, deviceId: string, lineId: string) {
+  if (!e.dataTransfer) return
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', deviceId)
+  dragState.deviceId = deviceId
+  dragState.fromLineId = lineId
+}
+
+function onDragEnd() {
+  dragState.deviceId = ''
+  dragState.fromLineId = ''
+}
+
+function onDragOver(e: DragEvent, _lineId: string) {
+  if (!e.dataTransfer) return
+  e.dataTransfer.dropEffect = 'move'
+}
+
+async function onDrop(_e: DragEvent, targetDeviceId: string, targetLineId: string) {
+  if (!dragState.deviceId || dragState.deviceId === targetDeviceId) return
+
+  const fromLine = lineData.value.find(l => l.id === dragState.fromLineId)
+  const toLine = lineData.value.find(l => l.id === targetLineId)
+  if (!fromLine || !toLine) return
+
+  const fromIndex = fromLine.devices.findIndex(d => d.id === dragState.deviceId)
+  if (fromIndex === -1) return
+
+  const [moved] = fromLine.devices.splice(fromIndex, 1)
+
+  if (dragState.fromLineId === targetLineId) {
+    // Reorder within same line
+    const toIndex = toLine.devices.findIndex(d => d.id === targetDeviceId)
+    toLine.devices.splice(toIndex, 0, moved)
+    try {
+      await reorderDevices(targetLineId, toLine.devices.map(d => d.id))
+    } catch {}
+  } else {
+    // Move to different line — assign to new line, append at end
+    toLine.devices.push({ ...moved })
+    try {
+      await updateDevice(moved.id, { line_id: targetLineId })
+      await reorderDevices(targetLineId, toLine.devices.map(d => d.id))
+    } catch {}
+  }
+
+  dragState.deviceId = ''
+  dragState.fromLineId = ''
+}
 
 async function loadAll() {
   loading.value = true
@@ -231,7 +289,9 @@ onMounted(loadAll)
   display: flex; flex-wrap: wrap; gap: 10px;
   padding: 12px 16px;
   min-height: 64px; align-items: flex-start;
+  transition: background 0.15s;
 }
+.line-devices.drop-over { background: var(--el-color-primary-light-9); }
 
 .device-node {
   display: flex; align-items: center; gap: 8px;
@@ -247,6 +307,9 @@ onMounted(loadAll)
   border-color: var(--el-color-primary);
   box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
   transform: translateY(-1px);
+}
+.device-node.device-dragging {
+  opacity: 0.4; border-style: dashed;
 }
 .device-icon {
   color: var(--el-color-primary);

@@ -257,19 +257,19 @@ class LineDeviceRepository:
             if line_id is not None:
                 rows = await connection.fetch("""
                     SELECT d.id, d.line_id, l.name AS line_name,
-                           d.name, d.type, d.icon, d.description
+                           d.name, d.type, d.icon, d.description, d.sort_order
                     FROM device_registry d
                     LEFT JOIN production_lines l ON l.id = d.line_id
                     WHERE d.line_id = $1
-                    ORDER BY d.name
+                    ORDER BY d.sort_order, d.name
                 """, line_id)
             else:
                 rows = await connection.fetch("""
                     SELECT d.id, d.line_id, l.name AS line_name,
-                           d.name, d.type, d.icon, d.description
+                           d.name, d.type, d.icon, d.description, d.sort_order
                     FROM device_registry d
                     LEFT JOIN production_lines l ON l.id = d.line_id
-                    ORDER BY d.name
+                    ORDER BY d.sort_order, d.name
                 """)
         return [dict(r) for r in rows]
 
@@ -334,6 +334,16 @@ class LineDeviceRepository:
                 line_id,
             )
         return [r["id"] for r in rows]
+
+    async def reorder_devices(self, line_id: str, device_ids: list[str]) -> None:
+        """Update sort_order for devices in a line based on the ordered list."""
+        async with self._pool.acquire() as connection:
+            async with connection.transaction():
+                for idx, device_id in enumerate(device_ids):
+                    await connection.execute(
+                        "UPDATE device_registry SET sort_order = $1, updated_at = now() WHERE id = $2 AND line_id = $3",
+                        idx, device_id, line_id,
+                    )
 
     async def ensure_device_exists(self, device_id: str, device_type: str) -> None:
         """Idempotent device registration for mock generator."""

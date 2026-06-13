@@ -76,6 +76,7 @@ class LineDeviceRepositoryProtocol(Protocol):
     async def update_device(self, device_id: str, name: str | None, type_: str | None, icon: str | None, description: str | None, line_id: str | None) -> dict[str, Any] | None: ...
     async def delete_device(self, device_id: str) -> bool: ...
     async def get_devices_by_line(self, line_id: str) -> list[str]: ...
+    async def reorder_devices(self, line_id: str, device_ids: list[str]) -> None: ...
 
 
 class StatusTransitionRequest(BaseModel):
@@ -284,6 +285,14 @@ def create_app(
             ok = await line_device_repo.delete_device(device_id)
             if not ok:
                 raise HTTPException(status_code=404, detail="Device not found")
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+        @app.put("/api/v1/lines/{line_id}/reorder")
+        async def reorder_devices_route(line_id: str, body: dict[str, Any]) -> Response:
+            device_ids = body.get("device_ids", [])
+            if not isinstance(device_ids, list) or not device_ids:
+                raise HTTPException(status_code=400, detail="device_ids list is required")
+            await line_device_repo.reorder_devices(line_id, device_ids)
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
         @app.get("/api/v1/lines/{line_id}/monitor")

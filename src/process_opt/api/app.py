@@ -418,7 +418,12 @@ def create_app(
             if not device_id:
                 raise HTTPException(status_code=400, detail="device_id is required")
             since_raw = body.get("since")
-            since = datetime.fromisoformat(since_raw) if since_raw else None
+            since: datetime | None = None
+            if since_raw:
+                try:
+                    since = datetime.fromisoformat(since_raw)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="Invalid since format, use ISO 8601")
             ds_id = await builder.build_to_dataset_id(device_id, since=since)
             ds = get_dataset(ds_id)
             feature_fields = sorted({k for f in ds.features for k in f}) if ds else []

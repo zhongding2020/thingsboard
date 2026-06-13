@@ -373,23 +373,66 @@ def create_app(
 
         @app.post("/api/v1/analysis/profile")
         async def profile_route(body: AnalysisDatasetRequest) -> list[ProfilingResult]:
+            if body.dataset_id:
+                from process_opt.analysis.excel import get_dataset
+                from process_opt.analysis.profiling import profile_dataset
+                ds = get_dataset(body.dataset_id)
+                if ds is None:
+                    raise HTTPException(status_code=404, detail="Dataset not found or expired")
+                return profile_dataset(ds)
             return await analysis_service.profile_from_request(body)
 
         @app.post("/api/v1/analysis/correlation")
-        async def correlation_route(body: CorrelationRequest) -> CorrelationResult:
-            return await analysis_service.correlation(body)
+        async def correlation_route(body: dict[str, Any]) -> Any:
+            ds_id = body.get("dataset_id")
+            if ds_id:
+                from process_opt.analysis.excel import get_dataset
+                from process_opt.analysis.correlation import compute_correlation
+                ds = get_dataset(ds_id)
+                if ds is None:
+                    raise HTTPException(status_code=404, detail="Dataset not found or expired")
+                field_x = body.get("field_x")
+                field_y = body.get("field_y")
+                if field_x and field_y:
+                    results = compute_correlation(ds, [field_x], [field_y], body.get("method", "pearson"))
+                    return results[0]
+                feature_cols = sorted({k for f in ds.features for k in f})
+                target_cols = sorted({k for t in ds.targets for k in t})
+                return compute_correlation(ds, feature_cols, target_cols, body.get("method", "pearson"))
+            req = CorrelationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
+            return await analysis_service.correlation(req)
 
         @app.post("/api/v1/analysis/importance")
         async def importance_route(body: ImportanceRequest) -> ImportanceResult:
             return await analysis_service.importance(body)
 
         @app.post("/api/v1/analysis/regression")
-        async def regression_route(body: RegressionRequest) -> RegressionResult:
-            return await analysis_service.regression(body)
+        async def regression_route(body: dict[str, Any]) -> Any:
+            ds_id = body.get("dataset_id")
+            if ds_id:
+                from process_opt.analysis.excel import get_dataset
+                from process_opt.analysis.regression import fit_regression
+                ds = get_dataset(ds_id)
+                if ds is None:
+                    raise HTTPException(status_code=404, detail="Dataset not found or expired")
+                req = RegressionRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
+                return fit_regression(ds, req.feature_fields, req.target_field, req.model_type)
+            req = RegressionRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
+            return await analysis_service.regression(req)
 
         @app.post("/api/v1/analysis/recommendation")
-        async def recommendation_route(body: RecommendationRequest) -> RecommendationResult:
-            return await analysis_service.recommendation(body)
+        async def recommendation_route(body: dict[str, Any]) -> Any:
+            ds_id = body.get("dataset_id")
+            if ds_id:
+                from process_opt.analysis.excel import get_dataset
+                from process_opt.analysis.recommendation import compute_recommendation
+                ds = get_dataset(ds_id)
+                if ds is None:
+                    raise HTTPException(status_code=404, detail="Dataset not found or expired")
+                req = RecommendationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
+                return compute_recommendation(ds, req.feature_fields, req)
+            req = RecommendationRequest(**{k: v for k, v in body.items() if k != "dataset_id"})
+            return await analysis_service.recommendation(req)
 
         @app.post("/api/v1/analysis/spc")
         async def spc_route(body: SpcRequest) -> SpcResult:
@@ -407,6 +450,60 @@ def create_app(
                 "dataset_id": ds_id,
                 "fields": {"features": feature_fields, "targets": target_fields},
                 "sample_count": ds.sample_count,
+            }
+
+        @app.get("/api/v1/analysis/dataset/{dataset_id}/preview")
+        async def dataset_preview_route(
+            dataset_id: str,
+            page: int = 1,
+            size: int = 50,
+        ) -> Any:
+            from process_opt.analysis.excel import get_dataset
+            ds = get_dataset(dataset_id)
+            if ds is None:
+                raise HTTPException(status_code=404, detail="Dataset not found or expired")
+            total = len(ds.features)
+            start = (page - 1) * size
+            end = min(start + size, total)
+
+            feature_names = sorted({k for f in ds.features for k in f})
+            target_names = sorted({k for t in ds.targets for k in t})
+
+            rows: list[dict[str, Any]] = []
+            for i in range(start, end):
+                row: dict[str, Any] = {}
+                if i < len(ds.metadata):
+                    row["_barcode"] = ds.metadata[i].get("barcode", "")
+                for fn in feature_names:
+                    row[fn] = ds.features[i].get(fn) if i < len(ds.features) else None
+                for tn in target_names:
+                    row[tn] = ds.targets[i].get(tn) if i < len(ds.targets) else None
+                rows.append(row)
+
+            field_meta = {
+                "features": [
+                    {
+                        "name": fn,
+                        "type": "numeric",
+                        "min": ds.field_summary.get(fn, {}).get("min"),
+                        "max": ds.field_summary.get(fn, {}).get("max"),
+                    }
+                    for fn in feature_names
+                ],
+                "targets": [
+                    {
+                        "name": tn,
+                        "type": "pass_fail",
+                    }
+                    for tn in target_names
+                ],
+            }
+            return {
+                "rows": rows,
+                "total": total,
+                "page": page,
+                "size": size,
+                "fields": field_meta,
             }
 
         @app.post("/api/v1/analysis/dataset/query")

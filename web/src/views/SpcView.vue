@@ -1,5 +1,20 @@
 <template>
   <div class="spc-view" :style="app.fullscreen ? { height: '100vh', padding: '8px' } : {}">
+    <!-- Line context breadcrumb (shown when viewing from line detail) -->
+    <div v-if="route.query.line && route.query.device" class="spc-breadcrumb">
+      <router-link to="/lines" class="bc-link">线体监控</router-link>
+      <span class="bc-sep">›</span>
+      <router-link :to="`/lines/${route.query.line}`" class="bc-link">{{ lineName || route.query.line }}</router-link>
+      <span class="bc-sep">›</span>
+      <span class="bc-current">{{ deviceInfo?.name || route.query.device }}</span>
+      <el-button v-if="deviceInfo" text size="small" @click="editingDevice = true" style="margin-left:auto">编辑设备</el-button>
+    </div>
+
+    <div v-if="deviceInfo" class="device-info-bar">
+      <span class="info-item"><span class="info-label">类型</span> {{ deviceInfo.type }}</span>
+      <span v-if="deviceInfo.description" class="info-item"><span class="info-label">描述</span> {{ deviceInfo.description }}</span>
+    </div>
+
     <div class="spc-header">
       <h2 class="page-title">设备监控</h2>
       <p class="page-desc">工艺参数SPC控制图</p>
@@ -102,11 +117,24 @@
         </div>
       </el-card>
     </div>
+
+    <el-dialog v-model="editingDevice" title="编辑设备" width="480px">
+      <el-form :model="deviceForm" label-width="80px">
+        <el-form-item label="名称"><el-input v-model="deviceForm.name" /></el-form-item>
+        <el-form-item label="类型"><el-input v-model="deviceForm.type" /></el-form-item>
+        <el-form-item label="图标"><el-input v-model="deviceForm.icon" placeholder="Element Plus icon name" /></el-form-item>
+        <el-form-item label="描述"><el-input v-model="deviceForm.description" type="textarea" :rows="2" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editingDevice = false">取消</el-button>
+        <el-button type="primary" @click="saveDeviceInfo" :loading="savingDevice">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -120,6 +148,8 @@ import {
 } from 'echarts/components'
 import { fetchSpc, type SpcResult, type ParamOverview } from '@/api/spc'
 import { listDevices } from '@/api/records'
+import { useRoute } from 'vue-router'
+import { getDevice, updateDevice, getLine, type DeviceResponse } from '@/api/lines'
 import { useAppStore } from '@/stores/app'
 
 use([
@@ -148,6 +178,13 @@ const filter = reactive({
 })
 
 const spec = reactive<{ usl?: number; lsl?: number }>({})
+
+const route = useRoute()
+const deviceInfo = ref<DeviceResponse | null>(null)
+const lineName = ref('')
+const editingDevice = ref(false)
+const savingDevice = ref(false)
+const deviceForm = ref({ name: '', type: '', icon: '', description: '' })
 
 const charts = computed(() => {
   const r = spcResult.value
@@ -307,6 +344,44 @@ onUnmounted(() => {
   clearInterval(monitorTimer)
   clearInterval(countdownTimer)
   app.exitFullscreen()
+})
+
+watchEffect(async () => {
+  const deviceId = route.query.device as string | undefined
+  if (deviceId) {
+    try {
+      deviceInfo.value = await getDevice(deviceId)
+      if (deviceInfo.value?.line_id) {
+        const line = await getLine(deviceInfo.value.line_id)
+        lineName.value = line.name
+      }
+    } catch { deviceInfo.value = null }
+  } else {
+    deviceInfo.value = null
+    lineName.value = ''
+  }
+})
+
+async function saveDeviceInfo() {
+  if (!deviceInfo.value) return
+  savingDevice.value = true
+  try {
+    await updateDevice(deviceInfo.value.id, deviceForm.value)
+    editingDevice.value = false
+    // Reload device info
+    deviceInfo.value = await getDevice(deviceInfo.value.id)
+  } finally { savingDevice.value = false }
+}
+
+watch(editingDevice, (val) => {
+  if (val && deviceInfo.value) {
+    deviceForm.value = {
+      name: deviceInfo.value.name,
+      type: deviceInfo.value.type,
+      icon: deviceInfo.value.icon || '',
+      description: deviceInfo.value.description || '',
+    }
+  }
 })
 
 const C = {
@@ -618,4 +693,18 @@ function buildSummaryOption(summary: SpcResult['summary'], cap: SpcResult['capab
   font-weight: 500;
   color: var(--el-text-color-secondary);
 }
+.spc-breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: var(--el-fill-color-light);
+  border-radius: 6px; font-size: 12px;
+}
+.bc-link { color: var(--el-color-primary); text-decoration: none; }
+.bc-link:hover { text-decoration: underline; }
+.bc-sep { color: var(--el-text-color-placeholder); }
+.bc-current { color: var(--el-text-color-primary); font-weight: 500; }
+.device-info-bar {
+  display: flex; gap: 24px; padding: 4px 12px;
+  font-size: 12px; color: var(--el-text-color-regular);
+}
+.info-label { color: var(--el-text-color-secondary); margin-right: 4px; }
 </style>

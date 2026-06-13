@@ -65,6 +65,19 @@ class AnalysisService(Protocol):
     async def spc(self, request: SpcRequest) -> SpcResult: ...
 
 
+class LineDeviceRepositoryProtocol(Protocol):
+    async def list_lines(self) -> list[dict[str, Any]]: ...
+    async def get_line(self, line_id: str) -> dict[str, Any] | None: ...
+    async def create_line(self, name: str, responsible: str, location: str | None) -> dict[str, Any]: ...
+    async def update_line(self, line_id: str, name: str | None, responsible: str | None, location: str | None) -> dict[str, Any] | None: ...
+    async def delete_line(self, line_id: str) -> bool: ...
+    async def list_devices(self, line_id: str | None = None) -> list[dict[str, Any]]: ...
+    async def get_device(self, device_id: str) -> dict[str, Any] | None: ...
+    async def update_device(self, device_id: str, name: str | None, type_: str | None, icon: str | None, description: str | None, line_id: str | None) -> dict[str, Any] | None: ...
+    async def delete_device(self, device_id: str) -> bool: ...
+    async def get_devices_by_line(self, line_id: str) -> list[str]: ...
+
+
 class StatusTransitionRequest(BaseModel):
     actor: str = Field(min_length=1)
     note: str | None = None
@@ -95,6 +108,7 @@ def create_app(
     repository: AnalysisRepository | None = None,
     parameter_service: ParameterService | None = None,
     analysis_service: AnalysisService | None = None,
+    line_device_repo: LineDeviceRepositoryProtocol | None = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -205,6 +219,146 @@ def create_app(
         async def record_confirmation(body: ParameterConfirmationCreate) -> Response:
             await parameter_service.record_confirmation(**body.model_dump())
             return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if line_device_repo is not None:
+
+        @app.get("/api/v1/lines")
+        async def list_lines_route() -> Any:
+            return await line_device_repo.list_lines()
+
+        @app.get("/api/v1/lines/{line_id}")
+        async def get_line_route(line_id: str) -> Any:
+            line = await line_device_repo.get_line(line_id)
+            if line is None:
+                raise HTTPException(status_code=404, detail="Line not found")
+            devices = await line_device_repo.list_devices(line_id=line_id)
+            line["devices"] = devices
+            return line
+
+        @app.post("/api/v1/lines", status_code=status.HTTP_201_CREATED)
+        async def create_line_route(body: dict[str, Any]) -> Any:
+            from process_opt.analysis.line_schemas import LineCreate
+            lc = LineCreate(**body)
+            return await line_device_repo.create_line(lc.name, lc.responsible, lc.location)
+
+        @app.put("/api/v1/lines/{line_id}")
+        async def update_line_route(line_id: str, body: dict[str, Any]) -> Any:
+            from process_opt.analysis.line_schemas import LineUpdate
+            lu = LineUpdate(**body)
+            result = await line_device_repo.update_line(line_id, lu.name, lu.responsible, lu.location)
+            if result is None:
+                raise HTTPException(status_code=404, detail="Line not found")
+            return result
+
+        @app.delete("/api/v1/lines/{line_id}")
+        async def delete_line_route(line_id: str) -> Response:
+            ok = await line_device_repo.delete_line(line_id)
+            if not ok:
+                raise HTTPException(status_code=409, detail="Line has assigned devices")
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+        @app.get("/api/v1/devices")
+        async def list_devices_route(line_id: str | None = None) -> Any:
+            return await line_device_repo.list_devices(line_id=line_id)
+
+        @app.get("/api/v1/devices/{device_id}")
+        async def get_device_route(device_id: str) -> Any:
+            device = await line_device_repo.get_device(device_id)
+            if device is None:
+                raise HTTPException(status_code=404, detail="Device not found")
+            return device
+
+        @app.put("/api/v1/devices/{device_id}")
+        async def update_device_route(device_id: str, body: dict[str, Any]) -> Any:
+            from process_opt.analysis.line_schemas import DeviceUpdate
+            du = DeviceUpdate(**body)
+            result = await line_device_repo.update_device(
+                device_id, du.name, du.type, du.icon, du.description, du.line_id,
+            )
+            if result is None:
+                raise HTTPException(status_code=404, detail="Device not found")
+            return result
+
+        @app.delete("/api/v1/devices/{device_id}")
+        async def delete_device_route(device_id: str) -> Response:
+            ok = await line_device_repo.delete_device(device_id)
+            if not ok:
+                raise HTTPException(status_code=404, detail="Device not found")
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+        @app.get("/api/v1/lines/{line_id}/monitor")
+        async def line_monitor_route(line_id: str) -> Any:
+            line = await line_device_repo.get_line(line_id)
+            if line is None:
+                raise HTTPException(status_code=404, detail="Line not found")
+            devices = await line_device_repo.list_devices(line_id=line_id)
+
+            device_summaries: list[dict[str, Any]] = []
+            normal = abnormal = marginal = no_spec = 0
+
+            for device in devices:
+                from process_opt.analysis.schemas import SpcRequest
+                if analysis_service is None:
+                    continue
+                try:
+                    result = await analysis_service.spc(SpcRequest(
+                        device_id=device["id"],
+                    ))
+                except Exception:
+                    continue
+                if not result.overview:
+                    continue
+                statuses = [ov.status for ov in result.overview]
+                if "abnormal" in statuses:
+                    dev_status = "abnormal"
+                elif "marginal" in statuses:
+                    dev_status = "marginal"
+                elif "no_spec" in statuses:
+                    dev_status = "no_spec"
+                else:
+                    dev_status = "normal"
+                cpks = [ov.cpk for ov in result.overview if ov.cpk is not None]
+                device_summaries.append({
+                    "device_id": device["id"],
+                    "device_name": device["name"],
+                    "type": device["type"],
+                    "status": dev_status,
+                    "worst_cpk": round(min(cpks), 2) if cpks else None,
+                    "param_count": len(result.overview),
+                    "outlier_total": sum(ov.outlier_count for ov in result.overview),
+                })
+                if dev_status == "abnormal":
+                    abnormal += 1
+                elif dev_status == "marginal":
+                    marginal += 1
+                elif dev_status == "no_spec":
+                    no_spec += 1
+                else:
+                    normal += 1
+
+            if abnormal > 0:
+                line_status = "abnormal"
+            elif marginal > 0:
+                line_status = "marginal"
+            elif no_spec > 0:
+                line_status = "no_spec"
+            elif normal > 0:
+                line_status = "normal"
+            else:
+                line_status = "empty"
+
+            return {
+                "line": line,
+                "summary": {
+                    "device_count": len(devices),
+                    "normal_count": normal,
+                    "abnormal_count": abnormal,
+                    "marginal_count": marginal,
+                    "no_spec_count": no_spec,
+                    "status": line_status,
+                },
+                "devices": device_summaries,
+            }
 
     if analysis_service is not None:
 

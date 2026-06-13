@@ -12,7 +12,7 @@ from process_opt.analysis.dataset import DatasetBuilder
 from process_opt.analysis.schemas import AnalysisDataset, AnalysisDatasetRequest, CorrelationRequest, CorrelationResult, ImportanceRequest, ImportanceResult, ProfilingResult, RecommendationRequest, RecommendationResult, RegressionRequest, RegressionResult, SpcRequest, SpcResult
 from process_opt.api.app import create_app
 from process_opt.common.db import apply_sql_file, create_pool
-from process_opt.common.repositories import DataRepository
+from process_opt.common.repositories import DataRepository, LineDeviceRepository
 from process_opt.common.settings import Settings
 from process_opt.parameters.repository import ParameterRepository
 from process_opt.parameters.schemas import ParameterSet, ParameterSetCreate, ParameterSetWithItems
@@ -132,11 +132,67 @@ class AnalysisServiceProxy:
         return await self._service.spc(request)
 
 
+class LineDeviceRepositoryProxy:
+    def __init__(self) -> None:
+        self._repo: LineDeviceRepository | None = None
+
+    async def list_lines(self) -> list[dict[str, Any]]:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.list_lines()
+
+    async def get_line(self, line_id: str) -> dict[str, Any] | None:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.get_line(line_id)
+
+    async def create_line(self, name: str, responsible: str, location: str | None) -> dict[str, Any]:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.create_line(name, responsible, location)
+
+    async def update_line(self, line_id: str, name: str | None, responsible: str | None, location: str | None) -> dict[str, Any] | None:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.update_line(line_id, name, responsible, location)
+
+    async def delete_line(self, line_id: str) -> bool:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.delete_line(line_id)
+
+    async def list_devices(self, line_id: str | None = None) -> list[dict[str, Any]]:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.list_devices(line_id)
+
+    async def get_device(self, device_id: str) -> dict[str, Any] | None:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.get_device(device_id)
+
+    async def update_device(self, device_id: str, name: str | None, type_: str | None, icon: str | None, description: str | None, line_id: str | None) -> dict[str, Any] | None:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.update_device(device_id, name, type_, icon, description, line_id)
+
+    async def delete_device(self, device_id: str) -> bool:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.delete_device(device_id)
+
+    async def get_devices_by_line(self, line_id: str) -> list[str]:
+        if self._repo is None:
+            raise RuntimeError("LineDeviceRepository not initialized")
+        return await self._repo.get_devices_by_line(line_id)
+
+
 def create_api_app_from_settings() -> FastAPI:
     settings = Settings()
     repository_proxy = RepositoryProxy()
     parameter_service_proxy = ParameterServiceProxy()
     analysis_service_proxy = AnalysisServiceProxy()
+    line_device_repo_proxy = LineDeviceRepositoryProxy()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -145,6 +201,7 @@ def create_api_app_from_settings() -> FastAPI:
         for fpath in sorted(migrations_dir.glob("*.sql")):
             await apply_sql_file(pool, fpath)
         repository = DataRepository(pool)
+        line_device_repo = LineDeviceRepository(pool)
         parameter_repo = ParameterRepository(pool)
         parameter_service = ParameterService(parameter_repo)
         dataset_builder = DatasetBuilder(pool)
@@ -152,17 +209,24 @@ def create_api_app_from_settings() -> FastAPI:
         app.state.pool = pool
         app.state.repository = repository
         repository_proxy.repository = repository
+        line_device_repo_proxy._repo = line_device_repo
         parameter_service_proxy._service = parameter_service
         analysis_service_proxy._service = analysis_service
         try:
             yield
         finally:
             repository_proxy.repository = None
+            line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None
             analysis_service_proxy._service = None
             await pool.close()
 
-    app = create_app(repository_proxy, parameter_service_proxy, analysis_service_proxy)
+    app = create_app(
+        repository=repository_proxy,
+        parameter_service=parameter_service_proxy,
+        analysis_service=analysis_service_proxy,
+        line_device_repo=line_device_repo_proxy,
+    )
     app.router.lifespan_context = lifespan
     return app
 

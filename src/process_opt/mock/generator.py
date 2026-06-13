@@ -37,7 +37,7 @@ def generate_results(device_type: str, params: dict[str, float | int]) -> dict[s
     return results
 
 
-def generate_pair(device_type: str, barcode: str) -> tuple[dict[str, Any], dict[str, Any]]:
+def generate_pair(device_type: str, barcode: str, device_index: int = 1) -> tuple[dict[str, Any], dict[str, Any]]:
     message_id = str(uuid4())
     params = generate_params(device_type)
     results = generate_results(device_type, params)
@@ -46,7 +46,7 @@ def generate_pair(device_type: str, barcode: str) -> tuple[dict[str, Any], dict[
     process_payload = {
         "message_id": message_id,
         "barcode": barcode,
-        "device_id": device_type,
+        "device_id": f"{device_type}-{device_index:03d}",
         "processed_at": now.isoformat(),
         "params": params,
     }

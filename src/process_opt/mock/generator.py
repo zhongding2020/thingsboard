@@ -41,6 +41,18 @@ def generate_results(device_type: str, params: dict[str, float | int]) -> dict[s
             quality = "fail" if params["nozzle_temp"] > 245 else "pass"
         elif device_type == "testing-station" and "test_voltage" in params:
             quality = "fail" if params["test_voltage"] > 4.5 else "pass"
+        elif device_type == "laser-cutter" and "laser_power" in params:
+            quality = "fail" if params["laser_power"] > 400 else "pass"
+        elif device_type == "coating-machine" and "coating_thickness_um" in params:
+            quality = "fail" if params["coating_thickness_um"] > 80 else "pass"
+        elif device_type == "xray-inspection" and "xray_voltage_kv" in params:
+            quality = "fail" if params["xray_voltage_kv"] > 120 else "pass"
+        elif device_type == "oven-curing" and "oven_temp" in params:
+            quality = "fail" if params["oven_temp"] > 180 else "pass"
+        elif device_type == "wire-bonder" and "bond_force_g" in params:
+            quality = "fail" if params["bond_force_g"] > 80 else "pass"
+        elif device_type == "ultrasonic-cleaner" and "temperature_c" in params:
+            quality = "fail" if params["temperature_c"] > 70 else "pass"
         else:
             quality = "pass" if random.random() < 0.9 else "fail"
         results[name] = quality

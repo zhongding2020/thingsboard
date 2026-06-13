@@ -84,4 +84,78 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "leakage_current_na": {"min": 0, "max": 100},
         },
     },
+    "laser-cutter": {
+        "params": {
+            "laser_power": {"min": 50, "max": 500, "mu": 280, "sigma": 60, "precision": 1},
+            "cutting_speed": {"min": 10, "max": 200, "mu": 100, "sigma": 25, "precision": 1},
+            "focus_depth": {"min": 0.5, "max": 8.0, "mu": 3.5, "sigma": 1.2, "precision": 2},
+            "gas_pressure": {"min": 2, "max": 20, "mu": 10, "sigma": 3, "precision": 1},
+        },
+        "results": {
+            "cut_quality": "pass_fail",
+            "kerf_width_um": {"min": 50, "max": 300},
+        },
+    },
+    "coating-machine": {
+        "params": {
+            "spray_pressure": {"min": 10, "max": 60, "mu": 35, "sigma": 8, "precision": 1},
+            "coating_thickness_um": {"min": 5, "max": 100, "mu": 45, "sigma": 15, "precision": 1},
+            "cure_temp": {"min": 60, "max": 180, "mu": 120, "sigma": 15, "precision": 1},
+            "conveyor_speed": {"min": 0.5, "max": 5.0, "mu": 2.5, "sigma": 0.6, "precision": 1},
+        },
+        "results": {
+            "coating_uniformity": "pass_fail",
+            "bubble_count": {"min": 0, "max": 10},
+        },
+    },
+    "xray-inspection": {
+        "params": {
+            "xray_voltage_kv": {"min": 40, "max": 150, "mu": 90, "sigma": 15, "precision": 1},
+            "exposure_ms": {"min": 100, "max": 2000, "mu": 800, "sigma": 300, "precision": 0},
+            "resolution_um": {"min": 1, "max": 20, "mu": 8, "sigma": 3, "precision": 1},
+            "detector_gain": {"min": 1.0, "max": 8.0, "mu": 4.0, "sigma": 1.2, "precision": 1},
+        },
+        "results": {
+            "defect_detected": "pass_fail",
+            "false_positive_rate": {"min": 0, "max": 5},
+        },
+    },
+    "oven-curing": {
+        "params": {
+            "oven_temp": {"min": 80, "max": 200, "mu": 150, "sigma": 15, "precision": 1},
+            "cure_duration_min": {"min": 10, "max": 120, "mu": 45, "sigma": 15, "precision": 0},
+            "humidity_pct": {"min": 10, "max": 80, "mu": 40, "sigma": 10, "precision": 1},
+            "airflow_rate": {"min": 5, "max": 50, "mu": 25, "sigma": 8, "precision": 1},
+        },
+        "results": {
+            "cure_complete": "pass_fail",
+            "weight_loss_pct": {"min": 0, "max": 3},
+        },
+    },
+    "wire-bonder": {
+        "params": {
+            "bond_force_g": {"min": 10, "max": 100, "mu": 50, "sigma": 12, "precision": 1},
+            "ultrasonic_power": {"min": 20, "max": 200, "mu": 110, "sigma": 25, "precision": 1},
+            "bond_time_ms": {"min": 10, "max": 100, "mu": 45, "sigma": 12, "precision": 0},
+            "stage_temp": {"min": 100, "max": 250, "mu": 175, "sigma": 20, "precision": 1},
+            "wire_tension": {"min": 3, "max": 15, "mu": 8, "sigma": 2, "precision": 1},
+        },
+        "results": {
+            "bond_strength": "pass_fail",
+            "lift_off_count": {"min": 0, "max": 5},
+        },
+    },
+    "ultrasonic-cleaner": {
+        "params": {
+            "frequency_khz": {"min": 20, "max": 80, "mu": 40, "sigma": 8, "precision": 0},
+            "power_watt": {"min": 100, "max": 1000, "mu": 500, "sigma": 150, "precision": 0},
+            "clean_time_min": {"min": 3, "max": 30, "mu": 12, "sigma": 4, "precision": 0},
+            "temperature_c": {"min": 25, "max": 80, "mu": 50, "sigma": 8, "precision": 1},
+            "solution_conc_pct": {"min": 1, "max": 20, "mu": 7, "sigma": 3, "precision": 1},
+        },
+        "results": {
+            "cleanliness_pass": "pass_fail",
+            "particle_residue": {"min": 0, "max": 50},
+        },
+    },
 }

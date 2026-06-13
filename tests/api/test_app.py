@@ -1,0 +1,193 @@
+from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from process_opt.api.app import create_app
+
+
+class FakeRepository:
+    def __init__(self) -> None:
+        self.records: dict[str, dict[str, Any]] = {
+            "B1": {
+                "barcode": "B1",
+                "device_id": "D1",
+                "processed_at": datetime(2026, 6, 8, 10, 0, tzinfo=UTC),
+                "params": {"temperature": 180},
+                "station_id": "QA1",
+                "inspected_at": datetime(2026, 6, 8, 10, 5, tzinfo=UTC),
+                "results": {"diameter": 10.2},
+            }
+        }
+        self.requested_barcodes: list[str] = []
+
+    async def get_analysis_record(self, barcode: str) -> dict[str, Any] | None:
+        self.requested_barcodes.append(barcode)
+        return self.records.get(barcode)
+
+    async def query_records(
+        self,
+        barcode: str | None = None,
+        device_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        items = list(self.records.values())
+        if barcode:
+            items = [r for r in items if r["barcode"] == barcode]
+        if device_id:
+            items = [r for r in items if r["device_id"] == device_id]
+        if start_time:
+            items = [r for r in items if r["processed_at"] >= start_time]
+        if end_time:
+            items = [r for r in items if r["processed_at"] <= end_time]
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return {"items": items[start:end], "total": total, "page": page, "page_size": page_size}
+
+    async def list_devices(self) -> list[str]:
+        return sorted(set(r["device_id"] for r in self.records.values()))
+
+    async def get_stats(self) -> dict[str, Any]:
+        return {
+            "today_data_count": 1,
+            "total_records": len(self.records),
+            "device_count": len(set(r["device_id"] for r in self.records.values())),
+            "pending_approvals": 0,
+            "latest_records": [],
+        }
+
+
+@pytest.mark.asyncio
+async def test_get_analysis_record_by_barcode_returns_joined_data() -> None:
+    repository = FakeRepository()
+    app = create_app(repository)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/v1/analysis/records/B1")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "barcode": "B1",
+        "device_id": "D1",
+        "processed_at": "2026-06-08T10:00:00+00:00",
+        "params": {"temperature": 180},
+        "station_id": "QA1",
+        "inspected_at": "2026-06-08T10:05:00+00:00",
+        "results": {"diameter": 10.2},
+    }
+    assert repository.requested_barcodes == ["B1"]
+
+
+@pytest.mark.asyncio
+async def test_query_records_returns_paginated_list() -> None:
+    app = create_app(FakeRepository())
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/v1/analysis/records")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["barcode"] == "B1"
+    assert data["page"] == 1
+    assert data["page_size"] == 20
+
+
+@pytest.mark.asyncio
+async def test_query_records_filters_by_parameters() -> None:
+    repository = FakeRepository()
+    repository.records["B2"] = {
+        "barcode": "B2",
+        "device_id": "injection-molder",
+        "processed_at": datetime(2026, 6, 9, 10, 0, tzinfo=UTC),
+        "params": {"pressure": 150},
+        "station_id": None,
+        "inspected_at": None,
+        "results": None,
+    }
+    app = create_app(repository)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Filter by device
+        r = await client.get("/api/v1/analysis/records", params={"device_id": "injection-molder"})
+        assert r.status_code == 200
+        assert r.json()["total"] == 1
+        assert r.json()["items"][0]["device_id"] == "injection-molder"
+
+        # Filter by barcode
+        r = await client.get("/api/v1/analysis/records", params={"barcode": "B1"})
+        assert r.status_code == 200
+        assert r.json()["total"] == 1
+
+        # Filter by time range
+        r = await client.get(
+            "/api/v1/analysis/records",
+            params={
+                "start_time": "2026-06-09T00:00:00Z",
+                "end_time": "2026-06-09T23:59:59Z",
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["total"] == 1
+
+        # Pagination
+        r = await client.get("/api/v1/analysis/records", params={"page": 1, "page_size": 1})
+        assert r.status_code == 200
+        assert len(r.json()["items"]) == 1
+        assert r.json()["total"] == 2
+
+        # No match
+        r = await client.get("/api/v1/analysis/records", params={"barcode": "NONEXIST"})
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
+        assert r.json()["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_list_devices_returns_device_ids() -> None:
+    repository = FakeRepository()
+    repository.records["B2"] = {
+        "barcode": "B2",
+        "device_id": "injection-molder",
+        "processed_at": datetime(2026, 6, 9, 10, 0, tzinfo=UTC),
+        "params": {"pressure": 150},
+        "station_id": None,
+        "inspected_at": None,
+        "results": None,
+    }
+    app = create_app(repository)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/v1/analysis/devices")
+
+    assert response.status_code == 200
+    assert response.json() == ["D1", "injection-molder"]
+
+
+@pytest.mark.asyncio
+async def test_get_unknown_barcode_returns_404() -> None:
+    repository = FakeRepository()
+    app = create_app(repository)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/v1/analysis/records/UNKNOWN")
+
+    assert response.status_code == 404
+    assert repository.requested_barcodes == ["UNKNOWN"]
+
+
+@pytest.mark.asyncio
+async def test_health_returns_ok() -> None:
+    app = create_app(FakeRepository())
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

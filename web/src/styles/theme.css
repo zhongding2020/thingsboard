@@ -1,0 +1,290 @@
+:root {
+  --el-component-size: 28px;
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-font-family: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --el-font-weight-primary: 500;
+  --el-transition-duration: 0.25s;
+}
+
+[data-theme="dark"] {
+  --el-color-primary: #3B82F6;
+  --el-color-primary-light-3: #60A5FA;
+  --el-color-primary-light-5: #93C5FD;
+  --el-color-primary-light-7: #BFDBFE;
+  --el-color-primary-light-8: #DBEAFE;
+  --el-color-primary-light-9: #EFF6FF;
+  --el-color-primary-dark-2: #2563EB;
+
+  --el-color-success: #059669;
+  --el-color-success-light-3: #34D399;
+  --el-color-success-light-5: #6EE7B7;
+  --el-color-success-light-7: #A7F3D0;
+  --el-color-success-light-8: #D1FAE5;
+  --el-color-success-light-9: #ECFDF5;
+  --el-color-success-dark-2: #047857;
+
+  --el-color-warning: #D97706;
+  --el-color-warning-light-3: #FBBF24;
+  --el-color-warning-light-5: #FCD34D;
+  --el-color-warning-light-7: #FDE68A;
+  --el-color-warning-light-8: #FEF3C7;
+  --el-color-warning-light-9: #FFFBEB;
+  --el-color-warning-dark-2: #B45309;
+
+  --el-color-danger: #DC2626;
+  --el-color-danger-light-3: #F87171;
+  --el-color-danger-light-5: #FCA5A5;
+  --el-color-danger-light-7: #FECACA;
+  --el-color-danger-light-8: #FEE2E2;
+  --el-color-danger-light-9: #FEF2F2;
+  --el-color-danger-dark-2: #B91C1C;
+
+  --el-color-error: #DC2626;
+
+  --el-color-info: #6366F1;
+
+  --el-bg-color: #0F172A;
+  --el-bg-color-overlay: #1E293B;
+  --el-bg-color-page: #0F172A;
+
+  --el-fill-color: #1E293B;
+  --el-fill-color-light: #334155;
+  --el-fill-color-lighter: #1E293B;
+  --el-fill-color-blank: #1E293B;
+  --el-fill-color-dark: #0F172A;
+
+  --el-text-color-primary: #F1F5F9;
+  --el-text-color-regular: #CBD5E1;
+  --el-text-color-secondary: #64748B;
+  --el-text-color-placeholder: #475569;
+  --el-text-color-disabled: #334155;
+
+  --el-border-color: #334155;
+  --el-border-color-light: #1E293B;
+  --el-border-color-lighter: #1E293B;
+  --el-border-color-extra-light: #0F172A;
+  --el-border-color-dark: #475569;
+  --el-border-color-darker: #64748B;
+
+  --el-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.2);
+  --el-box-shadow-light: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --el-box-shadow-lighter: 0 1px 1px 0 rgba(0, 0, 0, 0.2);
+
+  --el-mask-color: rgba(0, 0, 0, 0.6);
+
+  --theme-menu-hover: #334155;
+  --theme-table-hover: #334155;
+}
+
+[data-theme="light"] {
+  --el-color-primary: #2563EB;
+  --el-color-primary-light-3: #60A5FA;
+  --el-color-primary-light-5: #93C5FD;
+  --el-color-primary-light-7: #BFDBFE;
+  --el-color-primary-light-8: #DBEAFE;
+  --el-color-primary-light-9: #EFF6FF;
+  --el-color-primary-dark-2: #1D4ED8;
+
+  --el-color-success: #059669;
+  --el-color-success-light-3: #34D399;
+  --el-color-success-light-5: #6EE7B7;
+  --el-color-success-light-7: #A7F3D0;
+  --el-color-success-light-8: #D1FAE5;
+  --el-color-success-light-9: #ECFDF5;
+  --el-color-success-dark-2: #047857;
+
+  --el-color-warning: #D97706;
+  --el-color-warning-light-3: #FBBF24;
+  --el-color-warning-light-5: #FCD34D;
+  --el-color-warning-light-7: #FDE68A;
+  --el-color-warning-light-8: #FEF3C7;
+  --el-color-warning-light-9: #FFFBEB;
+  --el-color-warning-dark-2: #B45309;
+
+  --el-color-danger: #DC2626;
+  --el-color-danger-light-3: #F87171;
+  --el-color-danger-light-5: #FCA5A5;
+  --el-color-danger-light-7: #FECACA;
+  --el-color-danger-light-8: #FEE2E2;
+  --el-color-danger-light-9: #FEF2F2;
+
+  --el-bg-color: #F8FAFC;
+  --el-bg-color-overlay: #FFFFFF;
+  --el-bg-color-page: #F1F5F9;
+
+  --el-fill-color: #FFFFFF;
+  --el-fill-color-light: #F1F5F9;
+  --el-fill-color-lighter: #F8FAFC;
+  --el-fill-color-blank: #FFFFFF;
+  --el-fill-color-dark: #E2E8F0;
+
+  --el-text-color-primary: #0F172A;
+  --el-text-color-regular: #334155;
+  --el-text-color-secondary: #64748B;
+  --el-text-color-placeholder: #94A3B8;
+  --el-text-color-disabled: #CBD5E1;
+
+  --el-border-color: #E2E8F0;
+  --el-border-color-light: #F1F5F9;
+  --el-border-color-lighter: #F8FAFC;
+  --el-border-color-extra-light: #F8FAFC;
+  --el-border-color-dark: #CBD5E1;
+  --el-border-color-darker: #94A3B8;
+
+  --el-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --el-box-shadow-light: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --el-box-shadow-lighter: 0 1px 1px 0 rgba(0, 0, 0, 0.03);
+
+  --el-mask-color: rgba(0, 0, 0, 0.4);
+
+  --theme-menu-hover: #F1F5F9;
+  --theme-table-hover: #F8FAFC;
+}
+
+*, *::before, *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+body {
+  margin: 0;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-layout .el-aside {
+  background: var(--el-fill-color);
+  border-right: 1px solid var(--el-border-color);
+}
+
+.el-card {
+  border: 1px solid var(--el-border-color);
+  background: var(--el-fill-color);
+}
+
+.el-table {
+  --el-table-bg-color: var(--el-fill-color);
+  --el-table-tr-bg-color: var(--el-fill-color);
+  --el-table-header-bg-color: var(--el-fill-color-lighter);
+  --el-table-row-hover-bg-color: var(--theme-table-hover);
+}
+
+.el-menu {
+  --el-menu-bg-color: var(--el-fill-color);
+  --el-menu-text-color: var(--el-text-color-regular);
+  --el-menu-active-color: var(--el-color-primary);
+  --el-menu-hover-bg-color: var(--theme-menu-hover);
+}
+
+.el-header {
+  border-bottom: 1px solid var(--el-border-color) !important;
+}
+
+.el-dialog {
+  --el-dialog-bg-color: var(--el-bg-color-overlay);
+}
+
+.el-select-dropdown {
+  --el-select-dropdown-bg-color: var(--el-bg-color-overlay);
+  --el-select-dropdown-border-color: var(--el-border-color);
+}
+
+.el-picker-panel {
+  --el-datepicker-bg-color: var(--el-bg-color-overlay);
+  --el-datepicker-border-color: var(--el-border-color);
+}
+
+.el-pagination {
+  --el-pagination-button-bg-color: var(--el-fill-color);
+  --el-pagination-hover-bg-color: var(--theme-menu-hover);
+}
+
+.el-input {
+  --el-input-bg-color: var(--el-fill-color-light);
+  --el-input-border-color: var(--el-border-color);
+  --el-input-hover-border-color: var(--el-color-primary);
+  --el-input-focus-border-color: var(--el-color-primary);
+  --el-input-text-color: var(--el-text-color-primary);
+  --el-input-placeholder-color: var(--el-text-color-placeholder);
+}
+
+.el-tag {
+  --el-tag-bg-color: transparent;
+}
+
+.el-card__body {
+  padding: 10px 12px !important;
+}
+
+.el-table {
+  border-radius: 6px;
+  --el-table-border-color: transparent;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--el-fill-color-light);
+}
+
+.el-table .el-table__cell {
+  padding: 6px 8px !important;
+}
+
+.el-table .el-table__header-wrapper th.el-table__cell {
+  padding: 6px 8px !important;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--el-fill-color-lighter);
+  border-bottom: 1px solid var(--el-border-color);
+}
+
+.el-table .el-table__body-wrapper .el-table__row td.el-table__cell {
+  font-size: 13px;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.el-table .el-table__body-wrapper .el-table__row:last-child td.el-table__cell {
+  border-bottom: none;
+}
+
+.el-table .cell-mono .cell {
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+}
+
+.el-form--inline .el-form-item {
+  margin-right: 12px;
+}
+
+.el-form-item {
+  margin-bottom: 14px;
+}
+
+.el-card .el-form--inline .el-form-item {
+  margin-bottom: 4px;
+}
+
+.el-tabs__header {
+  margin: 0 0 12px;
+}
+
+.el-pagination {
+  --el-pagination-button-size: 26px;
+}
+
+.el-descriptions--small .el-descriptions__cell {
+  padding: 4px 8px;
+}
+
+.el-menu--vertical .el-menu-item {
+  height: 38px;
+  line-height: 38px;
+}
+
+.el-progress--line {
+  margin-bottom: 0;
+}

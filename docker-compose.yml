@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: process_opt
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d process_opt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  nats:
+    image: nats:2.10
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+    volumes:
+      - nats-data:/data
+
+  gateway:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    command: scripts/run-gateway.sh
+    environment:
+      PROCESS_OPT_GATEWAY_API_KEY: "change-me"
+      PROCESS_OPT_NATS_URL: "nats://nats:4222"
+      PROCESS_OPT_GATEWAY_PORT: "8001"
+    depends_on:
+      - nats
+
+  consumer:
+    build: .
+    restart: unless-stopped
+    command: scripts/run-consumer.sh
+    environment:
+      PROCESS_OPT_NATS_URL: "nats://nats:4222"
+      PROCESS_OPT_POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/process_opt"
+    depends_on:
+      - postgres
+      - nats
+
+  backend-api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    command: scripts/run-api.sh
+    environment:
+      PROCESS_OPT_POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/process_opt"
+      PROCESS_OPT_API_PORT: "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  nats-data:

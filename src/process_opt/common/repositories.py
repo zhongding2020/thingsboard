@@ -163,3 +163,184 @@ class DataRepository:
                 for r in recent_rows
             ],
         }
+
+
+class LineDeviceRepository:
+    """Repository for production_lines and device_registry tables."""
+
+    def __init__(self, pool: Pool) -> None:
+        self._pool = pool
+
+    async def list_lines(self) -> list[dict[str, Any]]:
+        async with self._pool.acquire() as connection:
+            rows = await connection.fetch("""
+                SELECT l.id, l.name, l.responsible, l.location,
+                       l.created_at, l.updated_at,
+                       COUNT(d.id) AS device_count
+                FROM production_lines l
+                LEFT JOIN device_registry d ON d.line_id = l.id
+                GROUP BY l.id
+                ORDER BY l.name
+            """)
+        return [dict(r) for r in rows]
+
+    async def get_line(self, line_id: str) -> dict[str, Any] | None:
+        async with self._pool.acquire() as connection:
+            row = await connection.fetchrow("""
+                SELECT l.id, l.name, l.responsible, l.location,
+                       l.created_at, l.updated_at,
+                       COUNT(d.id) AS device_count
+                FROM production_lines l
+                LEFT JOIN device_registry d ON d.line_id = l.id
+                WHERE l.id = $1
+                GROUP BY l.id
+            """, line_id)
+        return dict(row) if row else None
+
+    async def create_line(self, name: str, responsible: str, location: str | None) -> dict[str, Any]:
+        async with self._pool.acquire() as connection:
+            row = await connection.fetchrow("""
+                INSERT INTO production_lines (name, responsible, location)
+                VALUES ($1, $2, $3)
+                RETURNING id, name, responsible, location, created_at, updated_at
+            """, name, responsible, location)
+        result = dict(row)
+        result["device_count"] = 0
+        return result
+
+    async def update_line(self, line_id: str, name: str | None,
+                          responsible: str | None, location: str | None) -> dict[str, Any] | None:
+        fields: list[str] = []
+        params: list[Any] = [line_id]
+        idx = 2
+        if name is not None:
+            fields.append(f"name = ${idx}")
+            params.append(name)
+            idx += 1
+        if responsible is not None:
+            fields.append(f"responsible = ${idx}")
+            params.append(responsible)
+            idx += 1
+        if location is not None:
+            fields.append(f"location = ${idx}")
+            params.append(location)
+            idx += 1
+        if not fields:
+            return await self.get_line(line_id)
+        fields.append("updated_at = now()")
+        async with self._pool.acquire() as connection:
+            row = await connection.fetchrow(f"""
+                UPDATE production_lines
+                SET {', '.join(fields)}
+                WHERE id = $1
+                RETURNING id, name, responsible, location, created_at, updated_at
+            """, *params)
+        if row is None:
+            return None
+        result = await self.get_line(line_id)
+        return result
+
+    async def delete_line(self, line_id: str) -> bool:
+        async with self._pool.acquire() as connection:
+            device_count = await connection.fetchval(
+                "SELECT COUNT(*) FROM device_registry WHERE line_id = $1", line_id
+            )
+            if device_count and device_count > 0:
+                return False
+            result = await connection.execute(
+                "DELETE FROM production_lines WHERE id = $1", line_id
+            )
+        return result != "DELETE 0"
+
+    async def list_devices(self, line_id: str | None = None) -> list[dict[str, Any]]:
+        async with self._pool.acquire() as connection:
+            if line_id is not None:
+                rows = await connection.fetch("""
+                    SELECT d.id, d.line_id, l.name AS line_name,
+                           d.name, d.type, d.icon, d.description
+                    FROM device_registry d
+                    LEFT JOIN production_lines l ON l.id = d.line_id
+                    WHERE d.line_id = $1
+                    ORDER BY d.name
+                """, line_id)
+            else:
+                rows = await connection.fetch("""
+                    SELECT d.id, d.line_id, l.name AS line_name,
+                           d.name, d.type, d.icon, d.description
+                    FROM device_registry d
+                    LEFT JOIN production_lines l ON l.id = d.line_id
+                    ORDER BY d.name
+                """)
+        return [dict(r) for r in rows]
+
+    async def get_device(self, device_id: str) -> dict[str, Any] | None:
+        async with self._pool.acquire() as connection:
+            row = await connection.fetchrow("""
+                SELECT d.id, d.line_id, l.name AS line_name,
+                       d.name, d.type, d.icon, d.description
+                FROM device_registry d
+                LEFT JOIN production_lines l ON l.id = d.line_id
+                WHERE d.id = $1
+            """, device_id)
+        return dict(row) if row else None
+
+    async def update_device(self, device_id: str, name: str | None, type_: str | None,
+                            icon: str | None, description: str | None,
+                            line_id: str | None) -> dict[str, Any] | None:
+        fields: list[str] = []
+        params: list[Any] = [device_id]
+        idx = 2
+        if name is not None:
+            fields.append(f"name = ${idx}")
+            params.append(name)
+            idx += 1
+        if type_ is not None:
+            fields.append(f"type = ${idx}")
+            params.append(type_)
+            idx += 1
+        if icon is not None:
+            fields.append(f"icon = ${idx}")
+            params.append(icon)
+            idx += 1
+        if description is not None:
+            fields.append(f"description = ${idx}")
+            params.append(description)
+            idx += 1
+        if line_id is not None:
+            fields.append(f"line_id = ${idx}")
+            params.append(line_id)
+            idx += 1
+        if not fields:
+            return await self.get_device(device_id)
+        fields.append("updated_at = now()")
+        async with self._pool.acquire() as connection:
+            await connection.execute(f"""
+                UPDATE device_registry SET {', '.join(fields)} WHERE id = $1
+            """, *params)
+        return await self.get_device(device_id)
+
+    async def delete_device(self, device_id: str) -> bool:
+        async with self._pool.acquire() as connection:
+            result = await connection.execute(
+                "DELETE FROM device_registry WHERE id = $1", device_id
+            )
+        return result != "DELETE 0"
+
+    async def get_devices_by_line(self, line_id: str) -> list[str]:
+        """Return device IDs for a line. Used by SPC filtering."""
+        async with self._pool.acquire() as connection:
+            rows = await connection.fetch(
+                "SELECT id FROM device_registry WHERE line_id = $1 ORDER BY id",
+                line_id,
+            )
+        return [r["id"] for r in rows]
+
+    async def ensure_device_exists(self, device_id: str, device_type: str) -> None:
+        """Idempotent device registration for mock generator."""
+        async with self._pool.acquire() as connection:
+            await connection.execute("""
+                INSERT INTO device_registry (id, line_id, name, type, icon, description)
+                VALUES ($1, (SELECT id FROM production_lines WHERE name = '默认产线'),
+                        $1, $2, 'Monitor', '自动注册')
+                ON CONFLICT (id) DO NOTHING
+            """, device_id, device_type)

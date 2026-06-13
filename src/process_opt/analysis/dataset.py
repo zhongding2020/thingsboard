@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from statistics import mean, median
 from typing import Any
 
@@ -21,11 +22,29 @@ class DatasetBuilder:
 
     async def build(
         self, request: AnalysisDatasetRequest,
+        device_id: str | None = None,
+        since: datetime | None = None,
     ) -> AnalysisDataset | AnalysisError:
+        query = "SELECT * FROM analysis_view"
+        conditions: list[str] = []
+        params: list[Any] = []
+        idx = 0
+
+        if device_id is not None:
+            idx += 1
+            conditions.append(f"device_id = ${idx}")
+            params.append(device_id)
+        if since is not None:
+            idx += 1
+            conditions.append(f"processed_at >= ${idx}")
+            params.append(since)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY barcode"
+
         async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT * FROM analysis_view ORDER BY barcode",
-            )
+            rows = await conn.fetch(query, *params)
 
         if not rows:
             return AnalysisError(

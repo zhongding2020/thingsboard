@@ -105,7 +105,11 @@ class AnalysisService:
             max_samples=None,
             missing_strategy="mean",
         )
-        overview_dataset = await self.build_dataset(overview_req)
+        overview_dataset = await self._builder.build(
+            overview_req,
+            device_id=request.device_id,
+            since=request.since,
+        )
 
         field = request.field
         if field is not None:
@@ -115,7 +119,11 @@ class AnalysisService:
                 max_samples=None,
                 missing_strategy="mean",
             )
-            field_dataset = await self.build_dataset(field_req)
+            field_dataset = await self._builder.build(
+                field_req,
+                device_id=request.device_id,
+                since=request.since,
+            )
             if field not in {f for feat in field_dataset.features for f in feat}:
                 existing = sorted({f for feat in overview_dataset.features for f in feat})
                 raise AnalysisError(

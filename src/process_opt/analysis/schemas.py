@@ -14,6 +14,7 @@ class AnalysisDatasetRequest(BaseModel):
     target_fields: list[str] = Field(default=[])
     missing_strategy: str = "drop_row"
     max_samples: int | None = None
+    dataset_id: str | None = None
 
 
 class AnalysisDataset(BaseModel):

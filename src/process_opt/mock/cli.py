@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import asyncpg
@@ -105,68 +106,64 @@ def seed_db(dsn: str, device_count: int, records: int, clear: bool) -> None:
     asyncio.run(_run())
 
 
+LINE_DEFS: list[dict[str, Any]] = [
+    {"name": "PCBA-A线", "responsible": "张工", "location": "A栋1层",
+     "devices": {"reflow-oven": 2, "pick-and-place": 2, "wave-solder": 1, "xray-inspection": 1, "testing-station": 1, "oven-curing": 1}},
+    {"name": "PCBA-B线", "responsible": "李工", "location": "A栋2层",
+     "devices": {"reflow-oven": 2, "pick-and-place": 2, "wave-solder": 1, "xray-inspection": 1, "testing-station": 1}},
+    {"name": "SMT-A线", "responsible": "王工", "location": "A栋3层",
+     "devices": {"pick-and-place": 3, "reflow-oven": 2, "xray-inspection": 1}},
+    {"name": "DIP-A线", "responsible": "赵工", "location": "B栋1层",
+     "devices": {"wave-solder": 2, "ultrasonic-cleaner": 1, "coating-machine": 1}},
+    {"name": "组装-A线", "responsible": "钱工", "location": "B栋2层",
+     "devices": {"wire-bonder": 2, "coating-machine": 1, "ultrasonic-cleaner": 1, "laser-cutter": 1}},
+    {"name": "机加-A线", "responsible": "孙工", "location": "C栋1层",
+     "devices": {"cnc-drill": 3, "laser-cutter": 1, "3d-printer": 2}},
+    {"name": "注塑-A线", "responsible": "周工", "location": "C栋2层",
+     "devices": {"injection-molder": 3}},
+    {"name": "检测-A线", "responsible": "吴工", "location": "D栋1层",
+     "devices": {"testing-station": 2, "xray-inspection": 1}},
+    {"name": "老化-A线", "responsible": "郑工", "location": "D栋2层",
+     "devices": {"oven-curing": 2}},
+    {"name": "键合-A线", "responsible": "冯工", "location": "E栋1层",
+     "devices": {"wire-bonder": 2}},
+]
+
+
 async def _ensure_lines(pool: asyncpg.Pool) -> dict[str, str]:
-    lines = [
-        ("SMT-A-01", "张工", "A栋2层-A区"),
-        ("SMT-A-02", "张工", "A栋2层-B区"),
-        ("SMT-B-01", "刘工", "A栋3层-A区"),
-        ("SMT-B-02", "刘工", "A栋3层-B区"),
-        ("注塑-A线", "李工", "B栋1层-东"),
-        ("注塑-B线", "王工", "B栋1层-西"),
-        ("注塑-C线", "陈工", "B栋2层-东"),
-        ("CNC-A线", "赵工", "C栋1层-东"),
-        ("CNC-B线", "赵工", "C栋1层-西"),
-        ("CNC-C线", "钱工", "C栋1层-中"),
-        ("3D打印-A线", "孙工", "C栋2层"),
-        ("3D打印-B线", "孙工", "C栋2层"),
-        ("激光切割线", "周工", "C栋3层"),
-        ("涂覆-A线", "吴工", "D栋1层"),
-        ("涂覆-B线", "郑工", "D栋1层"),
-        ("X光检测线", "冯工", "D栋2层"),
-        ("电测-A线", "褚工", "D栋3层"),
-        ("电测-B线", "褚工", "D栋3层"),
-        ("固化-A线", "卫工", "E栋1层"),
-        ("键合-A线", "蒋工", "E栋2层"),
-    ]
     line_map: dict[str, str] = {}
     async with pool.acquire() as conn:
-        for name, responsible, location in lines:
+        for ld in LINE_DEFS:
             row = await conn.fetchrow(
                 "INSERT INTO production_lines (name, responsible, location) VALUES ($1,$2,$3) "
                 "ON CONFLICT (name) DO NOTHING RETURNING id",
-                name, responsible, location,
+                ld["name"], ld["responsible"], ld["location"],
             )
             if row:
-                line_map[name] = row["id"]
+                line_map[ld["name"]] = row["id"]
             else:
-                r2 = await conn.fetchrow("SELECT id FROM production_lines WHERE name=$1", name)
+                r2 = await conn.fetchrow("SELECT id FROM production_lines WHERE name=$1", ld["name"])
                 if r2:
-                    line_map[name] = r2["id"]
+                    line_map[ld["name"]] = r2["id"]
     return line_map
 
 
 async def _register_devices(pool: asyncpg.Pool, line_map: dict[str, str], device_count: int) -> list[str]:
-    type_to_line = {
-        "reflow-oven": "SMT-A-01", "injection-molder": "注塑-A线",
-        "pick-and-place": "SMT-A-02", "wave-solder": "SMT-B-01",
-        "cnc-drill": "CNC-A线", "3d-printer": "3D打印-A线",
-        "testing-station": "电测-A线", "laser-cutter": "激光切割线",
-        "coating-machine": "涂覆-A线", "xray-inspection": "X光检测线",
-        "oven-curing": "固化-A线", "wire-bonder": "键合-A线",
-        "ultrasonic-cleaner": "涂覆-B线",
-    }
     device_ids: list[str] = []
+    counters: dict[str, int] = {}
     async with pool.acquire() as conn:
-        for dtype, line_name in type_to_line.items():
-            line_id = line_map.get(line_name)
-            for i in range(1, device_count + 1):
-                dev_id = f"{dtype}-{i:03d}"
-                await conn.execute(
-                    "INSERT INTO device_registry (id, line_id, name, type, icon, description) "
-                    "VALUES ($1,$2,$3,$4,'Monitor',$5) ON CONFLICT (id) DO UPDATE SET line_id=EXCLUDED.line_id",
-                    dev_id, line_id, dev_id, dtype, f"{line_name}设备",
-                )
-                device_ids.append(dev_id)
+        for ld in LINE_DEFS:
+            line_id = line_map.get(ld["name"])
+            for dtype, count in ld["devices"].items():
+                for _ in range(count):
+                    counters[dtype] = counters.get(dtype, 0) + 1
+                    dev_id = f"{dtype}-{counters[dtype]:03d}"
+                    await conn.execute(
+                        "INSERT INTO device_registry (id, line_id, name, type, icon, description) "
+                        "VALUES ($1,$2,$3,$4,'Monitor',$5) ON CONFLICT (id) DO UPDATE SET line_id=EXCLUDED.line_id",
+                        dev_id, line_id, dev_id, dtype, f"{ld['name']}设备",
+                    )
+                    device_ids.append(dev_id)
     return device_ids
 
 

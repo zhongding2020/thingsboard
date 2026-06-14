@@ -71,6 +71,7 @@ class DataRepository:
         self,
         barcode: str | None = None,
         device_id: str | None = None,
+        station_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         product_model: str | None = None,
@@ -93,6 +94,9 @@ class DataRepository:
         if device_id is not None:
             conditions.append(f"device_id = ${len(params) + 1}")
             params.append(device_id)
+        if station_id is not None:
+            conditions.append(f"station_id = ${len(params) + 1}")
+            params.append(station_id)
         if start_time is not None:
             conditions.append(f"processed_at >= ${len(params) + 1}")
             params.append(start_time)

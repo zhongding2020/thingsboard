@@ -38,6 +38,7 @@ class AnalysisRepository(Protocol):
         self,
         barcode: str | None = None,
         device_id: str | None = None,
+        station_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         product_model: str | None = None,
@@ -160,6 +161,7 @@ def create_app(
         async def query_records_route(
             barcode: str | None = None,
             device_id: str | None = None,
+            station_id: str | None = None,
             start_time: datetime | None = None,
             end_time: datetime | None = None,
             product_model: str | None = None,
@@ -167,7 +169,7 @@ def create_app(
             page_size: int = 20,
         ) -> Any:
             return await repository.query_records(
-                barcode, device_id, start_time, end_time, product_model, page, page_size
+                barcode, device_id, station_id, start_time, end_time, product_model, page, page_size
             )
 
         @app.get("/api/v1/analysis/records/{barcode}")

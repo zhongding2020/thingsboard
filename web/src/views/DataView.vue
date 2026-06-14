@@ -1,17 +1,32 @@
 <template>
   <div class="data-view">
     <el-card class="filter-card">
+      <el-tabs v-model="activeTab" class="data-tabs" @tab-change="handleTabChange">
+        <el-tab-pane label="全部数据" name="all" />
+        <el-tab-pane label="工艺参数" name="process" />
+        <el-tab-pane label="检测结果" name="inspection" />
+      </el-tabs>
       <el-form :inline="true" :model="filters" size="default">
         <el-form-item label="条码">
           <el-input v-model="filters.barcode" placeholder="精确条码" clearable />
         </el-form-item>
-        <el-form-item label="设备">
+        <el-form-item v-if="activeTab !== 'inspection'" label="工艺设备">
           <el-select v-model="filters.device_id" placeholder="全部设备" clearable>
             <el-option
               v-for="d in devices"
               :key="d"
               :label="d"
               :value="d"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="activeTab !== 'process'" label="检测工位">
+          <el-select v-model="filters.station_id" placeholder="全部工位" clearable>
+            <el-option
+              v-for="s in stations"
+              :key="s"
+              :label="s"
+              :value="s"
             />
           </el-select>
         </el-form-item>
@@ -48,7 +63,13 @@
         <el-table-column type="expand" width="40">
           <template #default="{ row }">
             <div class="detail-panel">
-              <el-descriptions title="工艺参数" :column="1" border size="small">
+              <el-descriptions
+                v-if="activeTab !== 'inspection'"
+                title="工艺参数"
+                :column="1"
+                border
+                size="small"
+              >
                 <el-descriptions-item
                   v-for="(val, key) in row.params"
                   :key="key"
@@ -58,7 +79,7 @@
                 </el-descriptions-item>
               </el-descriptions>
               <el-descriptions
-                v-if="row.results && row.results.length > 0"
+                v-if="activeTab !== 'process' && row.results && row.results.length > 0"
                 title="检测结果"
                 :column="1"
                 border
@@ -99,17 +120,17 @@
                   </el-descriptions-item>
                 </template>
               </el-descriptions>
-              <el-empty v-else description="暂无检测数据" />
+              <el-empty v-if="activeTab !== 'process' && (!row.results || row.results.length === 0)" description="暂无检测数据" />
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="barcode" label="条码" min-width="200" show-overflow-tooltip class-name="cell-mono" />
-        <el-table-column label="工艺设备" width="140" show-overflow-tooltip>
+        <el-table-column v-if="activeTab !== 'inspection'" label="工艺设备" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ deviceTypeLabel(row.device_id) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="检测工位" width="140" show-overflow-tooltip>
+        <el-table-column v-if="activeTab !== 'process'" label="检测工位" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ row.station_id ? deviceTypeLabel(row.station_id) : '—' }}</span>
           </template>
@@ -120,12 +141,12 @@
             <span>{{ row.process_product_model || row.inspection_product_model || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="参数数" width="80">
+        <el-table-column v-if="activeTab !== 'inspection'" label="参数数" width="80">
           <template #default="{ row }">
             {{ Object.keys(row.params).length }}
           </template>
         </el-table-column>
-        <el-table-column label="结果" width="100">
+        <el-table-column v-if="activeTab !== 'process'" label="结果" width="100">
           <template #default="{ row }">
             <template v-if="row.results">
               <el-tag
@@ -166,6 +187,8 @@ import { deviceLabel } from '@/utils/device-icons'
 const loading = ref(false)
 const records = ref<AnalysisRecord[]>([])
 const devices = ref<string[]>([])
+const stations = ref<string[]>([])
+const activeTab = ref('all')
 
 const pagination = reactive({
   page: 1,
@@ -176,6 +199,7 @@ const pagination = reactive({
 const filters = reactive({
   barcode: '',
   device_id: '',
+  station_id: '',
   product_model: '',
 })
 
@@ -208,6 +232,7 @@ async function fetchRecords() {
     }
     if (filters.barcode) params.barcode = filters.barcode
     if (filters.device_id) params.device_id = filters.device_id
+    if (filters.station_id) params.station_id = filters.station_id
     if (filters.product_model) params.product_model = filters.product_model
     if (timeRange.value) {
       params.start_time = timeRange.value[0].toISOString()
@@ -221,6 +246,11 @@ async function fetchRecords() {
   }
 }
 
+function handleTabChange() {
+  pagination.page = 1
+  fetchRecords()
+}
+
 function handleSearch() {
   pagination.page = 1
   fetchRecords()
@@ -229,6 +259,8 @@ function handleSearch() {
 function handleReset() {
   filters.barcode = ''
   filters.device_id = ''
+  filters.station_id = ''
+  filters.product_model = ''
   timeRange.value = null
   pagination.page = 1
   fetchRecords()
@@ -292,6 +324,9 @@ onMounted(async () => {
 .result-spec {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+.data-tabs {
+  margin-bottom: 0;
 }
 .pagination-wrapper {
   flex-shrink: 0;

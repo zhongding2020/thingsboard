@@ -16,27 +16,27 @@
         class="sidebar-menu"
       >
         <el-menu-item index="/dashboard">
-          <el-icon><Monitor /></el-icon>
+          <el-icon class="nav-icon-dashboard"><Monitor /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
         <el-menu-item index="/data">
-          <el-icon><DocumentCopy /></el-icon>
+          <el-icon class="nav-icon-data"><DocumentCopy /></el-icon>
           <span>数据查询</span>
         </el-menu-item>
         <el-menu-item index="/lines">
-          <el-icon><TrendCharts /></el-icon>
+          <el-icon class="nav-icon-lines"><TrendCharts /></el-icon>
           <span>线体监控</span>
         </el-menu-item>
         <el-menu-item index="/analysis">
-          <el-icon><DataAnalysis /></el-icon>
+          <el-icon class="nav-icon-analysis"><DataAnalysis /></el-icon>
           <span>参数调优</span>
         </el-menu-item>
         <el-menu-item index="/parameters">
-          <el-icon><Setting /></el-icon>
+          <el-icon class="nav-icon-params"><Setting /></el-icon>
           <span>参数管理</span>
         </el-menu-item>
         <el-menu-item index="/settings">
-          <el-icon><Tools /></el-icon>
+          <el-icon class="nav-icon-settings"><Tools /></el-icon>
           <span>设置</span>
         </el-menu-item>
       </el-menu>
@@ -169,6 +169,13 @@ function handleLogout() {
 .sidebar-menu .el-menu-item.is-active {
   background: rgba(59, 130, 246, 0.12);
 }
+
+.nav-icon-dashboard { color: #3B82F6; }
+.nav-icon-data { color: #10B981; }
+.nav-icon-lines { color: #8B5CF6; }
+.nav-icon-analysis { color: #F59E0B; }
+.nav-icon-params { color: #EC4899; }
+.nav-icon-settings { color: #6B7280; }
 
 .sidebar-user {
   display: flex;

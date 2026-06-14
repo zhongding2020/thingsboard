@@ -11,7 +11,7 @@
           :style="{ '--i': index, '--accent': card.accent }"
         >
           <div class="stat-card-header">
-            <el-icon :size="20"><component :is="card.icon" /></el-icon>
+            <el-icon :size="20" :style="{ color: card.accent }"><component :is="card.icon" /></el-icon>
             <span>{{ card.label }}</span>
           </div>
           <div class="stat-card-value">

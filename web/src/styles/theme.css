@@ -288,3 +288,14 @@ body {
 .el-progress--line {
   margin-bottom: 0;
 }
+
+.el-icon.icon-accent-blue { color: #3B82F6; }
+.el-icon.icon-accent-green { color: #10B981; }
+.el-icon.icon-accent-purple { color: #8B5CF6; }
+.el-icon.icon-accent-amber { color: #F59E0B; }
+.el-icon.icon-accent-pink { color: #EC4899; }
+.el-icon.icon-accent-red { color: #EF4444; }
+.el-icon.icon-accent-teal { color: #14B8A6; }
+.el-icon.icon-accent-indigo { color: #6366F1; }
+.el-icon.icon-accent-lime { color: #84CC16; }
+.el-icon.icon-accent-sky { color: #0EA5E9; }

@@ -125,14 +125,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="barcode" label="条码" min-width="200" show-overflow-tooltip class-name="cell-mono" />
-        <el-table-column v-if="activeTab !== 'inspection'" label="工艺设备" width="140" show-overflow-tooltip>
+        <el-table-column v-if="activeTab !== 'inspection'" label="工艺设备" width="160" show-overflow-tooltip>
           <template #default="{ row }">
-            <span>{{ deviceTypeLabel(row.device_id) }}</span>
+            <span class="device-label-cell">
+              <el-icon :size="14" :style="{ color: deviceColor(deviceTypeFromId(row.device_id)) }"><component :is="deviceIcon(deviceTypeFromId(row.device_id))" /></el-icon>
+              {{ deviceTypeLabel(row.device_id) }}
+            </span>
           </template>
         </el-table-column>
-        <el-table-column v-if="activeTab !== 'process'" label="检测工位" width="140" show-overflow-tooltip>
+        <el-table-column v-if="activeTab !== 'process'" label="检测工位" width="160" show-overflow-tooltip>
           <template #default="{ row }">
-            <span>{{ row.station_id ? deviceTypeLabel(row.station_id) : '—' }}</span>
+            <span class="device-label-cell">
+              <el-icon v-if="row.station_id" :size="14" :style="{ color: deviceColor(deviceTypeFromId(row.station_id)) }"><component :is="deviceIcon(deviceTypeFromId(row.station_id))" /></el-icon>
+              {{ row.station_id ? deviceTypeLabel(row.station_id) : '—' }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="inspected_at" label="检测时间" width="160" class-name="cell-mono" />
@@ -182,7 +188,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { queryRecords, listDevices, type AnalysisRecord } from '@/api/records'
-import { deviceLabel } from '@/utils/device-icons'
+import { deviceIcon, deviceLabel, deviceColor } from '@/utils/device-icons'
 
 const loading = ref(false)
 const records = ref<AnalysisRecord[]>([])
@@ -211,9 +217,12 @@ const timeShortcuts = [
   { text: '一个月', value: () => [new Date(Date.now() - 2592000000), new Date()] },
 ]
 
+function deviceTypeFromId(id: string): string {
+  return id.replace(/^station-/, '').replace(/-\d+$/, '')
+}
+
 function deviceTypeLabel(id: string): string {
-  const type = id.replace(/^station-/, '').replace(/-\d+$/, '')
-  return deviceLabel(type)
+  return deviceLabel(deviceTypeFromId(id))
 }
 
 function allPass(results: any): boolean {
@@ -325,6 +334,12 @@ onMounted(async () => {
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
+.device-label-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .data-tabs {
   margin-bottom: 0;
 }

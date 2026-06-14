@@ -38,7 +38,7 @@
             @dragover.prevent="onDragOver($event, line.id)"
             @drop="onDrop($event, device.id, line.id)"
           >
-            <div class="device-icon">
+            <div class="device-icon" :style="{ color: deviceColor(device.type) }">
               <el-icon size="22"><component :is="deviceIcon(device.type)" /></el-icon>
             </div>
             <div class="device-body">
@@ -94,7 +94,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Edit, Delete, Plus } from '@element-plus/icons-vue'
-import { deviceIcon, deviceLabel } from '@/utils/device-icons'
+import { deviceIcon, deviceLabel, deviceColor } from '@/utils/device-icons'
 import {
   listLines, createLine, updateLine, deleteLine,
   listDevices, updateDevice, reorderDevices,
@@ -313,8 +313,8 @@ onMounted(loadAll)
   opacity: 0.4; border-style: dashed;
 }
 .device-icon {
-  color: var(--el-color-primary);
   display: flex; align-items: center;
+  transition: color 0.2s;
 }
 .device-body {
   display: flex; flex-direction: column; flex: 1;

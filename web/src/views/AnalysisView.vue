@@ -16,7 +16,7 @@
     <div v-if="state === 'import'" class="step-wrap">
       <div class="import-cards">
         <el-card shadow="hover" class="import-card" :class="{ active: importMode === 'db' }" @click="importMode = 'db'">
-          <div class="import-icon">🗄️</div>
+          <el-icon :size="28" class="import-icon" color="#3B82F6"><DataBoard /></el-icon>
           <h3>在线查询</h3>
           <p>从数据库查询设备历史数据</p>
           <div class="import-body" :class="{ 'body-hidden': importMode !== 'db' }">
@@ -44,7 +44,7 @@
           </div>
         </el-card>
         <el-card shadow="hover" class="import-card" :class="{ active: importMode === 'excel' }" @click="importMode = 'excel'">
-          <div class="import-icon">📂</div>
+          <el-icon :size="28" class="import-icon" color="#10B981"><FolderOpened /></el-icon>
           <h3>上传 Excel</h3>
           <p>拖拽 .xlsx / .xls 文件解析数据</p>
           <div class="import-body" :class="{ 'body-hidden': importMode !== 'excel' }">
@@ -99,7 +99,9 @@
         @update:selected-targets="selectedTargets = $event"
       />
       <div class="config-actions">
-        <el-button type="primary" size="large" @click="goReport" :loading="analyzing">🔍 开始分析</el-button>
+        <el-button type="primary" size="large" @click="goReport" :loading="analyzing">
+          <el-icon style="margin-right: 4px;"><Search /></el-icon> 开始分析
+        </el-button>
       </div>
     </div>
 
@@ -124,12 +126,12 @@
       <div class="report-layout">
         <nav class="report-nav">
           <a v-for="item in navItems" :key="item.id" :href="'#' + item.id" class="nav-item" :class="{ active: activeNav === item.id }" @click.prevent="scrollTo(item.id)">
-            {{ item.icon }} {{ item.label }}
+            <el-icon :size="14" :style="{ color: item.color }"><component :is="item.icon" /></el-icon> {{ item.label }}
           </a>
         </nav>
         <div class="report-content" ref="reportContentRef" @scroll="onReportScroll">
           <section id="report-overview">
-            <h3>📋 数据概览</h3>
+            <h3><el-icon :size="16" color="#3B82F6"><Document /></el-icon> 数据概览</h3>
             <el-row :gutter="12">
               <el-col :span="6"><el-card><div class="stat-num">{{ sampleCount }}</div><div class="stat-label">样本数</div></el-card></el-col>
               <el-col :span="6"><el-card><div class="stat-num" style="color: var(--el-color-primary)">{{ selectedFeatures.length }}</div><div class="stat-label">参数字段</div></el-card></el-col>
@@ -138,7 +140,7 @@
             </el-row>
           </section>
           <section id="report-profile">
-            <h3>📊 字段分析</h3>
+            <h3><el-icon :size="16" color="#8B5CF6"><DataAnalysis /></el-icon> 字段分析</h3>
             <div v-if="profileData.length" class="profile-grid">
               <el-card v-for="stat in profileData" :key="stat.field" class="profile-card" shadow="hover">
                 <template #header>
@@ -156,15 +158,15 @@
             <el-empty v-else description="无分析数据" :image-size="60" />
           </section>
           <section id="report-correlation">
-            <h3>🔗 相关性</h3>
+            <h3><el-icon :size="16" color="#10B981"><Link /></el-icon> 相关性</h3>
             <CorrelationChart :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" :auto-mode="true" />
           </section>
           <section id="report-regression">
-            <h3>📈 回归分析</h3>
+            <h3><el-icon :size="16" color="#F59E0B"><TrendCharts /></el-icon> 回归分析</h3>
             <RegressionChart :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" :auto-mode="true" />
           </section>
           <section id="report-recommendation">
-            <h3>💡 参数推荐</h3>
+            <h3><el-icon :size="16" color="#EC4899"><MagicStick /></el-icon> 参数推荐</h3>
             <RecommendationForm :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" />
           </section>
         </div>
@@ -182,7 +184,7 @@ import FieldCheckboxGrid from '@/components/FieldCheckboxGrid.vue'
 import CorrelationChart from '@/components/CorrelationChart.vue'
 import RegressionChart from '@/components/RegressionChart.vue'
 import RecommendationForm from '@/components/RecommendationForm.vue'
-import { UploadFilled, Loading } from '@element-plus/icons-vue'
+import { UploadFilled, Loading, DataBoard, FolderOpened, Search, Document, DataAnalysis, Link, TrendCharts, MagicStick } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 
 type Step = 'import' | 'preview' | 'config' | 'loading' | 'report'
@@ -228,11 +230,11 @@ const activeNav = ref('report-overview')
 const reportContentRef = ref<HTMLElement | null>(null)
 
 const navItems = [
-  { id: 'report-overview', icon: '📋', label: '数据概览' },
-  { id: 'report-profile', icon: '📊', label: '字段分析' },
-  { id: 'report-correlation', icon: '🔗', label: '相关性' },
-  { id: 'report-regression', icon: '📈', label: '回归' },
-  { id: 'report-recommendation', icon: '💡', label: '推荐' },
+  { id: 'report-overview', icon: Document, label: '数据概览', color: '#3B82F6' },
+  { id: 'report-profile', icon: DataAnalysis, label: '字段分析', color: '#8B5CF6' },
+  { id: 'report-correlation', icon: Link, label: '相关性', color: '#10B981' },
+  { id: 'report-regression', icon: TrendCharts, label: '回归', color: '#F59E0B' },
+  { id: 'report-recommendation', icon: MagicStick, label: '推荐', color: '#EC4899' },
 ]
 
 async function loadDevices() {
@@ -383,7 +385,7 @@ onMounted(loadDevices)
 .import-card.active { border-color: var(--el-color-primary); }
 .import-card h3 { margin: 4px 0 2px; font-size: 15px; }
 .import-card p { font-size: 12px; color: var(--el-text-color-secondary); margin: 0 0 8px; }
-.import-icon { font-size: 24px; }
+.import-icon { margin-bottom: 4px; }
 .import-body { margin-top: 8px; flex: 1; }
 .body-hidden { visibility: hidden; pointer-events: none; }
 .import-error { color: var(--el-color-danger); font-size: 12px; margin-top: 8px; }

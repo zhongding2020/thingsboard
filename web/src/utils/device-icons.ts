@@ -37,10 +37,30 @@ export const DEVICE_TYPE_LABELS: Record<string, string> = {
   'ultrasonic-cleaner': '超声清洗',
 }
 
+export const DEVICE_TYPE_COLORS: Record<string, string> = {
+  'reflow-oven': '#F59E0B',
+  'injection-molder': '#8B5CF6',
+  'pick-and-place': '#3B82F6',
+  'wave-solder': '#F97316',
+  'cnc-drill': '#14B8A6',
+  '3d-printer': '#06B6D4',
+  'testing-station': '#10B981',
+  'laser-cutter': '#EF4444',
+  'coating-machine': '#EC4899',
+  'xray-inspection': '#6366F1',
+  'oven-curing': '#F59E0B',
+  'wire-bonder': '#84CC16',
+  'ultrasonic-cleaner': '#0EA5E9',
+}
+
 export function deviceIcon(type: string): Component {
   return DEVICE_TYPE_ICON_MAP[type] || Cpu
 }
 
 export function deviceLabel(type: string): string {
   return DEVICE_TYPE_LABELS[type] || type
+}
+
+export function deviceColor(type: string): string {
+  return DEVICE_TYPE_COLORS[type] || '#6B7280'
 }

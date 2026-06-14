@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Any
 
@@ -13,43 +14,50 @@ class DataRepository:
         async with self._pool.acquire() as connection:
             await connection.execute(
                 """
-                INSERT INTO process_summary (barcode, device_id, processed_at, params)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO process_summary (barcode, device_id, processed_at, params, product_model)
+                VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (barcode) DO UPDATE SET
                   device_id = EXCLUDED.device_id,
                   processed_at = EXCLUDED.processed_at,
                   params = EXCLUDED.params,
+                  product_model = EXCLUDED.product_model,
                   updated_at = now()
                 """,
                 message.barcode,
                 message.device_id,
                 message.processed_at,
                 message.params,
+                message.product_model,
             )
 
     async def upsert_inspection(self, message: InspectionMessage) -> None:
         async with self._pool.acquire() as connection:
+            results_json = [item.model_dump() for item in message.results]
             await connection.execute(
                 """
-                INSERT INTO inspection_results (barcode, station_id, inspected_at, results)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO inspection_results (barcode, station_id, inspected_at, results, product_model)
+                VALUES ($1, $2, $3, $4::jsonb, $5)
                 ON CONFLICT (barcode) DO UPDATE SET
                   station_id = EXCLUDED.station_id,
                   inspected_at = EXCLUDED.inspected_at,
                   results = EXCLUDED.results,
+                  product_model = EXCLUDED.product_model,
                   updated_at = now()
                 """,
                 message.barcode,
                 message.station_id,
                 message.inspected_at,
-                message.results,
+                json.dumps(results_json),
+                message.product_model,
             )
 
     async def get_analysis_record(self, barcode: str) -> dict[str, Any] | None:
         async with self._pool.acquire() as connection:
             row = await connection.fetchrow(
                 """
-                SELECT barcode, device_id, processed_at, params, station_id, inspected_at, results
+                SELECT barcode, device_id, processed_at, params,
+                       station_id, inspected_at, results,
+                       process_product_model, inspection_product_model
                 FROM analysis_view
                 WHERE barcode = $1
                 """,
@@ -65,6 +73,7 @@ class DataRepository:
         device_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        product_model: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
@@ -90,6 +99,10 @@ class DataRepository:
         if end_time is not None:
             conditions.append(f"processed_at <= ${len(params) + 1}")
             params.append(end_time)
+        if product_model is not None:
+            conditions.append(f"(process_product_model = ${len(params) + 1} OR inspection_product_model = ${len(params) + 2})")
+            params.append(product_model)
+            params.append(product_model)
 
         where_clause = " AND ".join(conditions) if conditions else "TRUE"
         offset = (page - 1) * page_size
@@ -99,6 +112,7 @@ class DataRepository:
                 f"""
                 SELECT barcode, device_id, processed_at, params,
                        station_id, inspected_at, results,
+                       process_product_model, inspection_product_model,
                        COUNT(*) OVER() AS total_count
                 FROM analysis_view
                 WHERE {where_clause}
@@ -123,6 +137,8 @@ class DataRepository:
                 "station_id": r["station_id"],
                 "inspected_at": r["inspected_at"],
                 "results": r["results"],
+                "process_product_model": r["process_product_model"],
+                "inspection_product_model": r["inspection_product_model"],
             }
             for r in rows
         ]

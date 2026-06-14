@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -39,6 +40,7 @@ class AnalysisRepository(Protocol):
         device_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        product_model: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]: ...
@@ -105,6 +107,9 @@ def _error_response(code: str, message: str) -> ErrorResponse:
     )
 
 
+logger = logging.getLogger(__name__)
+
+
 def create_app(
     repository: AnalysisRepository | None = None,
     parameter_service: ParameterService | None = None,
@@ -157,11 +162,12 @@ def create_app(
             device_id: str | None = None,
             start_time: datetime | None = None,
             end_time: datetime | None = None,
+            product_model: str | None = None,
             page: int = 1,
             page_size: int = 20,
         ) -> Any:
             return await repository.query_records(
-                barcode, device_id, start_time, end_time, page, page_size
+                barcode, device_id, start_time, end_time, product_model, page, page_size
             )
 
         @app.get("/api/v1/analysis/records/{barcode}")
@@ -313,7 +319,8 @@ def create_app(
                     result = await analysis_service.spc(SpcRequest(
                         device_id=device["id"],
                     ))
-                except Exception:
+                except Exception as exc:
+                    logger.warning("SPC analysis failed for device %s: %s", device["id"], exc)
                     continue
                 if not result.overview:
                     continue

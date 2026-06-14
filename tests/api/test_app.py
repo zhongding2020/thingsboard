@@ -15,7 +15,7 @@ class FakeRepository:
                 "device_id": "D1",
                 "processed_at": datetime(2026, 6, 8, 10, 0, tzinfo=UTC),
                 "params": {"temperature": 180},
-                "product_model": "Model-A",
+                "process_product_model": "Model-A",
                 "station_id": "QA1",
                 "inspected_at": datetime(2026, 6, 8, 10, 5, tzinfo=UTC),
                 "results": {"diameter": 10.2},
@@ -78,7 +78,7 @@ async def test_get_analysis_record_by_barcode_returns_joined_data() -> None:
         "device_id": "D1",
         "processed_at": "2026-06-08T10:00:00+00:00",
         "params": {"temperature": 180},
-        "product_model": "Model-A",
+        "process_product_model": "Model-A",
         "station_id": "QA1",
         "inspected_at": "2026-06-08T10:05:00+00:00",
         "results": {"diameter": 10.2},
@@ -111,9 +111,11 @@ async def test_query_records_filters_by_parameters() -> None:
         "device_id": "injection-molder",
         "processed_at": datetime(2026, 6, 9, 10, 0, tzinfo=UTC),
         "params": {"pressure": 150},
+        "process_product_model": "",
         "station_id": None,
         "inspected_at": None,
         "results": None,
+        "inspection_product_model": "",
     }
     app = create_app(repository)
 
@@ -161,9 +163,11 @@ async def test_list_devices_returns_device_ids() -> None:
         "device_id": "injection-molder",
         "processed_at": datetime(2026, 6, 9, 10, 0, tzinfo=UTC),
         "params": {"pressure": 150},
+        "process_product_model": "",
         "station_id": None,
         "inspected_at": None,
         "results": None,
+        "inspection_product_model": "",
     }
     app = create_app(repository)
 

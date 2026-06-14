@@ -7,10 +7,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "conveyor_speed": {"min": 10, "max": 100, "mu": 50, "sigma": 10, "precision": 1},
             "oxygen_ppm": {"min": 0, "max": 1000, "mu": 200, "sigma": 50, "precision": 0},
         },
-        "results": {
-            "solder_joint_quality": "pass_fail",
-            "voiding_pct": {"min": 0, "max": 5},
-        },
+        "results": [
+            {"name": "solder_joint_quality", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "voiding_pct", "value": 0.0, "unit": "", "result": "pass", "usl": 5.0, "lsl": 0.0},
+        ],
     },
     "injection-molder": {
         "params": {
@@ -18,10 +18,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "injection_pressure": {"min": 50, "max": 200, "mu": 120, "sigma": 20, "precision": 1},
             "cooling_time": {"min": 5, "max": 60, "mu": 25, "sigma": 8, "precision": 1},
         },
-        "results": {
-            "dimensional_accuracy": "pass_fail",
-            "flash_present": "pass_fail",
-        },
+        "results": [
+            {"name": "dimensional_accuracy", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "flash_present", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+        ],
     },
     "pick-and-place": {
         "params": {
@@ -30,10 +30,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "feeder_count": {"min": 20, "max": 120, "mu": 60, "sigma": 15, "precision": 0},
             "nozzle_pressure": {"min": 40, "max": 90, "mu": 65, "sigma": 8, "precision": 1},
         },
-        "results": {
-            "placement_quality": "pass_fail",
-            "misalignment_count": {"min": 0, "max": 20},
-        },
+        "results": [
+            {"name": "placement_quality", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "misalignment_count", "value": 0.0, "unit": "", "result": "pass", "usl": 20.0, "lsl": 0.0},
+        ],
     },
     "wave-solder": {
         "params": {
@@ -42,10 +42,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "preheat_temp": {"min": 80, "max": 150, "mu": 110, "sigma": 10, "precision": 1},
             "conveyor_angle": {"min": 3, "max": 8, "mu": 5.5, "sigma": 0.8, "precision": 1},
         },
-        "results": {
-            "solder_bridge_rate": {"min": 0, "max": 3},
-            "through_hole_fill": "pass_fail",
-        },
+        "results": [
+            {"name": "solder_bridge_rate", "value": 0.0, "unit": "", "result": "pass", "usl": 3.0, "lsl": 0.0},
+            {"name": "through_hole_fill", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+        ],
     },
     "cnc-drill": {
         "params": {
@@ -54,10 +54,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "drill_depth": {"min": 0.5, "max": 12.0, "mu": 4.5, "sigma": 1.5, "precision": 2},
             "coolant_flow": {"min": 2, "max": 15, "mu": 8, "sigma": 2, "precision": 1},
         },
-        "results": {
-            "hole_accuracy": "pass_fail",
-            "surface_roughness_ra": {"min": 0.5, "max": 6.0},
-        },
+        "results": [
+            {"name": "hole_accuracy", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "surface_roughness_ra", "value": 0.5, "unit": "", "result": "pass", "usl": 6.0, "lsl": 0.5},
+        ],
     },
     "3d-printer": {
         "params": {
@@ -67,10 +67,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "print_speed": {"min": 20, "max": 120, "mu": 60, "sigma": 15, "precision": 0},
             "filament_diameter": {"min": 1.70, "max": 1.80, "mu": 1.75, "sigma": 0.02, "precision": 2},
         },
-        "results": {
-            "print_quality": "pass_fail",
-            "warping_mm": {"min": 0, "max": 5.0},
-        },
+        "results": [
+            {"name": "print_quality", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "warping_mm", "value": 0.0, "unit": "", "result": "pass", "usl": 5.0, "lsl": 0.0},
+        ],
     },
     "testing-station": {
         "params": {
@@ -79,10 +79,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "test_temperature": {"min": 20, "max": 85, "mu": 45, "sigma": 10, "precision": 1},
             "cycle_time_ms": {"min": 50, "max": 2000, "mu": 600, "sigma": 200, "precision": 0},
         },
-        "results": {
-            "functional_test": "pass_fail",
-            "leakage_current_na": {"min": 0, "max": 100},
-        },
+        "results": [
+            {"name": "functional_test", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "leakage_current_na", "value": 0.0, "unit": "nA", "result": "pass", "usl": 100.0, "lsl": 0.0},
+        ],
     },
     "laser-cutter": {
         "params": {
@@ -91,10 +91,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "focus_depth": {"min": 0.5, "max": 8.0, "mu": 3.5, "sigma": 1.2, "precision": 2},
             "gas_pressure": {"min": 2, "max": 20, "mu": 10, "sigma": 3, "precision": 1},
         },
-        "results": {
-            "cut_quality": "pass_fail",
-            "kerf_width_um": {"min": 50, "max": 300},
-        },
+        "results": [
+            {"name": "cut_quality", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "kerf_width_um", "value": 50.0, "unit": "", "result": "pass", "usl": 300.0, "lsl": 50.0},
+        ],
     },
     "coating-machine": {
         "params": {
@@ -103,10 +103,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "cure_temp": {"min": 60, "max": 180, "mu": 120, "sigma": 15, "precision": 1},
             "conveyor_speed": {"min": 0.5, "max": 5.0, "mu": 2.5, "sigma": 0.6, "precision": 1},
         },
-        "results": {
-            "coating_uniformity": "pass_fail",
-            "bubble_count": {"min": 0, "max": 10},
-        },
+        "results": [
+            {"name": "coating_uniformity", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "bubble_count", "value": 0.0, "unit": "", "result": "pass", "usl": 10.0, "lsl": 0.0},
+        ],
     },
     "xray-inspection": {
         "params": {
@@ -115,10 +115,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "resolution_um": {"min": 1, "max": 20, "mu": 8, "sigma": 3, "precision": 1},
             "detector_gain": {"min": 1.0, "max": 8.0, "mu": 4.0, "sigma": 1.2, "precision": 1},
         },
-        "results": {
-            "defect_detected": "pass_fail",
-            "false_positive_rate": {"min": 0, "max": 5},
-        },
+        "results": [
+            {"name": "defect_detected", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "false_positive_rate", "value": 0.0, "unit": "", "result": "pass", "usl": 5.0, "lsl": 0.0},
+        ],
     },
     "oven-curing": {
         "params": {
@@ -127,10 +127,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "humidity_pct": {"min": 10, "max": 80, "mu": 40, "sigma": 10, "precision": 1},
             "airflow_rate": {"min": 5, "max": 50, "mu": 25, "sigma": 8, "precision": 1},
         },
-        "results": {
-            "cure_complete": "pass_fail",
-            "weight_loss_pct": {"min": 0, "max": 3},
-        },
+        "results": [
+            {"name": "cure_complete", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "weight_loss_pct", "value": 0.0, "unit": "", "result": "pass", "usl": 3.0, "lsl": 0.0},
+        ],
     },
     "wire-bonder": {
         "params": {
@@ -140,10 +140,10 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "stage_temp": {"min": 100, "max": 250, "mu": 175, "sigma": 20, "precision": 1},
             "wire_tension": {"min": 3, "max": 15, "mu": 8, "sigma": 2, "precision": 1},
         },
-        "results": {
-            "bond_strength": "pass_fail",
-            "lift_off_count": {"min": 0, "max": 5},
-        },
+        "results": [
+            {"name": "bond_strength", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "lift_off_count", "value": 0.0, "unit": "", "result": "pass", "usl": 5.0, "lsl": 0.0},
+        ],
     },
     "ultrasonic-cleaner": {
         "params": {
@@ -153,9 +153,9 @@ DEVICE_TEMPLATES: dict[str, dict[str, Any]] = {
             "temperature_c": {"min": 25, "max": 80, "mu": 50, "sigma": 8, "precision": 1},
             "solution_conc_pct": {"min": 1, "max": 20, "mu": 7, "sigma": 3, "precision": 1},
         },
-        "results": {
-            "cleanliness_pass": "pass_fail",
-            "particle_residue": {"min": 0, "max": 50},
-        },
+        "results": [
+            {"name": "cleanliness_pass", "value": 0.5, "unit": "", "result": "pass", "usl": 1.5, "lsl": 0.5},
+            {"name": "particle_residue", "value": 0.0, "unit": "", "result": "pass", "usl": 50.0, "lsl": 0.0},
+        ],
     },
 }

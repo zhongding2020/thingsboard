@@ -27,6 +27,8 @@ from process_opt.analysis.schemas import (
     RegressionRequest,
     RegressionResult,
 )
+from unittest.mock import AsyncMock, MagicMock
+
 from process_opt.common.db import apply_sql_file, create_pool
 
 
@@ -329,6 +331,8 @@ class TestDatasetBuilder:
             "station_id": "QA1",
             "processed_at": "2026-06-08T10:00:00+00:00",
             "inspected_at": "2026-06-08T10:05:00+00:00",
+            "process_product_model": "",
+            "inspection_product_model": "",
         }]
 
     @pytest.mark.asyncio
@@ -437,3 +441,207 @@ class TestDatasetBuilder:
 
         assert isinstance(result, AnalysisError)
         assert result.code == "INSUFFICIENT_SAMPLES"
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for new results array format
+# ---------------------------------------------------------------------------
+
+def _make_mock_row(barcode: str, params: dict | None, results: list | dict | None,
+                   process_product_model: str = "", inspection_product_model: str = ""):
+    return {
+        "barcode": barcode,
+        "device_id": "D1",
+        "processed_at": datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+        "params": params,
+        "station_id": "S1",
+        "inspected_at": datetime(2026, 1, 1, 12, 5, 0, tzinfo=UTC),
+        "results": results,
+        "process_product_model": process_product_model,
+        "inspection_product_model": inspection_product_model,
+    }
+
+
+class TestDatasetBuilderNewFormat:
+    @staticmethod
+    def _mock_pool(rows: list[dict]) -> MagicMock:
+        conn = AsyncMock()
+        conn.fetch.return_value = rows
+        cm = AsyncMock()
+        cm.__aenter__.return_value = conn
+        cm.__aexit__.return_value = None
+        pool = MagicMock()
+        pool.acquire.return_value = cm
+        return pool
+
+    @pytest.mark.asyncio
+    async def test_array_format_field_discovery(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                [
+                    {"name": "voltage", "value": 5.0, "result": "pass", "usl": 5.5, "lsl": 4.5},
+                    {"name": "current", "value": 1.0, "result": "pass", "usl": 1.5, "lsl": 0.5},
+                ],
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=["voltage", "voltage_result", "current", "current_result"],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert result.targets == [
+            {"voltage": 5.0, "voltage_result": "pass", "current": 1.0, "current_result": "pass"},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_array_format_auto_field_discovery(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                [
+                    {"name": "voltage", "value": 5.0, "result": "pass", "usl": 5.5, "lsl": 4.5},
+                ],
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=[],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert "voltage" in result.targets[0]
+        assert "voltage_result" in result.targets[0]
+        assert result.targets[0]["voltage"] == 5.0
+        assert result.targets[0]["voltage_result"] == "pass"
+
+    @pytest.mark.asyncio
+    async def test_dict_format_still_works(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                {"diameter": 10.2, "roundness": 0.99},
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=["diameter", "roundness"],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert result.targets == [
+            {"diameter": 10.2, "roundness": 0.99},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_dict_format_auto_discovery(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                {"diameter": 10.2, "roundness": 0.99},
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=[],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert result.targets[0] == {"diameter": 10.2, "roundness": 0.99}
+
+    @pytest.mark.asyncio
+    async def test_new_format_metadata_includes_product_model(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                [{"name": "voltage", "value": 5.0, "result": "pass", "usl": 5.5, "lsl": 4.5}],
+                process_product_model="Model-X",
+                inspection_product_model="Model-Y",
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=["voltage"],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert result.metadata[0]["process_product_model"] == "Model-X"
+        assert result.metadata[0]["inspection_product_model"] == "Model-Y"
+
+    @pytest.mark.asyncio
+    async def test_dict_format_metadata_product_model_defaults(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                {"diameter": 10.2},
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=["diameter"],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert result.metadata[0]["process_product_model"] == ""
+        assert result.metadata[0]["inspection_product_model"] == ""
+
+    @pytest.mark.asyncio
+    async def test_array_format_result_only_field(self) -> None:
+        from process_opt.analysis.dataset import DatasetBuilder
+
+        rows = [
+            _make_mock_row(
+                "B1",
+                {"temperature": 180.0},
+                [
+                    {"name": "voltage", "value": 5.0, "result": "fail", "usl": 5.5, "lsl": 4.5},
+                ],
+            ),
+        ]
+        pool = self._mock_pool(rows)
+        builder = DatasetBuilder(pool)
+        request = AnalysisDatasetRequest(
+            feature_fields=["temperature"],
+            target_fields=["voltage_result"],
+        )
+        result = await builder.build(request)
+
+        assert isinstance(result, AnalysisDataset)
+        assert result.targets == [{"voltage_result": "fail"}]

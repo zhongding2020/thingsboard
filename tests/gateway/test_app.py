@@ -37,7 +37,10 @@ async def test_process_endpoint_publishes_and_returns_202() -> None:
 
     assert response.status_code == 202
     assert response.json() == {"status": "accepted"}
-    assert publisher.published == [(settings.process_subject, payload)]
+    assert len(publisher.published) == 1
+    assert publisher.published[0][0] == settings.process_subject
+    assert publisher.published[0][1]["barcode"] == "B1"
+    assert publisher.published[0][1]["product_model"] == ""
 
 
 @pytest.mark.asyncio
@@ -50,7 +53,7 @@ async def test_inspection_endpoint_publishes_and_returns_202() -> None:
         "barcode": "B1",
         "station_id": "QA1",
         "inspected_at": "2026-06-08T10:05:00Z",
-        "results": {"diameter": 10.2},
+        "results": [{"name": "diameter", "value": 10.2, "result": "pass", "unit": "", "usl": None, "lsl": None}],
     }
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -58,7 +61,11 @@ async def test_inspection_endpoint_publishes_and_returns_202() -> None:
 
     assert response.status_code == 202
     assert response.json() == {"status": "accepted"}
-    assert publisher.published == [(settings.inspection_subject, payload)]
+    assert len(publisher.published) == 1
+    assert publisher.published[0][0] == settings.inspection_subject
+    assert publisher.published[0][1]["barcode"] == "B1"
+    assert publisher.published[0][1]["product_model"] == ""
+    assert publisher.published[0][1]["results"] == payload["results"]
 
 
 @pytest.mark.asyncio

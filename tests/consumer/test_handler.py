@@ -81,7 +81,7 @@ async def test_handle_inspection_message_upserts_and_acks() -> None:
                 "barcode": "B1",
                 "station_id": "QA1",
                 "inspected_at": "2026-06-08T10:05:00Z",
-                "results": {"diameter": 10.2},
+                "results": [{"name": "diameter", "value": 10.2, "result": "pass", "unit": "", "usl": None, "lsl": None}],
             }
         )
     )

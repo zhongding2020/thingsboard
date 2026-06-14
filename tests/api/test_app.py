@@ -34,6 +34,7 @@ class FakeRepository:
         device_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        product_model: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
@@ -46,6 +47,8 @@ class FakeRepository:
             items = [r for r in items if r["processed_at"] >= start_time]
         if end_time:
             items = [r for r in items if r["processed_at"] <= end_time]
+        if product_model:
+            items = [r for r in items if r.get("process_product_model") == product_model or r.get("inspection_product_model") == product_model]
         total = len(items)
         start = (page - 1) * page_size
         end = start + page_size

@@ -191,6 +191,10 @@ def create_app(
 
     if parameter_service is not None:
 
+        @app.get("/api/v1/parameters/sets")
+        async def list_sets() -> list[ParameterSet]:
+            return await parameter_service.list_sets()
+
         @app.post("/api/v1/parameters/sets", status_code=status.HTTP_201_CREATED)
         async def create_draft(body: ParameterSetCreate) -> ParameterSet:
             return await parameter_service.create_draft(body)

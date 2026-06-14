@@ -53,6 +53,18 @@ class ParameterRepository:
                     )
         return self._set_from_row(row)
 
+    async def list_sets(self) -> list[ParameterSet]:
+        async with self._pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                SELECT id, name, device_type, version, status, source, created_by, approved_by,
+                  activated_by, note, created_at, updated_at, approved_at, activated_at, archived_at
+                FROM parameter_sets
+                ORDER BY updated_at DESC
+                """
+            )
+        return [self._set_from_row(row) for row in rows]
+
     async def get_set(self, set_id: int) -> ParameterSet | None:
         async with self._pool.acquire() as connection:
             row = await connection.fetchrow(

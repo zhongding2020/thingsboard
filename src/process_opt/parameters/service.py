@@ -19,6 +19,9 @@ class ParameterService:
     def __init__(self, repo: ParameterRepository) -> None:
         self._repo = repo
 
+    async def list_sets(self) -> list[ParameterSet]:
+        return await self._repo.list_sets()
+
     async def create_draft(self, parameter_set: ParameterSetCreate) -> ParameterSet:
         draft = await self._repo.create_set(parameter_set)
         await self._repo.add_event(draft.id, "create", parameter_set.created_by)

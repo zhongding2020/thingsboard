@@ -1,5 +1,5 @@
-ALTER TABLE process_summary ADD COLUMN product_model TEXT NOT NULL DEFAULT '';
-ALTER TABLE inspection_results ADD COLUMN product_model TEXT NOT NULL DEFAULT '';
+ALTER TABLE process_summary ADD COLUMN IF NOT EXISTS product_model TEXT NOT NULL DEFAULT '';
+ALTER TABLE inspection_results ADD COLUMN IF NOT EXISTS product_model TEXT NOT NULL DEFAULT '';
 DROP VIEW IF EXISTS analysis_view;
 CREATE VIEW analysis_view AS
 SELECT

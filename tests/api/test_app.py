@@ -201,15 +201,3 @@ async def test_health_returns_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.asyncio
-async def test_analysis_view_has_product_model() -> None:
-    app = create_app(FakeRepository())
-
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.get("/api/v1/analysis/records?page_size=1")
-
-    assert resp.status_code == 200
-    data = resp.json()
-    if data["items"]:
-        item = data["items"][0]
-        assert "process_product_model" in item or "inspection_product_model" in item

@@ -139,6 +139,10 @@ def compute_overview(dataset: AnalysisDataset, spec: dict[str, dict[str, float]]
         for key, val in feat.items():
             if isinstance(val, (int, float)):
                 field_values.setdefault(key, []).append(float(val))
+    for tgt in dataset.targets:
+        for key, val in tgt.items():
+            if isinstance(val, (int, float)):
+                field_values.setdefault(key, []).append(float(val))
 
     overviews = []
     for field, vals in field_values.items():
@@ -200,11 +204,14 @@ def build_spc_result(
     labels: list[str] = []
     for i in range(field_dataset.sample_count):
         feat = field_dataset.features[i]
+        tgt = field_dataset.targets[i]
         val = feat.get(field)
+        if not isinstance(val, (int, float)):
+            val = tgt.get(field)
         if isinstance(val, (int, float)):
             feature_values.append(float(val))
             labels.append(field_dataset.metadata[i].get("barcode", str(i)) if field_dataset.metadata else str(i))
-        for k, v in field_dataset.targets[i].items():
+        for k, v in tgt.items():
             if isinstance(v, str):
                 result_values.append(v)
 

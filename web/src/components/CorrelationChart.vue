@@ -17,29 +17,35 @@
         </el-form-item>
       </el-form>
     </div>
-    <div class="chart-wrapper">
-      <div v-if="results.length" class="correlation-results">
-        <div v-for="r in results" :key="r.field_x + '|' + r.field_y" class="correlation-card">
-          <div class="correlation-pair">{{ r.field_x }} × {{ r.field_y }}</div>
-          <div class="correlation-stats">
-            <span>r = {{ r.coefficient.toFixed(4) }}</span>
-            <span>p = {{ r.p_value.toFixed(4) }}</span>
-          </div>
-          <el-progress
-            :percentage="Math.abs(r.coefficient) * 100"
-            :color="r.coefficient > 0 ? '#3b82f6' : '#ef4444'"
-            :stroke-width="8"
-          />
+    <div class="chart-wrapper" v-loading="loading">
+      <div v-if="results.length && !autoMode" class="single-result">
+        <div class="single-value">
+          <span class="correlation-pair">{{ results[0].field_x }} × {{ results[0].field_y }}</span>
+          <span class="correlation-coeff" :style="{ color: coeffColor(results[0].coefficient) }">
+            r = {{ results[0].coefficient.toFixed(4) }}
+          </span>
+          <span class="correlation-p">p = {{ results[0].p_value.toFixed(4) }}</span>
         </div>
       </div>
-      <el-empty v-else description="选择参数后点击计算" />
+      <div v-if="matrixData.length" class="heatmap-container">
+        <div ref="chartRef" class="heatmap-chart" />
+        <div class="heatmap-legend">
+          <span class="legend-label">-1</span>
+          <div class="legend-bar" />
+          <span class="legend-label">0</span>
+          <div class="legend-bar2" />
+          <span class="legend-label">+1</span>
+        </div>
+      </div>
+      <el-empty v-if="!results.length && !matrixData.length" :description="autoMode ? '请先执行分析' : '选择参数后点击计算'" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { correlation } from '@/api/analysis'
+import * as echarts from 'echarts'
 
 const props = defineProps<{
   datasetId: string
@@ -52,8 +58,20 @@ const loading = ref(false)
 const fieldX = ref('')
 const fieldY = ref('')
 const results = ref<{ field_x: string; field_y: string; coefficient: number; p_value: number; method: string }[]>([])
+const matrixData = ref<{ x: string; y: string; value: number }[]>([])
+const chartRef = ref<HTMLDivElement>()
 
 const allFields = computed(() => [...props.featureFields, ...props.targetFields])
+
+function coeffColor(r: number): string {
+  if (r > 0.7) return '#ef4444'
+  if (r > 0.4) return '#f97316'
+  if (r > 0.2) return '#eab308'
+  if (r < -0.7) return '#3b82f6'
+  if (r < -0.4) return '#06b6d4'
+  if (r < -0.2) return '#22c55e'
+  return '#9ca3af'
+}
 
 async function handleCompute() {
   if (!fieldX.value || !fieldY.value) return
@@ -83,38 +101,147 @@ async function autoCompute() {
   if (!props.datasetId || !props.featureFields.length || !props.targetFields.length) return
   loading.value = true
   try {
-    results.value = await correlation({
+    const data = await correlation({
       dataset_id: props.datasetId,
       method: 'pearson',
     }) as unknown as { field_x: string; field_y: string; coefficient: number; p_value: number; method: string }[]
+    results.value = data
+    buildMatrix(data)
   } finally {
     loading.value = false
   }
+}
+
+function buildMatrix(data: { field_x: string; field_y: string; coefficient: number }[]) {
+  const xSet = new Set<string>()
+  const ySet = new Set<string>()
+  for (const d of data) {
+    xSet.add(d.field_x)
+    ySet.add(d.field_y)
+  }
+  const xLabels = Array.from(xSet)
+  const yLabels = Array.from(ySet)
+  const map = new Map<string, number>()
+  for (const d of data) {
+    map.set(`${d.field_x}|${d.field_y}`, d.coefficient)
+  }
+  const items: { x: string; y: string; value: number }[] = []
+  for (const y of yLabels) {
+    for (const x of xLabels) {
+      const v = map.get(`${x}|${y}`)
+      if (v !== undefined) {
+        items.push({ x, y, value: v })
+      }
+    }
+  }
+  matrixData.value = items
+  nextTick(() => renderHeatmap(xLabels, yLabels, items))
+}
+
+function renderHeatmap(xLabels: string[], yLabels: string[], items: { x: string; y: string; value: number }[]) {
+  if (!chartRef.value) return
+  const chart = echarts.init(chartRef.value)
+  const heatData = items.map(i => [xLabels.indexOf(i.x), yLabels.indexOf(i.y), i.value])
+  chart.setOption({
+    tooltip: {
+      formatter: (p: any) => {
+        const d = items[p.dataIndex]
+        return `${d.x} × ${d.y}<br/>r = ${d.value.toFixed(4)}`
+      },
+    },
+    grid: { left: 120, right: 60, top: 40, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: xLabels,
+      axisLabel: { rotate: 30, fontSize: 11, interval: 0 },
+      splitArea: { show: true },
+    },
+    yAxis: {
+      type: 'category',
+      data: yLabels,
+      axisLabel: { fontSize: 11 },
+      splitArea: { show: true },
+    },
+    visualMap: {
+      min: -1,
+      max: 1,
+      inRange: {
+        color: ['#3b82f6', '#ffffff', '#ef4444'],
+      },
+      calculable: true,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+      textStyle: { fontSize: 11 },
+    },
+    series: [{
+      type: 'heatmap',
+      data: heatData,
+      label: {
+        show: true,
+        formatter: (p: any) => heatData[p.dataIndex][2].toFixed(2),
+        fontSize: 10,
+        color: '#333',
+      },
+      emphasis: {
+        itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.3)' },
+      },
+    }],
+  })
+  window.addEventListener('resize', () => chart.resize())
 }
 </script>
 
 <style scoped>
 .correlation-form { margin-bottom: 12px; }
-.chart-wrapper { min-height: 120px; }
-.correlation-results { display: flex; flex-direction: column; gap: 10px; }
-.correlation-card {
+.chart-wrapper { min-height: 200px; }
+.single-result {
   background: var(--el-bg-color);
   border-radius: 6px;
-  padding: 10px 14px;
+  padding: 14px;
   border: 1px solid var(--el-border-color-light);
+}
+.single-value {
+  display: flex;
+  gap: 16px;
+  align-items: center;
 }
 .correlation-pair {
   font-family: 'Fira Code', monospace;
+  font-weight: 600;
   font-size: 13px;
-  font-weight: 500;
   color: var(--el-color-primary);
-  margin-bottom: 4px;
 }
-.correlation-stats {
+.correlation-coeff { font-weight: 600; font-size: 15px; }
+.correlation-p { font-size: 12px; color: var(--el-text-color-secondary); }
+.heatmap-container {
+  min-height: 300px;
   display: flex;
-  gap: 16px;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 6px;
+  flex-direction: column;
+}
+.heatmap-chart {
+  flex: 1;
+  min-height: 350px;
+  width: 100%;
+}
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.legend-label { font-size: 11px; color: var(--el-text-color-secondary); }
+.legend-bar {
+  width: 80px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #3b82f6, #ffffff, #ef4444);
+}
+.legend-bar2 {
+  width: 80px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #ef4444, #ffffff, #3b82f6);
 }
 </style>

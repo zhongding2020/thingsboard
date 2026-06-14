@@ -1,12 +1,10 @@
 FROM python:3.11-slim
 
-ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-
 WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src/ src/
-RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple .
+RUN pip install --no-cache-dir .
 
 COPY scripts/ scripts/
 COPY web/dist/ web/dist/

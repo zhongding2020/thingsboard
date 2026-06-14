@@ -5,6 +5,8 @@ from uuid import uuid4
 
 from process_opt.mock.templates import DEVICE_TEMPLATES
 
+PRODUCT_MODELS = ["A", "B", "C"]
+
 
 def generate_params(device_type: str) -> dict[str, float | int]:
     template = DEVICE_TEMPLATES[device_type]
@@ -23,39 +25,27 @@ def generate_params(device_type: str) -> dict[str, float | int]:
     return params
 
 
-def generate_results(device_type: str, params: dict[str, float | int]) -> dict[str, str]:
+def generate_results(device_type: str, params: dict[str, float | int]) -> list[dict[str, Any]]:
     template = DEVICE_TEMPLATES[device_type]
-    results: dict[str, str] = {}
-    for name in template["results"]:
-        if device_type == "reflow-oven" and "temperature" in params:
-            quality = "fail" if params["temperature"] > 250 else "pass"
-        elif device_type == "injection-molder" and "melt_temp" in params:
-            quality = "fail" if params["melt_temp"] > 290 else "pass"
-        elif device_type == "pick-and-place" and "placement_accuracy_um" in params:
-            quality = "fail" if params["placement_accuracy_um"] > 70 else "pass"
-        elif device_type == "wave-solder" and "solder_temp" in params:
-            quality = "fail" if params["solder_temp"] > 270 else "pass"
-        elif device_type == "cnc-drill" and "surface_roughness_ra" in params:
-            quality = "fail" if random.random() < 0.08 else "pass"
-        elif device_type == "3d-printer" and "nozzle_temp" in params:
-            quality = "fail" if params["nozzle_temp"] > 245 else "pass"
-        elif device_type == "testing-station" and "test_voltage" in params:
-            quality = "fail" if params["test_voltage"] > 4.5 else "pass"
-        elif device_type == "laser-cutter" and "laser_power" in params:
-            quality = "fail" if params["laser_power"] > 400 else "pass"
-        elif device_type == "coating-machine" and "coating_thickness_um" in params:
-            quality = "fail" if params["coating_thickness_um"] > 80 else "pass"
-        elif device_type == "xray-inspection" and "xray_voltage_kv" in params:
-            quality = "fail" if params["xray_voltage_kv"] > 120 else "pass"
-        elif device_type == "oven-curing" and "oven_temp" in params:
-            quality = "fail" if params["oven_temp"] > 180 else "pass"
-        elif device_type == "wire-bonder" and "bond_force_g" in params:
-            quality = "fail" if params["bond_force_g"] > 80 else "pass"
-        elif device_type == "ultrasonic-cleaner" and "temperature_c" in params:
-            quality = "fail" if params["temperature_c"] > 70 else "pass"
+    results: list[dict[str, Any]] = []
+    for item_def in template["results"]:
+        name = item_def["name"]
+        usl = item_def["usl"]
+        lsl = item_def["lsl"]
+        if random.random() < 0.05:
+            val = random.uniform(usl, usl * 1.2) if random.random() < 0.5 else random.uniform(lsl * 0.8, lsl)
         else:
-            quality = "pass" if random.random() < 0.9 else "fail"
-        results[name] = quality
+            val = random.uniform(lsl, usl)
+        val = round(val, 2)
+        result = "fail" if val > usl or val < lsl else "pass"
+        results.append({
+            "name": name,
+            "value": val,
+            "unit": item_def.get("unit", ""),
+            "result": result,
+            "usl": usl,
+            "lsl": lsl,
+        })
     return results
 
 
@@ -64,12 +54,14 @@ def generate_pair(device_type: str, barcode: str, device_index: int = 1) -> tupl
     params = generate_params(device_type)
     results = generate_results(device_type, params)
     now = datetime.now(UTC)
+    product_model = random.choice(PRODUCT_MODELS)
 
     process_payload = {
         "message_id": message_id,
         "barcode": barcode,
         "device_id": f"{device_type}-{device_index:03d}",
         "processed_at": now.isoformat(),
+        "product_model": product_model,
         "params": params,
     }
 
@@ -78,6 +70,7 @@ def generate_pair(device_type: str, barcode: str, device_index: int = 1) -> tupl
         "barcode": barcode,
         "station_id": f"{device_type}-qa",
         "inspected_at": now.isoformat(),
+        "product_model": product_model,
         "results": results,
     }
 

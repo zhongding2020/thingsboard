@@ -54,8 +54,9 @@ def test_generate_results_returns_all_keys() -> None:
     for device_type in DEVICE_TEMPLATES:
         params = generate_params(device_type)
         results = generate_results(device_type, params)
-        expected = set(DEVICE_TEMPLATES[device_type]["results"].keys())
-        assert set(results.keys()) == expected
+        expected_names = {item["name"] for item in DEVICE_TEMPLATES[device_type]["results"]}
+        actual_names = {item["name"] for item in results}
+        assert actual_names == expected_names
 
 
 def test_generate_results_values_pass_fail() -> None:
@@ -63,8 +64,34 @@ def test_generate_results_values_pass_fail() -> None:
         for _ in range(50):
             params = generate_params(device_type)
             results = generate_results(device_type, params)
-            for name, value in results.items():
-                assert value in ("pass", "fail"), f"{name} expected pass/fail, got {value}"
+            for item in results:
+                assert item["result"] in ("pass", "fail"), f"{item['name']} expected pass/fail, got {item['result']}"
+
+
+def test_generate_results_returns_list():
+    results = generate_results("reflow-oven", {"temperature": 220})
+    assert isinstance(results, list)
+    assert len(results) > 0
+    item = results[0]
+    assert "name" in item
+    assert "value" in item
+    assert "result" in item
+    assert "usl" in item
+    assert "lsl" in item
+
+
+def test_generate_pair_has_product_model():
+    proc, insp = generate_pair("testing-station", "BC-001")
+    assert "product_model" in proc
+    assert "product_model" in insp
+    assert proc["product_model"] in ("A", "B", "C")
+
+
+def test_generate_pair_results_is_list():
+    _, insp = generate_pair("testing-station", "BC-001")
+    assert isinstance(insp["results"], list)
+    assert len(insp["results"]) > 0
+    assert "name" in insp["results"][0]
 
 
 def test_generate_pair_returns_two_dicts() -> None:

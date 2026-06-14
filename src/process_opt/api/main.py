@@ -34,12 +34,13 @@ class RepositoryProxy:
         device_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        product_model: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
         if self.repository is None:
             raise RuntimeError("Repository is not initialized")
-        return await self.repository.query_records(barcode, device_id, start_time, end_time, page, page_size)
+        return await self.repository.query_records(barcode, device_id, start_time, end_time, product_model, page, page_size)
 
     async def list_devices(self) -> list[str]:
         if self.repository is None:

@@ -6,7 +6,7 @@ import pytest
 
 from process_opt.common.db import apply_sql_file, create_pool
 from process_opt.common.repositories import DataRepository
-from process_opt.common.schemas import InspectionMessage, ProcessMessage
+from process_opt.common.schemas import InspectionItem, InspectionMessage, ProcessMessage
 
 
 @pytest.mark.asyncio
@@ -213,5 +213,105 @@ async def test_list_devices_returns_distinct_device_ids() -> None:
 
         devices = await repo.list_devices()
         assert sorted(devices) == ["injection-molder", "reflow-oven"]
+    finally:
+        await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_upsert_process_with_product_model() -> None:
+    dsn = os.environ.get(
+        "PROCESS_OPT_TEST_POSTGRES_DSN",
+        "postgresql://postgres:postgres@localhost:5432/process_opt",
+    )
+    migration_path = Path(__file__).parents[2] / "db" / "migrations" / "001_initial.sql"
+    pool = await create_pool(dsn)
+    try:
+        await apply_sql_file(pool, migration_path)
+        migration_004 = Path(__file__).parents[2] / "db" / "migrations" / "004_product_model.sql"
+        await apply_sql_file(pool, migration_004)
+        async with pool.acquire() as connection:
+            await connection.execute("TRUNCATE process_summary, inspection_results")
+
+        repo = DataRepository(pool)
+        msg = ProcessMessage(
+            message_id="pm1", barcode="PM-TEST-001", device_id="D1",
+            processed_at=datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+            product_model="A",
+            params={"temp": 220},
+        )
+        await repo.upsert_process(msg)
+        row = await repo.get_analysis_record("PM-TEST-001")
+        assert row is not None
+        assert row.get("process_product_model") == "A"
+    finally:
+        await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_upsert_inspection_with_items() -> None:
+    dsn = os.environ.get(
+        "PROCESS_OPT_TEST_POSTGRES_DSN",
+        "postgresql://postgres:postgres@localhost:5432/process_opt",
+    )
+    migration_path = Path(__file__).parents[2] / "db" / "migrations" / "001_initial.sql"
+    pool = await create_pool(dsn)
+    try:
+        await apply_sql_file(pool, migration_path)
+        migration_004 = Path(__file__).parents[2] / "db" / "migrations" / "004_product_model.sql"
+        await apply_sql_file(pool, migration_004)
+        async with pool.acquire() as connection:
+            await connection.execute("TRUNCATE process_summary, inspection_results")
+
+        repo = DataRepository(pool)
+        msg = InspectionMessage(
+            message_id="im1", barcode="IM-TEST-001", station_id="S1",
+            inspected_at=datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+            product_model="B",
+            results=[InspectionItem(name="voltage", value=5.0, result="pass", usl=10.0, lsl=0.0)],
+        )
+        await repo.upsert_inspection(msg)
+        row = await repo.get_analysis_record("IM-TEST-001")
+        assert row is not None
+        assert row.get("inspection_product_model") == "B"
+        assert isinstance(row["results"], list)
+        assert row["results"][0]["name"] == "voltage"
+    finally:
+        await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_query_records_with_product_model() -> None:
+    dsn = os.environ.get(
+        "PROCESS_OPT_TEST_POSTGRES_DSN",
+        "postgresql://postgres:postgres@localhost:5432/process_opt",
+    )
+    migration_path = Path(__file__).parents[2] / "db" / "migrations" / "001_initial.sql"
+    pool = await create_pool(dsn)
+    try:
+        await apply_sql_file(pool, migration_path)
+        migration_004 = Path(__file__).parents[2] / "db" / "migrations" / "004_product_model.sql"
+        await apply_sql_file(pool, migration_004)
+        async with pool.acquire() as connection:
+            await connection.execute("TRUNCATE process_summary, inspection_results")
+
+        repo = DataRepository(pool)
+        proc_msg = ProcessMessage(
+            message_id="q1", barcode="Q-TEST-001", device_id="D1",
+            processed_at=datetime(2026, 2, 1, 12, 0, 0, tzinfo=UTC),
+            product_model="A",
+            params={"temp": 220},
+        )
+        await repo.upsert_process(proc_msg)
+        insp_msg = InspectionMessage(
+            message_id="q2", barcode="Q-TEST-001", station_id="S1",
+            inspected_at=datetime(2026, 2, 1, 12, 0, 0, tzinfo=UTC),
+            product_model="A",
+            results=[InspectionItem(name="v", value=5.0, result="pass")],
+        )
+        await repo.upsert_inspection(insp_msg)
+
+        result = await repo.query_records(product_model="A")
+        assert len(result["items"]) > 0
+        assert result["items"][0]["process_product_model"] == "A"
     finally:
         await pool.close()

@@ -21,7 +21,7 @@
         </el-menu-item>
         <el-menu-item index="/data">
           <el-icon><DocumentCopy /></el-icon>
-          <span>原始数据</span>
+          <span>数据查询</span>
         </el-menu-item>
         <el-menu-item index="/lines">
           <el-icon><TrendCharts /></el-icon>

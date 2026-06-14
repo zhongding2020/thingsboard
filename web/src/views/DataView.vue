@@ -15,6 +15,9 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="产品型号">
+          <el-input v-model="filters.product_model" placeholder="精确型号" clearable style="width: 140px" />
+        </el-form-item>
         <el-form-item label="处理时间">
           <el-date-picker
             v-model="timeRange"
@@ -55,25 +58,46 @@
                 </el-descriptions-item>
               </el-descriptions>
               <el-descriptions
-                v-if="row.results"
+                v-if="row.results && row.results.length > 0"
                 title="检测结果"
                 :column="1"
                 border
                 size="small"
                 class="results-desc"
               >
-                <el-descriptions-item
-                  v-for="(val, key) in row.results"
-                  :key="key"
-                  :label="key"
-                >
-                  <el-tag
-                    :type="val === 'pass' ? 'success' : 'danger'"
-                    size="small"
+                <template v-if="Array.isArray(row.results)">
+                  <el-descriptions-item
+                    v-for="item in row.results"
+                    :key="item.name"
+                    :label="item.name"
                   >
-                    {{ val }}
-                  </el-tag>
-                </el-descriptions-item>
+                    <span class="result-value">{{ item.value }}{{ item.unit ? ' ' + item.unit : '' }}</span>
+                    <el-tag
+                      :type="item.result === 'pass' ? 'success' : 'danger'"
+                      size="small"
+                      class="result-tag"
+                    >
+                      {{ item.result }}
+                    </el-tag>
+                    <span v-if="item.usl != null" class="result-spec">
+                      ({{ item.lsl }} ~ {{ item.usl }})
+                    </span>
+                  </el-descriptions-item>
+                </template>
+                <template v-else>
+                  <el-descriptions-item
+                    v-for="(val, key) in row.results"
+                    :key="key"
+                    :label="key"
+                  >
+                    <el-tag
+                      :type="val === 'pass' ? 'success' : 'danger'"
+                      size="small"
+                    >
+                      {{ val }}
+                    </el-tag>
+                  </el-descriptions-item>
+                </template>
               </el-descriptions>
               <el-empty v-else description="暂无检测数据" />
             </div>
@@ -137,6 +161,7 @@ const pagination = reactive({
 const filters = reactive({
   barcode: '',
   device_id: '',
+  product_model: '',
 })
 
 const timeRange = ref<[Date, Date] | null>([new Date(Date.now() - 604800000), new Date()])
@@ -147,7 +172,10 @@ const timeShortcuts = [
   { text: '一个月', value: () => [new Date(Date.now() - 2592000000), new Date()] },
 ]
 
-function allPass(results: Record<string, string | number>): boolean {
+function allPass(results: any): boolean {
+  if (Array.isArray(results)) {
+    return results.every((item) => item.result === 'pass')
+  }
   return Object.values(results).every((v) => v === 'pass')
 }
 
@@ -160,6 +188,7 @@ async function fetchRecords() {
     }
     if (filters.barcode) params.barcode = filters.barcode
     if (filters.device_id) params.device_id = filters.device_id
+    if (filters.product_model) params.product_model = filters.product_model
     if (timeRange.value) {
       params.start_time = timeRange.value[0].toISOString()
       params.end_time = timeRange.value[1].toISOString()
@@ -233,6 +262,16 @@ onMounted(async () => {
 }
 .results-desc {
   margin-top: 8px;
+}
+.result-value {
+  margin-right: 8px;
+}
+.result-tag {
+  margin-right: 6px;
+}
+.result-spec {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 .pagination-wrapper {
   flex-shrink: 0;

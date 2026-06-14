@@ -15,9 +15,11 @@ class FakeRepository:
                 "device_id": "D1",
                 "processed_at": datetime(2026, 6, 8, 10, 0, tzinfo=UTC),
                 "params": {"temperature": 180},
+                "product_model": "Model-A",
                 "station_id": "QA1",
                 "inspected_at": datetime(2026, 6, 8, 10, 5, tzinfo=UTC),
                 "results": {"diameter": 10.2},
+                "inspection_product_model": "Model-A",
             }
         }
         self.requested_barcodes: list[str] = []
@@ -76,9 +78,11 @@ async def test_get_analysis_record_by_barcode_returns_joined_data() -> None:
         "device_id": "D1",
         "processed_at": "2026-06-08T10:00:00+00:00",
         "params": {"temperature": 180},
+        "product_model": "Model-A",
         "station_id": "QA1",
         "inspected_at": "2026-06-08T10:05:00+00:00",
         "results": {"diameter": 10.2},
+        "inspection_product_model": "Model-A",
     }
     assert repository.requested_barcodes == ["B1"]
 
@@ -191,3 +195,17 @@ async def test_health_returns_ok() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.asyncio
+async def test_analysis_view_has_product_model() -> None:
+    app = create_app(FakeRepository())
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/analysis/records?page_size=1")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    if data["items"]:
+        item = data["items"][0]
+        assert "process_product_model" in item or "inspection_product_model" in item

@@ -187,15 +187,25 @@ async def _insert_records(pool: asyncpg.Pool, device_ids: list[str], count: int)
             proc_payload, insp_payload = generate_pair(
                 dev_id.rsplit("-", 1)[0], barcode, int(dev_id.rsplit("-", 1)[-1]),
             )
-            process_rows.append((barcode, dev_id, ts, json.dumps(proc_payload["params"])))
-            inspect_rows.append((barcode, "station-" + dev_id.rsplit("-", 1)[0], ts, json.dumps(insp_payload["results"])))
+            process_rows.append((
+                barcode, dev_id, ts,
+                json.dumps(proc_payload["params"]),
+                proc_payload["product_model"],
+            ))
+            inspect_rows.append((
+                barcode, "station-" + dev_id.rsplit("-", 1)[0], ts,
+                json.dumps(insp_payload["results"]),
+                insp_payload["product_model"],
+            ))
         async with pool.acquire() as conn:
             await conn.executemany(
-                "INSERT INTO process_summary (barcode, device_id, processed_at, params) VALUES ($1,$2,$3,$4::jsonb) ON CONFLICT (barcode) DO NOTHING",
+                """INSERT INTO process_summary (barcode, device_id, processed_at, params, product_model)
+                   VALUES ($1,$2,$3,$4::jsonb,$5) ON CONFLICT (barcode) DO NOTHING""",
                 process_rows,
             )
             await conn.executemany(
-                "INSERT INTO inspection_results (barcode, station_id, inspected_at, results) VALUES ($1,$2,$3,$4::jsonb) ON CONFLICT (barcode) DO NOTHING",
+                """INSERT INTO inspection_results (barcode, station_id, inspected_at, results, product_model)
+                   VALUES ($1,$2,$3,$4::jsonb,$5) ON CONFLICT (barcode) DO NOTHING""",
                 inspect_rows,
             )
         total += batch_size

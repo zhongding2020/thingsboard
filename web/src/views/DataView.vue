@@ -104,8 +104,22 @@
           </template>
         </el-table-column>
         <el-table-column prop="barcode" label="条码" min-width="200" show-overflow-tooltip class-name="cell-mono" />
-        <el-table-column prop="device_id" label="设备" width="120" />
+        <el-table-column label="工艺设备" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span>{{ deviceTypeLabel(row.device_id) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="检测工位" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span>{{ row.station_id ? deviceTypeLabel(row.station_id) : '—' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="inspected_at" label="检测时间" width="160" class-name="cell-mono" />
+        <el-table-column label="产品型号" width="100">
+          <template #default="{ row }">
+            <span>{{ row.process_product_model || row.inspection_product_model || '—' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="参数数" width="80">
           <template #default="{ row }">
             {{ Object.keys(row.params).length }}
@@ -147,6 +161,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { queryRecords, listDevices, type AnalysisRecord } from '@/api/records'
+import { deviceLabel } from '@/utils/device-icons'
 
 const loading = ref(false)
 const records = ref<AnalysisRecord[]>([])
@@ -171,6 +186,11 @@ const timeShortcuts = [
   { text: '最近一周', value: () => [new Date(Date.now() - 604800000), new Date()] },
   { text: '一个月', value: () => [new Date(Date.now() - 2592000000), new Date()] },
 ]
+
+function deviceTypeLabel(id: string): string {
+  const type = id.replace(/^station-/, '').replace(/-\d+$/, '')
+  return deviceLabel(type)
+}
 
 function allPass(results: any): boolean {
   if (Array.isArray(results)) {

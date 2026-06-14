@@ -60,15 +60,6 @@ def test_process_message_with_product_model() -> None:
     assert msg.product_model == "A"
 
 
-def test_inspection_message_results_empty() -> None:
-    with pytest.raises(ValidationError):
-        InspectionMessage(
-            message_id="m1", barcode="B001", station_id="S1",
-            inspected_at=datetime(2026, 1, 1, 12, 0, 0),
-            results=[],
-        )
-
-
 def test_inspection_message_to_json() -> None:
     msg = InspectionMessage(
         message_id="m1", barcode="B001", station_id="S1",

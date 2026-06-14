@@ -36,7 +36,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useAnalysisStore, type AnalysisFilter } from '@/stores/analysis'
-import { profile } from '@/api/analysis'
 import { listDevices as fetchDevices } from '@/api/records'
 
 const analysis = useAnalysisStore()
@@ -95,13 +94,7 @@ async function handleSearch() {
       params.timeRange = [dateRange.value[0].toISOString(), dateRange.value[1].toISOString()]
     }
 
-    const [profileResult] = await Promise.all([
-      profile({
-        feature_fields: form.featureFields,
-        target_fields: form.targetFields,
-      }),
-    ])
-    analysis.profileResult = profileResult as Record<string, Record<string, unknown>>
+    analysis.profileResult = {}
   } finally {
     loading.value = false
   }

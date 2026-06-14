@@ -5,6 +5,13 @@
       <p class="page-desc">工艺参数统计分析与优化</p>
     </div>
 
+    <el-steps :active="stepIndex" align-center class="analysis-steps" size="small">
+      <el-step title="导入数据" description="在线查询或上传Excel" />
+      <el-step title="数据预览" description="查看原始数据" />
+      <el-step title="配置分析" description="选择字段与参数" />
+      <el-step title="分析报告" description="结果分析与推荐" />
+    </el-steps>
+
     <!-- Step 1: Import -->
     <div v-if="state === 'import'" class="step-wrap">
       <div class="import-cards">
@@ -12,7 +19,7 @@
           <div class="import-icon">🗄️</div>
           <h3>在线查询</h3>
           <p>从数据库查询设备历史数据</p>
-          <div v-if="importMode === 'db'" class="import-body">
+          <div class="import-body" :class="{ 'body-hidden': importMode !== 'db' }">
             <el-form inline>
               <el-form-item label="设备">
                 <el-select v-model="filterDevice" placeholder="选择设备" style="width: 200px">
@@ -40,7 +47,7 @@
           <div class="import-icon">📂</div>
           <h3>上传 Excel</h3>
           <p>拖拽 .xlsx / .xls 文件解析数据</p>
-          <div v-if="importMode === 'excel'" class="import-body">
+          <div class="import-body" :class="{ 'body-hidden': importMode !== 'excel' }">
             <el-upload drag :auto-upload="false" :limit="1" accept=".xlsx,.xls" :on-change="handleFileChange" :file-list="fileList">
               <div class="upload-hint">
                 <el-icon size="20"><UploadFilled /></el-icon>
@@ -167,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { queryDataset, uploadDataset, previewDataset, profile as apiProfile, type PreviewResponse } from '@/api/analysis'
 import { listDevices as fetchDevices } from '@/api/records'
 import DataPreviewTable from '@/components/DataPreviewTable.vue'
@@ -181,6 +188,10 @@ import type { UploadFile } from 'element-plus'
 type Step = 'import' | 'preview' | 'config' | 'loading' | 'report'
 
 const state = ref<Step>('import')
+const stepIndex = computed(() => {
+  const map: Record<Step, number> = { import: 0, preview: 1, config: 2, loading: 3, report: 3 }
+  return map[state.value]
+})
 const importMode = ref<'db' | 'excel'>('db')
 const loading = ref(false)
 const importError = ref('')
@@ -358,6 +369,8 @@ onMounted(loadDevices)
 .page-title { font-family: 'Fira Code', monospace; font-size: 20px; font-weight: 600; margin: 0 0 2px; color: var(--el-text-color-primary); }
 .page-desc { font-size: 12px; color: var(--el-text-color-secondary); margin: 0; }
 
+.analysis-steps { margin: 16px 0 20px; }
+
 .step-wrap { margin-top: 12px; }
 .step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--el-color-primary); border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; margin-right: 8px; }
@@ -365,12 +378,14 @@ onMounted(loadDevices)
 .step-actions { display: flex; gap: 8px; }
 
 .import-cards { display: flex; gap: 16px; }
-.import-card { flex: 1; padding: 4px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+.import-card { flex: 1; display: flex; flex-direction: column; min-height: 220px; padding: 4px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+.import-card :deep(.el-card__body) { display: flex; flex-direction: column; flex: 1; }
 .import-card.active { border-color: var(--el-color-primary); }
 .import-card h3 { margin: 4px 0 2px; font-size: 15px; }
 .import-card p { font-size: 12px; color: var(--el-text-color-secondary); margin: 0 0 8px; }
 .import-icon { font-size: 24px; }
-.import-body { margin-top: 8px; }
+.import-body { margin-top: 8px; flex: 1; }
+.body-hidden { visibility: hidden; pointer-events: none; }
 .import-error { color: var(--el-color-danger); font-size: 12px; margin-top: 8px; }
 .upload-hint { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px; }
 

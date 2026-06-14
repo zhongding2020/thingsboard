@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
 import { recommendation, submitRecommendation } from '@/api/analysis'
 
 const props = defineProps<{
@@ -61,13 +61,20 @@ const cfg = reactive<{
   constraints: {},
 })
 
+watch(() => props.featureFields, (fields) => {
+  for (const f of fields) {
+    if (!(f in cfg.constraints)) {
+      cfg.constraints[f] = 250
+    }
+  }
+}, { immediate: true })
+
 async function handleCompute() {
   if (!cfg.targetField || !props.featureFields.length) return
   loading.value = true
   try {
-    const constraints = Object.entries(cfg.constraints).map(([field, max]) => ({
-      field,
-      max: max || undefined,
+    const constraints = Object.entries(cfg.constraints).map(([field, val]) => ({
+      field, max: val,
     }))
     result.value = await recommendation({
       dataset_id: props.datasetId,

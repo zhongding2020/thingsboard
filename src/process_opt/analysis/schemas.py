@@ -47,8 +47,8 @@ class CorrelationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dataset_id: str | None = None
-    field_x: str
-    field_y: str
+    field_x: str | None = None
+    field_y: str | None = None
     method: str = "pearson"
 
 

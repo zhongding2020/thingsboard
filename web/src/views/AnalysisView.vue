@@ -5,302 +5,398 @@
       <p class="page-desc">工艺参数统计分析与优化</p>
     </div>
 
-    <el-tabs v-model="mode" class="mode-tabs">
-      <el-tab-pane label="在线分析" name="db">
-        <AnalysisFilter />
-        <el-tabs v-model="activeTab" class="analysis-tabs">
-          <el-tab-pane label="字段概览" name="profile">
-            <div v-if="profileFields.length" class="profile-grid">
-              <el-card v-for="stat in profileFields" :key="stat.field" class="profile-card">
+    <!-- Step 1: Import -->
+    <div v-if="state === 'import'" class="step-wrap">
+      <div class="import-cards">
+        <el-card shadow="hover" class="import-card" :class="{ active: importMode === 'db' }" @click="importMode = 'db'">
+          <div class="import-icon">🗄️</div>
+          <h3>在线查询</h3>
+          <p>从数据库查询设备历史数据</p>
+          <div v-if="importMode === 'db'" class="import-body">
+            <el-form inline>
+              <el-form-item label="设备">
+                <el-select v-model="filterDevice" placeholder="选择设备" style="width: 200px">
+                  <el-option v-for="d in devices" :key="d" :label="d" :value="d" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="时间范围">
+                <el-date-picker
+                  v-model="dateRange"
+                  type="datetimerange"
+                  range-separator="至"
+                  start-placeholder="开始时间"
+                  end-placeholder="结束时间"
+                  :shortcuts="timeShortcuts"
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleOnlineQuery" :loading="loading">查询数据</el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="importError" class="import-error">{{ importError }}</div>
+          </div>
+        </el-card>
+        <el-card shadow="hover" class="import-card" :class="{ active: importMode === 'excel' }" @click="importMode = 'excel'">
+          <div class="import-icon">📂</div>
+          <h3>上传 Excel</h3>
+          <p>拖拽 .xlsx / .xls 文件解析数据</p>
+          <div v-if="importMode === 'excel'" class="import-body">
+            <el-upload drag :auto-upload="false" :limit="1" accept=".xlsx,.xls" :on-change="handleFileChange" :file-list="fileList">
+              <div class="upload-hint">
+                <el-icon size="20"><UploadFilled /></el-icon>
+                <span>拖拽或点击选择文件</span>
+              </div>
+            </el-upload>
+            <el-button type="primary" @click="handleExcelUpload" :loading="loading" :disabled="!fileList.length" style="margin-top: 8px;">
+              上传解析
+            </el-button>
+            <div v-if="importError" class="import-error">{{ importError }}</div>
+          </div>
+        </el-card>
+      </div>
+    </div>
+
+    <!-- Step 2: Preview -->
+    <div v-if="state === 'preview'" class="step-wrap">
+      <div class="step-header">
+        <div>
+          <span class="step-num">2</span>
+          <span class="step-title">数据预览</span>
+        </div>
+        <el-button text size="small" @click="goImport">← 重新导入</el-button>
+      </div>
+      <DataPreviewTable
+        :rows="previewRows"
+        :total="previewTotal"
+        :size="50"
+        :page="previewPage"
+        :fields="previewFields"
+        :loading="previewLoading"
+        @page-change="handlePreviewPage"
+        @confirm="goConfig"
+      />
+    </div>
+
+    <!-- Step 3: Config -->
+    <div v-if="state === 'config'" class="step-wrap">
+      <div class="step-header">
+        <div>
+          <span class="step-num">3</span>
+          <span class="step-title">配置分析参数</span>
+        </div>
+        <el-button text size="small" @click="state = 'preview'">← 返回预览</el-button>
+      </div>
+      <FieldCheckboxGrid
+        :fields="previewFields"
+        @update:selected-features="selectedFeatures = $event"
+        @update:selected-targets="selectedTargets = $event"
+      />
+      <div class="config-actions">
+        <el-button type="primary" size="large" @click="goReport" :loading="analyzing">🔍 开始分析</el-button>
+      </div>
+    </div>
+
+    <!-- Step 4: Loading -->
+    <div v-if="state === 'loading'" class="step-wrap loading-state">
+      <el-icon class="is-loading" size="28"><Loading /></el-icon>
+      <p>正在执行分析... {{ loadingProgress }}</p>
+    </div>
+
+    <!-- Step 5: Report -->
+    <div v-if="state === 'report'" class="report-wrap">
+      <div class="step-header">
+        <div>
+          <span class="step-num">4</span>
+          <span class="step-title">分析报告</span>
+        </div>
+        <div class="step-actions">
+          <el-button text size="small" @click="state = 'config'">调整参数</el-button>
+          <el-button text size="small" @click="goImport">重新导入</el-button>
+        </div>
+      </div>
+      <div class="report-layout">
+        <nav class="report-nav">
+          <a v-for="item in navItems" :key="item.id" :href="'#' + item.id" class="nav-item" :class="{ active: activeNav === item.id }" @click.prevent="scrollTo(item.id)">
+            {{ item.icon }} {{ item.label }}
+          </a>
+        </nav>
+        <div class="report-content" ref="reportContentRef" @scroll="onReportScroll">
+          <section id="report-overview">
+            <h3>📋 数据概览</h3>
+            <el-row :gutter="12">
+              <el-col :span="6"><el-card><div class="stat-num">{{ sampleCount }}</div><div class="stat-label">样本数</div></el-card></el-col>
+              <el-col :span="6"><el-card><div class="stat-num" style="color: var(--el-color-primary)">{{ selectedFeatures.length }}</div><div class="stat-label">参数字段</div></el-card></el-col>
+              <el-col :span="6"><el-card><div class="stat-num" style="color: #a855f7">{{ selectedTargets.length }}</div><div class="stat-label">结果字段</div></el-card></el-col>
+              <el-col :span="6"><el-card><div class="stat-num" style="color: var(--el-color-warning)">{{ missingCount }}</div><div class="stat-label">缺失值</div></el-card></el-col>
+            </el-row>
+          </section>
+          <section id="report-profile">
+            <h3>📊 字段分析</h3>
+            <div v-if="profileData.length" class="profile-grid">
+              <el-card v-for="stat in profileData" :key="stat.field" class="profile-card" shadow="hover">
                 <template #header>
                   <span class="profile-field">{{ stat.field }}</span>
-                  <el-tag size="small" class="profile-dtype">{{ stat.dtype }}</el-tag>
                 </template>
                 <div class="profile-stats">
-                  <div class="profile-stat">
-                    <span class="profile-stat-label">Count</span>
-                    <span class="profile-stat-value">{{ stat.count }}</span>
-                  </div>
-                  <div class="profile-stat" v-if="stat.mean !== null">
-                    <span class="profile-stat-label">Mean</span>
-                    <span class="profile-stat-value">{{ stat.mean.toFixed(4) }}</span>
-                  </div>
-                  <div class="profile-stat" v-if="stat.std !== null">
-                    <span class="profile-stat-label">Std</span>
-                    <span class="profile-stat-value">{{ stat.std.toFixed(4) }}</span>
-                  </div>
-                  <div class="profile-stat" v-if="stat.min !== null">
-                    <span class="profile-stat-label">Min</span>
-                    <span class="profile-stat-value">{{ stat.min }}</span>
-                  </div>
-                  <div class="profile-stat" v-if="stat.max !== null">
-                    <span class="profile-stat-label">Max</span>
-                    <span class="profile-stat-value">{{ stat.max }}</span>
-                  </div>
-                  <div class="profile-stat" v-if="stat.missing_count > 0">
-                    <span class="profile-stat-label">Missing</span>
-                    <span class="profile-stat-value">{{ stat.missing_count }} ({{ (stat.missing_rate * 100).toFixed(1) }}%)</span>
-                  </div>
-                  <div class="profile-stat" v-if="stat.iqr_outliers > 0">
-                    <span class="profile-stat-label">Outliers</span>
-                    <span class="profile-stat-value" style="color: var(--el-color-danger)">{{ stat.iqr_outliers }}</span>
-                  </div>
+                  <div class="profile-stat"><span>Mean</span><span>{{ stat.mean?.toFixed(4) ?? '—' }}</span></div>
+                  <div class="profile-stat"><span>Std</span><span>{{ stat.std?.toFixed(4) ?? '—' }}</span></div>
+                  <div class="profile-stat"><span>Min</span><span>{{ stat.min ?? '—' }}</span></div>
+                  <div class="profile-stat"><span>Max</span><span>{{ stat.max ?? '—' }}</span></div>
+                  <div class="profile-stat"><span>Missing</span><span>{{ stat.missing_count }} ({{ (stat.missing_rate * 100).toFixed(1) }}%)</span></div>
                 </div>
               </el-card>
             </div>
-            <el-empty v-else description="请选择参数和结果后点击查询" :image-size="80" />
-          </el-tab-pane>
-          <el-tab-pane label="相关性" name="correlation">
-            <CorrelationChart />
-          </el-tab-pane>
-          <el-tab-pane label="回归分析" name="regression">
-            <RegressionChart />
-          </el-tab-pane>
-          <el-tab-pane label="参数推荐" name="recommendation">
-            <RecommendationForm />
-          </el-tab-pane>
-        </el-tabs>
-      </el-tab-pane>
-
-      <el-tab-pane label="手动分析" name="excel">
-        <div v-if="!datasetId" class="excel-upload-area">
-          <el-card shadow="hover">
-            <el-upload
-              drag
-              :auto-upload="false"
-              :limit="1"
-              accept=".xlsx,.xls"
-              :on-change="handleFileChange"
-              :file-list="fileList"
-              class="full-upload"
-            >
-              <div class="upload-inline">
-                <el-icon size="16"><UploadFilled /></el-icon>
-                <span>拖拽或点击选择 .xlsx / .xls 文件</span>
-              </div>
-            </el-upload>
-            <div class="excel-actions">
-              <el-button type="primary" size="small" @click="handleUpload" :loading="uploading" :disabled="!fileList.length">
-                上传并分析
-              </el-button>
-              <el-button size="small" @click="downloadTemplate">下载模板</el-button>
-            </div>
-            <div v-if="uploadError" class="upload-error">{{ uploadError }}</div>
-          </el-card>
+            <el-empty v-else description="无分析数据" :image-size="60" />
+          </section>
+          <section id="report-correlation">
+            <h3>🔗 相关性</h3>
+            <CorrelationChart :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" :auto-mode="true" />
+          </section>
+          <section id="report-regression">
+            <h3>📈 回归分析</h3>
+            <RegressionChart :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" :auto-mode="true" />
+          </section>
+          <section id="report-recommendation">
+            <h3>💡 参数推荐</h3>
+            <RecommendationForm :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" />
+          </section>
         </div>
-
-        <div v-else>
-          <el-card shadow="hover" class="upload-result">
-            <div class="upload-result-info">
-              <el-icon size="18" color="#059669"><CircleCheckFilled /></el-icon>
-              <span>已上传 {{ sampleCount }} 条数据</span>
-              <span class="field-count">{{ features.length }} 个参数 / {{ targets.length }} 个结果</span>
-              <el-button text size="small" @click="resetUpload">重新上传</el-button>
-            </div>
-          </el-card>
-          <el-tabs v-model="activeTab" class="analysis-tabs">
-            <el-tab-pane label="字段概览" name="profile">
-              <div v-if="profileFields.length" class="profile-grid">
-                <el-card v-for="stat in profileFields" :key="stat.field" class="profile-card">
-                  <template #header>
-                    <span class="profile-field">{{ stat.field }}</span>
-                    <el-tag size="small" class="profile-dtype">{{ stat.dtype }}</el-tag>
-                  </template>
-                  <div class="profile-stats">
-                    <div class="profile-stat">
-                      <span class="profile-stat-label">Count</span>
-                      <span class="profile-stat-value">{{ stat.count }}</span>
-                    </div>
-                    <div class="profile-stat" v-if="stat.mean !== null">
-                      <span class="profile-stat-label">Mean</span>
-                      <span class="profile-stat-value">{{ stat.mean.toFixed(4) }}</span>
-                    </div>
-                    <div class="profile-stat" v-if="stat.std !== null">
-                      <span class="profile-stat-label">Std</span>
-                      <span class="profile-stat-value">{{ stat.std.toFixed(4) }}</span>
-                    </div>
-                    <div class="profile-stat" v-if="stat.min !== null">
-                      <span class="profile-stat-label">Min</span>
-                      <span class="profile-stat-value">{{ stat.min }}</span>
-                    </div>
-                    <div class="profile-stat" v-if="stat.max !== null">
-                      <span class="profile-stat-label">Max</span>
-                      <span class="profile-stat-value">{{ stat.max }}</span>
-                    </div>
-                  </div>
-                </el-card>
-              </div>
-              <el-empty v-else description="请先上传 Excel 文件" :image-size="80" />
-            </el-tab-pane>
-            <el-tab-pane label="相关性" name="correlation">
-              <ExcelCorrelationChart :dataset-id="datasetId" :fields="fields" />
-            </el-tab-pane>
-            <el-tab-pane label="回归分析" name="regression">
-              <ExcelRegressionChart :dataset-id="datasetId" :fields="fields" />
-            </el-tab-pane>
-            <el-tab-pane label="参数推荐" name="recommendation">
-              <ExcelRecommendationForm :dataset-id="datasetId" :fields="fields" />
-            </el-tab-pane>
-          </el-tabs>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useAnalysisStore, type ProfilingEntry } from '@/stores/analysis'
-import AnalysisFilter from '@/components/AnalysisFilter.vue'
+import { ref, onMounted, nextTick } from 'vue'
+import { queryDataset, uploadDataset, previewDataset, profile as apiProfile, type PreviewResponse } from '@/api/analysis'
+import { listDevices as fetchDevices } from '@/api/records'
+import DataPreviewTable from '@/components/DataPreviewTable.vue'
+import FieldCheckboxGrid from '@/components/FieldCheckboxGrid.vue'
 import CorrelationChart from '@/components/CorrelationChart.vue'
 import RegressionChart from '@/components/RegressionChart.vue'
 import RecommendationForm from '@/components/RecommendationForm.vue'
-import ExcelCorrelationChart from '@/components/ExcelCorrelationChart.vue'
-import ExcelRegressionChart from '@/components/ExcelRegressionChart.vue'
-import ExcelRecommendationForm from '@/components/ExcelRecommendationForm.vue'
-import { uploadExcel, excelProfile } from '@/api/analysis'
-import { UploadFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import { UploadFilled, Loading } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 
-const analysis = useAnalysisStore()
-const activeTab = ref('profile')
-const mode = ref('db')
+type Step = 'import' | 'preview' | 'config' | 'loading' | 'report'
 
-const datasetId = ref('')
+const state = ref<Step>('import')
+const importMode = ref<'db' | 'excel'>('db')
+const loading = ref(false)
+const importError = ref('')
+const analyzing = ref(false)
+const loadingProgress = ref('')
+
+const devices = ref<string[]>([])
+const filterDevice = ref('')
+const dateRange = ref<[Date, Date] | null>([new Date(Date.now() - 604800000), new Date()])
 const fileList = ref<UploadFile[]>([])
-const uploading = ref(false)
-const uploadError = ref('')
-const features = ref<string[]>([])
-const targets = ref<string[]>([])
+
+const timeShortcuts = [
+  { text: '近一天', value: () => [new Date(Date.now() - 86400000), new Date()] },
+  { text: '最近一周', value: () => [new Date(Date.now() - 604800000), new Date()] },
+  { text: '一个月', value: () => [new Date(Date.now() - 2592000000), new Date()] },
+]
+
+const datasetId = ref<string | null>(null)
 const sampleCount = ref(0)
 
-interface ExcelFields {
-  features: string[]
-  targets: string[]
-}
+const previewRows = ref<Record<string, unknown>[]>([])
+const previewTotal = ref(0)
+const previewPage = ref(1)
+const previewLoading = ref(false)
+const previewFields = ref<PreviewResponse['fields']>({ features: [], targets: [] })
 
-const fields = computed<ExcelFields>(() => ({
-  features: features.value,
-  targets: targets.value,
-}))
+const selectedFeatures = ref<string[]>([])
+const selectedTargets = ref<string[]>([])
 
-const profileFields = computed<ProfilingEntry[]>(() => {
-  const r = analysis.profileResult
-  if (!r || !Array.isArray(r)) return []
-  return r as unknown as ProfilingEntry[]
-})
+const profileData = ref<{ field: string; mean: number | null; std: number | null; min: number | null; max: number | null; missing_count: number; missing_rate: number }[]>([])
+const missingCount = ref(0)
 
-function handleFileChange(file: UploadFile) {
-  fileList.value = [file]
-  uploadError.value = ''
-}
+const activeNav = ref('report-overview')
+const reportContentRef = ref<HTMLElement | null>(null)
 
-async function handleUpload() {
-  const f = fileList.value[0]?.raw
-  if (!f) return
-  uploading.value = true
-  uploadError.value = ''
+const navItems = [
+  { id: 'report-overview', icon: '📋', label: '数据概览' },
+  { id: 'report-profile', icon: '📊', label: '字段分析' },
+  { id: 'report-correlation', icon: '🔗', label: '相关性' },
+  { id: 'report-regression', icon: '📈', label: '回归' },
+  { id: 'report-recommendation', icon: '💡', label: '推荐' },
+]
+
+async function loadDevices() {
   try {
-    const result = await uploadExcel(f)
-    datasetId.value = result.dataset_id
-    features.value = result.fields.features
-    targets.value = result.fields.targets
-    sampleCount.value = result.sample_count
-
-    const profileResult = await excelProfile(result.dataset_id)
-    analysis.profileResult = profileResult as unknown as Record<string, Record<string, unknown>>
-  } catch (e: any) {
-    uploadError.value = e?.response?.data?.message || e?.message || '上传失败'
-  } finally {
-    uploading.value = false
+    devices.value = await fetchDevices()
+    if (devices.value.length && !filterDevice.value) {
+      filterDevice.value = devices.value[0]
+    }
+  } catch {
+    // silent
   }
 }
 
-function resetUpload() {
-  datasetId.value = ''
-  fileList.value = []
-  features.value = []
-  targets.value = []
-  sampleCount.value = 0
-  analysis.profileResult = {}
+function handleFileChange(file: UploadFile) {
+  fileList.value = [file]
+  importError.value = ''
 }
 
-function downloadTemplate() {
-  const wb = [
-    ['temperature', 'conveyor_speed', 'oxygen_ppm', 'solder_joint_quality', 'voiding_pct'],
-    [220.5, 48.2, 187, 'pass', 'pass'],
-    [215.0, 52.0, 195, 'pass', 'fail'],
-  ]
-  const csv = wb.map(r => r.join(',')).join('\n')
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'spc_template.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+async function handleOnlineQuery() {
+  if (!filterDevice.value) return
+  loading.value = true
+  importError.value = ''
+  try {
+    const since = dateRange.value?.[0]?.toISOString()
+    const r = await queryDataset(filterDevice.value, since)
+    setDataset(r)
+  } catch (e: any) {
+    importError.value = e?.response?.data?.message || e?.message || '查询失败'
+  } finally {
+    loading.value = false
+  }
 }
+
+async function handleExcelUpload() {
+  const f = fileList.value[0]?.raw
+  if (!f) return
+  loading.value = true
+  importError.value = ''
+  try {
+    const r = await uploadDataset(f)
+    setDataset(r)
+  } catch (e: any) {
+    importError.value = e?.response?.data?.message || e?.message || '上传失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function setDataset(r: { dataset_id: string; fields: { features: string[]; targets: string[] }; sample_count: number }) {
+  datasetId.value = r.dataset_id
+  sampleCount.value = r.sample_count
+  state.value = 'preview'
+  loadPreview()
+}
+
+async function loadPreview() {
+  if (!datasetId.value) return
+  previewLoading.value = true
+  try {
+    const r = await previewDataset(datasetId.value, previewPage.value, 50)
+    previewRows.value = r.rows
+    previewTotal.value = r.total
+    previewFields.value = r.fields
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+async function handlePreviewPage(page: number) {
+  previewPage.value = page
+  await loadPreview()
+}
+
+function goConfig() {
+  state.value = 'config'
+  selectedFeatures.value = previewFields.value.features.map((f) => f.name)
+  selectedTargets.value = previewFields.value.targets.filter((f) => f.type === 'numeric').map((f) => f.name)
+}
+
+async function goReport() {
+  if (!datasetId.value || !selectedFeatures.value.length || !selectedTargets.value.length) return
+  state.value = 'loading'
+  analyzing.value = true
+  loadingProgress.value = ''
+  try {
+    loadingProgress.value = '1/4 字段分析...'
+    const pf = await apiProfile(datasetId.value) as { field: string; mean: number | null; std: number | null; min: number | null; max: number | null; missing_count: number; missing_rate: number }[]
+    profileData.value = pf
+    missingCount.value = pf.reduce((s, x) => s + (x.missing_count || 0), 0)
+
+    state.value = 'report'
+    await nextTick()
+    activeNav.value = 'report-overview'
+  } finally {
+    analyzing.value = false
+    loadingProgress.value = ''
+  }
+}
+
+function goImport() {
+  state.value = 'import'
+  datasetId.value = null
+  previewRows.value = []
+  previewFields.value = { features: [], targets: [] }
+  selectedFeatures.value = []
+  selectedTargets.value = []
+  profileData.value = []
+  importError.value = ''
+  fileList.value = []
+}
+
+function scrollTo(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  activeNav.value = id
+}
+
+function onReportScroll() {
+  const el = reportContentRef.value
+  if (!el) return
+  for (const item of [...navItems].reverse()) {
+    const section = document.getElementById(item.id)
+    if (section && section.offsetTop <= el.scrollTop + 100) {
+      activeNav.value = item.id
+      break
+    }
+  }
+}
+
+onMounted(loadDevices)
 </script>
 
 <style scoped>
-.analysis-header { margin-bottom: 12px; }
-.page-title {
-  font-family: 'Fira Code', monospace;
-  font-size: 20px; font-weight: 600;
-  color: var(--el-text-color-primary); margin: 0 0 2px;
-}
+.analysis-header { margin-bottom: 16px; }
+.page-title { font-family: 'Fira Code', monospace; font-size: 20px; font-weight: 600; margin: 0 0 2px; color: var(--el-text-color-primary); }
 .page-desc { font-size: 12px; color: var(--el-text-color-secondary); margin: 0; }
-.mode-tabs { margin-top: 12px; }
-.analysis-tabs { margin-top: 12px; }
-.excel-upload-area { }
-.full-upload { width: 100%; }
-.full-upload :deep(.el-upload-dragger) {
-  height: 30px; width: 100%; padding: 0 12px;
-  display: flex; align-items: center;
-}
-.upload-inline {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: var(--el-text-color-secondary);
-}
-.excel-actions {
-  margin-top: 10px; display: flex; gap: 8px; align-items: center;
-}
-.upload-error { margin-top: 8px; color: var(--el-color-danger); font-size: 13px; }
-.upload-result { margin-bottom: 12px; }
-.upload-result-info {
-  display: flex; align-items: center; gap: 10px; font-size: 13px;
-  color: var(--el-text-color-regular);
-}
-.field-count { color: var(--el-text-color-secondary); font-size: 12px; }
-.upload-result :deep(.el-card__body) { padding: 10px 14px; }
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-.profile-card { animation: cardIn 0.3s ease-out both; }
-.profile-card :deep(.el-card__header) {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px;
-}
-.profile-field {
-  font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 500;
-  color: var(--el-color-primary);
-}
-.profile-dtype { font-size: 10px; }
-.profile-stats { display: flex; flex-direction: column; gap: 6px; }
-.profile-stat {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 3px 0; border-bottom: 1px solid var(--el-border-color-light);
-}
-.profile-stat:last-child { border-bottom: none; }
-.profile-stat-label { font-size: 12px; color: var(--el-text-color-secondary); text-transform: capitalize; }
-.profile-stat-value {
-  font-family: 'Fira Code', monospace; font-size: 13px;
-  color: var(--el-text-color-primary); font-weight: 500;
-}
-@keyframes cardIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+
+.step-wrap { margin-top: 12px; }
+.step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--el-color-primary); border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; margin-right: 8px; }
+.step-title { font-size: 15px; font-weight: 600; color: var(--el-text-color-primary); }
+.step-actions { display: flex; gap: 8px; }
+
+.import-cards { display: flex; gap: 16px; }
+.import-card { flex: 1; padding: 4px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+.import-card.active { border-color: var(--el-color-primary); }
+.import-card h3 { margin: 4px 0 2px; font-size: 15px; }
+.import-card p { font-size: 12px; color: var(--el-text-color-secondary); margin: 0 0 8px; }
+.import-icon { font-size: 24px; }
+.import-body { margin-top: 8px; }
+.import-error { color: var(--el-color-danger); font-size: 12px; margin-top: 8px; }
+.upload-hint { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px; }
+
+.config-actions { margin-top: 20px; display: flex; justify-content: flex-end; }
+
+.loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; gap: 12px; font-size: 14px; color: var(--el-text-color-secondary); }
+
+.report-wrap { margin-top: 12px; }
+.report-layout { display: flex; gap: 16px; margin-top: 12px; }
+.report-nav { width: 140px; flex-shrink: 0; }
+.report-nav .nav-item { display: block; padding: 6px 8px; font-size: 12px; color: var(--el-text-color-secondary); text-decoration: none; border-left: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+.report-nav .nav-item:hover { color: var(--el-color-primary); }
+.report-nav .nav-item.active { color: var(--el-color-primary); border-left-color: var(--el-color-primary); font-weight: 500; }
+.report-content { flex: 1; max-height: calc(100vh - 200px); overflow-y: auto; }
+.report-content section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--el-border-color-light); }
+.report-content section:last-child { border-bottom: none; }
+.report-content h3 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+
+.stat-num { font-family: 'Fira Code', monospace; font-size: 24px; font-weight: 700; text-align: center; }
+.stat-label { font-size: 11px; color: var(--el-text-color-secondary); text-align: center; margin-top: 4px; }
+
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.profile-card :deep(.el-card__header) { padding: 8px 12px; }
+.profile-field { font-family: 'Fira Code', monospace; font-size: 13px; font-weight: 500; color: var(--el-color-primary); }
+.profile-stats { display: flex; flex-direction: column; gap: 4px; }
+.profile-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; border-bottom: 1px solid var(--el-border-color-light); }
+.profile-stat span:first-child { color: var(--el-text-color-secondary); }
+.profile-stat span:last-child { font-family: 'Fira Code', monospace; font-weight: 500; }
 </style>

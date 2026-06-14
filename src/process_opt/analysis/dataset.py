@@ -59,7 +59,13 @@ class DatasetBuilder:
             if row["params"] is not None:
                 all_param_keys.update(row["params"].keys())
             if row["results"] is not None:
-                all_result_keys.update(row["results"].keys())
+                if isinstance(row["results"], list):
+                    for item in row["results"]:
+                        if isinstance(item, dict) and "name" in item:
+                            all_result_keys.add(item["name"])
+                            all_result_keys.add(f"{item['name']}_result")
+                elif isinstance(row["results"], dict):
+                    all_result_keys.update(row["results"].keys())
 
         for field in request.feature_fields:
             if field not in all_param_keys:
@@ -93,9 +99,20 @@ class DatasetBuilder:
 
             tgt = {}
             if row["results"] is not None:
-                for t in use_target_fields:
-                    if t in row["results"]:
-                        tgt[t] = row["results"][t]
+                if isinstance(row["results"], list):
+                    for item in row["results"]:
+                        if not isinstance(item, dict):
+                            continue
+                        name = item.get("name")
+                        if name in use_target_fields:
+                            tgt[name] = item.get("value")
+                        result_key = f"{name}_result"
+                        if result_key in use_target_fields:
+                            tgt[result_key] = item.get("result")
+                elif isinstance(row["results"], dict):
+                    for t in use_target_fields:
+                        if t in row["results"]:
+                            tgt[t] = row["results"][t]
             targets.append(tgt)
 
             metadata.append({
@@ -104,6 +121,8 @@ class DatasetBuilder:
                 "station_id": row["station_id"],
                 "processed_at": row["processed_at"].isoformat() if row["processed_at"] else None,
                 "inspected_at": row["inspected_at"].isoformat() if row["inspected_at"] else None,
+                "process_product_model": row.get("process_product_model") or "",
+                "inspection_product_model": row.get("inspection_product_model") or "",
             })
 
         features, targets, metadata = self._handle_missing(
@@ -180,11 +199,13 @@ class DatasetBuilder:
             if existing:
                 fill_values[field] = _stat(existing, strategy)
 
+        ff = use_feature_fields or request.feature_fields
+        tf = use_target_fields or request.target_fields
         for i in range(len(features)):
-            for f in request.feature_fields:
+            for f in ff:
                 if f not in features[i] and f in fill_values:
                     features[i][f] = fill_values[f]
-            for t in request.target_fields:
+            for t in tf:
                 if t not in targets[i] and t in fill_values:
                     targets[i][t] = fill_values[t]
 

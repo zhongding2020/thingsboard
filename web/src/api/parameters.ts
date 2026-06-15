@@ -1,5 +1,17 @@
 import client from './client'
 
+export interface ParameterItem {
+  id: number
+  set_id: number
+  param_key: string
+  param_value: unknown
+  unit: string | null
+  data_type: string
+  min_value: number | null
+  max_value: number | null
+  description: string | null
+}
+
 export interface ParameterSet {
   id: number
   name: string
@@ -18,8 +30,18 @@ export interface ParameterSet {
   archived_at: string | null
 }
 
+export interface ParameterSetWithItems {
+  parameter_set: ParameterSet
+  items: ParameterItem[]
+  checksum: string
+}
+
 export function listSets(): Promise<ParameterSet[]> {
   return client.get('/parameters/sets').then((res) => res.data)
+}
+
+export function getSet(id: number): Promise<ParameterSetWithItems> {
+  return client.get(`/parameters/sets/${id}`).then((res) => res.data)
 }
 
 export function createSet(data?: Record<string, unknown>): Promise<ParameterSet> {
@@ -42,10 +64,17 @@ export function activateSet(id: number, data: { actor: string; note?: string }):
   return client.post(`/parameters/sets/${id}/activate`, data).then((res) => res.data)
 }
 
-export function getLatest(deviceType: string): Promise<unknown> {
+export function getLatest(deviceType: string): Promise<ParameterSetWithItems> {
   return client.get('/parameters/latest', { params: { device_type: deviceType } }).then((res) => res.data)
 }
 
-export function recordConfirmation(data?: Record<string, unknown>): Promise<unknown> {
+export function recordConfirmation(data: {
+  device_id: string
+  device_type: string
+  parameter_set_id: number
+  parameter_version: number
+  status: string
+  message?: string
+}): Promise<void> {
   return client.post('/parameters/confirmations', data).then((res) => res.data)
 }

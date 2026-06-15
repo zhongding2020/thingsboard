@@ -45,6 +45,11 @@
               <span class="device-name">{{ device.name }}</span>
               <span class="device-type">{{ deviceLabel(device.type) }}</span>
             </div>
+            <div class="device-actions">
+              <el-button text size="small" @click.stop="openDeviceParam(device)" title="查看参数">
+                <el-icon :size="13" color="var(--el-text-color-secondary)"><Setting /></el-icon>
+              </el-button>
+            </div>
             <div class="device-status">
               <span :class="['status-dot', `status-${device.status || 'normal'}`]" />
             </div>
@@ -87,14 +92,21 @@
         </el-table-column>
       </el-table>
     </el-dialog>
+
+    <DeviceParameterDialog
+      v-model="paramDialogVisible"
+      :device-id="paramDeviceId"
+      :device-type="paramDeviceType"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Edit, Delete, Plus } from '@element-plus/icons-vue'
+import { User, Edit, Delete, Plus, Setting } from '@element-plus/icons-vue'
 import { deviceIcon, deviceLabel, deviceColor } from '@/utils/device-icons'
+import DeviceParameterDialog from '@/components/DeviceParameterDialog.vue'
 import {
   listLines, createLine, updateLine, deleteLine,
   listDevices, updateDevice, reorderDevices,
@@ -118,6 +130,15 @@ const editing = ref<LineResponse | null>(null)
 const form = ref({ name: '', responsible: '', location: '' })
 
 const dragState = reactive({ deviceId: '', fromLineId: '' })
+
+const paramDialogVisible = ref(false)
+const paramDeviceId = ref('')
+const paramDeviceType = ref('')
+function openDeviceParam(device: { id: string; type: string }) {
+  paramDeviceId.value = device.id
+  paramDeviceType.value = device.type
+  paramDialogVisible.value = true
+}
 
 function onDragStart(e: DragEvent, deviceId: string, lineId: string) {
   if (!e.dataTransfer) return

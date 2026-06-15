@@ -28,8 +28,9 @@
       <el-table-column label="更新时间" width="150" class-name="cell-mono" sortable prop="updated_at">
         <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="340">
+      <el-table-column label="操作" width="420">
         <template #default="{ row }">
+          <el-button size="small" @click="handleDetail(row)">详情</el-button>
           <el-button size="small" @click="handleSubmit(row)" :disabled="row.status !== 'draft'">提交</el-button>
           <el-button size="small" type="success" @click="handleApprove(row)" :disabled="row.status !== 'proposed'">批准</el-button>
           <el-button size="small" type="danger" @click="handleReject(row)" :disabled="row.status !== 'proposed'">驳回</el-button>
@@ -48,12 +49,51 @@
         @size-change="handlePageChange"
       />
     </div>
+
+    <!-- Detail dialog -->
+    <el-dialog v-model="detailVisible" title="参数集详情" width="640px" :close-on-click-modal="false">
+      <template v-if="detailData">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="名称" span="2">{{ detailData.parameter_set.name }}</el-descriptions-item>
+          <el-descriptions-item label="设备类型">{{ detailData.parameter_set.device_type }}</el-descriptions-item>
+          <el-descriptions-item label="版本">{{ detailData.parameter_set.version }}</el-descriptions-item>
+          <el-descriptions-item label="来源">{{ detailData.parameter_set.source }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ detailData.parameter_set.created_by }}</el-descriptions-item>
+          <el-descriptions-item label="状态" span="2">
+            <ParameterStatus :status="detailData.parameter_set.status" />
+          </el-descriptions-item>
+          <el-descriptions-item label="备注" span="2">{{ detailData.parameter_set.note || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="校验和">
+            <code class="checksum">{{ detailData.checksum }}</code>
+          </el-descriptions-item>
+          <el-descriptions-item label="参数项数">{{ detailData.items.length }}</el-descriptions-item>
+        </el-descriptions>
+
+        <h4 class="items-title">参数项</h4>
+        <el-table :data="detailData.items" stripe size="small" max-height="300">
+          <el-table-column prop="param_key" label="参数名" min-width="120" />
+          <el-table-column label="值" width="100">
+            <template #default="{ row }">{{ formatValue(row.param_value, row.data_type) }}</template>
+          </el-table-column>
+          <el-table-column prop="unit" label="单位" width="60" />
+          <el-table-column prop="data_type" label="类型" width="70" />
+          <el-table-column label="规格下限" width="90" class-name="cell-mono">
+            <template #default="{ row }">{{ row.min_value ?? '—' }}</template>
+          </el-table-column>
+          <el-table-column label="规格上限" width="90" class-name="cell-mono">
+            <template #default="{ row }">{{ row.max_value ?? '—' }}</template>
+          </el-table-column>
+          <el-table-column prop="description" label="说明" min-width="120" show-overflow-tooltip />
+        </el-table>
+      </template>
+      <div v-else class="detail-loading" v-loading="detailLoading" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { listSets, submitSet, approveSet, rejectSet, activateSet, type ParameterSet } from '@/api/parameters'
+import { listSets, getSet, submitSet, approveSet, rejectSet, activateSet, type ParameterSet, type ParameterSetWithItems } from '@/api/parameters'
 import { useSessionStore } from '@/stores/session'
 import ParameterStatus from '@/components/ParameterStatus.vue'
 
@@ -81,6 +121,15 @@ function formatTime(iso: string) {
   })
 }
 
+function formatValue(value: unknown, dataType: string): string {
+  if (value === null || value === undefined) return '—'
+  if (dataType === 'float' || dataType === 'double') {
+    const n = Number(value)
+    return isNaN(n) ? String(value) : n.toFixed(4)
+  }
+  return String(value)
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -94,14 +143,29 @@ function handlePageChange() {
   // computed auto-updates
 }
 
+// Detail dialog
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailData = ref<ParameterSetWithItems | null>(null)
+
+async function handleDetail(row: ParameterSet) {
+  detailVisible.value = true
+  detailLoading.value = true
+  detailData.value = null
+  try {
+    detailData.value = await getSet(row.id)
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+// State transitions
 async function handleSubmit(row: ParameterSet) {
   loading.value = true
   try {
     await submitSet(row.id, { actor: session.currentUser || 'operator' })
     await fetchData()
-  } finally {
-    loading.value = false
-  }
+  } catch { loading.value = false }
 }
 
 async function handleApprove(row: ParameterSet) {
@@ -109,9 +173,7 @@ async function handleApprove(row: ParameterSet) {
   try {
     await approveSet(row.id, { actor: session.currentUser || 'operator' })
     await fetchData()
-  } finally {
-    loading.value = false
-  }
+  } catch { loading.value = false }
 }
 
 async function handleReject(row: ParameterSet) {
@@ -119,9 +181,7 @@ async function handleReject(row: ParameterSet) {
   try {
     await rejectSet(row.id, { actor: session.currentUser || 'operator' })
     await fetchData()
-  } finally {
-    loading.value = false
-  }
+  } catch { loading.value = false }
 }
 
 async function handleActivate(row: ParameterSet) {
@@ -129,9 +189,7 @@ async function handleActivate(row: ParameterSet) {
   try {
     await activateSet(row.id, { actor: session.currentUser || 'operator' })
     await fetchData()
-  } finally {
-    loading.value = false
-  }
+  } catch { loading.value = false }
 }
 
 onMounted(fetchData)
@@ -172,5 +230,19 @@ onMounted(fetchData)
   display: flex;
   justify-content: flex-end;
   margin-top: 8px;
+}
+
+.items-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+.checksum {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+.detail-loading {
+  min-height: 120px;
 }
 </style>

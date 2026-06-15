@@ -22,6 +22,14 @@ class ParameterService:
     async def list_sets(self) -> list[ParameterSet]:
         return await self._repo.list_sets()
 
+    async def get_set_with_items(self, set_id: int) -> ParameterSetWithItems | None:
+        s = await self._repo.get_set(set_id)
+        if s is None:
+            return None
+        items = await self._repo.list_items(s.id)
+        checksum = self._compute_checksum(items)
+        return ParameterSetWithItems(parameter_set=s, items=items, checksum=checksum)
+
     async def create_draft(self, parameter_set: ParameterSetCreate) -> ParameterSet:
         draft = await self._repo.create_set(parameter_set)
         await self._repo.add_event(draft.id, "create", parameter_set.created_by)

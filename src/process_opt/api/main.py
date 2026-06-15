@@ -63,6 +63,11 @@ class ParameterServiceProxy:
             raise RuntimeError("ParameterService not initialized")
         return await self._service.list_sets()
 
+    async def get_set_with_items(self, set_id: int) -> ParameterSetWithItems | None:
+        if self._service is None:
+            raise RuntimeError("ParameterService not initialized")
+        return await self._service.get_set_with_items(set_id)
+
     async def create_draft(self, parameter_set: ParameterSetCreate) -> ParameterSet:
         if self._service is None:
             raise RuntimeError("ParameterService not initialized")

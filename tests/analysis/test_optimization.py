@@ -29,16 +29,16 @@ class TestRunOptimization:
         n = 200
         temp = rng.uniform(150, 250, n)
         pressure = rng.uniform(1.0, 5.0, n)
-        strength = 100 + 0.3 * (temp - 200) - 5 * (pressure - 3) + rng.normal(0, 2, n)
+        strength = 90 - 0.3 * (temp - 200) + 0.1 * (pressure - 3) + rng.normal(0, 1.5, n)
 
         ds = _make_dataset(temp, pressure, strength)
 
         config = OptimizationConfig(
             dataset_id="test",
             target_field="strength",
-            usl=115.0,
-            lsl=85.0,
-            target_value=100.0,
+            usl=100.0,
+            lsl=80.0,
+            target_value=90.0,
             target_cpk=1.33,
             key_factors=["temp", "pressure"],
             step_size=5.0,

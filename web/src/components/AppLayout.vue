@@ -87,7 +87,7 @@
           <span>AI 分析助手</span>
           <el-button text size="small" @click="agentVisible = false">✕</el-button>
         </div>
-        <iframe src="http://localhost:18789" class="agent-iframe" />
+        <iframe src="http://localhost:5100" class="agent-iframe" />
       </div>
     </Transition>
   </Teleport>

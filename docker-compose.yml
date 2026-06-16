@@ -63,42 +63,13 @@ services:
       postgres:
         condition: service_healthy
 
-  openclaw-gateway:
-    image: ghcr.io/openclaw/openclaw:latest
+  opencode-web:
+    build: docker/opencode-web
     restart: unless-stopped
     ports:
-      - "18789:18789"
-      - "18790:18790"
+      - "127.0.0.1:5100:5097"
     environment:
-      HOME: /home/node
-      OPENCLAW_HOME: /home/node
-      OPENCLAW_STATE_DIR: /home/node/.openclaw
-      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
-      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      OPENCLAW_DISABLE_BONJOUR: "1"
-      TZ: Asia/Shanghai
-      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1"
-    volumes:
-      - ./openclaw/config:/home/node/.openclaw
-      - ./openclaw/workspace:/home/node/.openclaw/workspace
-      - ./openclaw/auth-secrets:/home/node/.config/openclaw
-    command:
-      - "node"
-      - "dist/index.js"
-      - "gateway"
-      - "--bind"
-      - "lan"
-      - "--port"
-      - "18789"
-    healthcheck:
-      test:
-        - "CMD-SHELL"
-        - "curl -fsS http://127.0.0.1:18789/healthz"
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      OPENCODE_WEB_PORT: "5097"
 
 volumes:
   pgdata:

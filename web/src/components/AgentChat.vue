@@ -278,9 +278,12 @@ async function loadHistory() {
     const msgs = await getMessages(sessionId.value)
     if (msgs) {
       messages.value = (msgs as any[])
-        .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+        .filter((m: any) => {
+          const r = m.info?.role || m.role
+          return r === 'user' || r === 'assistant'
+        })
         .map((m: any) => ({
-          role: m.role,
+          role: m.info?.role || m.role || 'assistant',
           text: m.parts?.find((p: any) => p.type === 'text')?.text || '',
           parts: (m.parts || []).map((p: any) => ({
             type: p.type || 'text',

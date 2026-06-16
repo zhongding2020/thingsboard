@@ -6,8 +6,9 @@ interface OpencodeSession {
 }
 
 interface OpencodeMessage {
-  id: string
-  role: string
+  id?: string
+  info?: { role: string }
+  role?: string
   parts: { type: string; text?: string }[]
 }
 

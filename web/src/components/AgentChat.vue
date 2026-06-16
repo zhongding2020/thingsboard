@@ -101,7 +101,15 @@
             </div>
             <div v-for="(msg, i) in messages" :key="i" class="agent-msg">
               <div v-if="msg.role === 'user'" class="msg-bubble user-msg">{{ msg.text }}</div>
-              <div v-else-if="msg.role === 'assistant'" class="msg-bubble assistant-msg">{{ msg.text }}</div>
+              <template v-else-if="msg.role === 'assistant'">
+                <div v-for="(part, j) in msg.parts" :key="j" class="msg-part">
+                  <details v-if="part.type === 'reasoning'" class="msg-reasoning" :open="loading && i === messages.length - 1">
+                    <summary>{{ loading && i === messages.length - 1 ? '思考中...' : '已思考' }}</summary>
+                    <div class="reasoning-content" v-html="renderMd(part.text)"></div>
+                  </details>
+                  <div v-else-if="part.type === 'text'" class="msg-bubble assistant-msg" v-html="renderMd(part.text)"></div>
+                </div>
+              </template>
             </div>
             </template>
           </div>
@@ -135,13 +143,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, computed } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listSessions, createSession, sendPrompt, getMessages } from '@/api/opencode'
+import { marked } from 'marked'
+
+function renderMd(text: string): string {
+  if (!text) return ''
+  return marked.parse(text, { breaks: true, gfm: true }) as string
+}
+
+interface MessagePart {
+  type: string  // "text" | "reasoning" | "thinking"
+  text: string
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant'
-  text: string
+  text: string       // flattened for user messages
+  parts?: MessagePart[]  // for assistant messages
 }
 
 interface SessionItem {
@@ -258,18 +278,15 @@ async function loadHistory() {
     const msgs = await getMessages(sessionId.value)
     if (msgs) {
       messages.value = (msgs as any[])
-        .filter((m: any) => m.role !== 'system')
-        .flatMap((m: any) => {
-          const texts: ChatMessage[] = []
-          if (m.parts) {
-            for (const p of m.parts) {
-              if (p.type === 'text' && p.text?.trim()) {
-                texts.push({ role: m.role || 'assistant', text: p.text })
-              }
-            }
-          }
-          return texts
-        })
+        .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+        .map((m: any) => ({
+          role: m.role,
+          text: m.parts?.find((p: any) => p.type === 'text')?.text || '',
+          parts: (m.parts || []).map((p: any) => ({
+            type: p.type || 'text',
+            text: p.text || '',
+          })),
+        }))
       scrollBottom()
     }
   } catch { /* best-effort */ }
@@ -291,11 +308,14 @@ async function send() {
     }
     const res = await sendPrompt(sessionId.value, text)
     if ((res as any).parts) {
-      for (const p of (res as any).parts) {
-        if (p.type === 'text' && p.text?.trim()) {
-          messages.value.push({ role: 'assistant', text: p.text })
-        }
-      }
+      messages.value.push({
+        role: 'assistant',
+        text: '',
+        parts: (res as any).parts.map((p: any) => ({
+          type: p.type || 'text',
+          text: p.text || '',
+        })),
+      })
     }
     scrollBottom()
   } catch (e: any) {
@@ -418,8 +438,43 @@ function scrollBottom() {
 
 .msg-bubble {
   padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.6;
-  max-width: 90%; white-space: pre-wrap; word-break: break-word;
+  max-width: 95%; word-break: break-word;
+}
+.msg-bubble :deep(p) { margin: 0 0 8px; }
+.msg-bubble :deep(p:last-child) { margin-bottom: 0; }
+.msg-bubble :deep(code) {
+  background: var(--el-fill-color-dark); padding: 2px 5px; border-radius: 4px;
+  font-size: 12px; font-family: 'Fira Code', monospace;
+}
+.msg-bubble :deep(pre) {
+  background: var(--el-fill-color); padding: 10px; border-radius: 8px;
+  overflow-x: auto; font-size: 12px; line-height: 1.4; margin: 8px 0;
+}
+.msg-bubble :deep(table) { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+.msg-bubble :deep(th), .msg-bubble :deep(td) {
+  border: 1px solid var(--el-border-color-light); padding: 4px 8px; text-align: left;
+}
+.msg-bubble :deep(th) { background: var(--el-fill-color); }
+.msg-bubble :deep(ul), .msg-bubble :deep(ol) { padding-left: 20px; margin: 4px 0; }
+.msg-bubble :deep(blockquote) {
+  border-left: 3px solid var(--el-color-primary); padding-left: 10px;
+  color: var(--el-text-color-secondary); margin: 8px 0;
+}
+.msg-bubble :deep(h1), .msg-bubble :deep(h2), .msg-bubble :deep(h3) {
+  font-size: 14px; margin: 10px 0 4px;
 }
 .user-msg { background: var(--el-color-primary-light-8); align-self: flex-end; }
 .assistant-msg { align-self: flex-start; background: var(--el-fill-color); }
+
+.msg-reasoning {
+  align-self: flex-start; margin: 2px 0;
+  border: 1px solid var(--el-border-color-light); border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; background: var(--el-color-info-light-9);
+  max-width: 95%;
+}
+.msg-reasoning summary {
+  cursor: pointer; color: var(--el-text-color-secondary); user-select: none;
+}
+.msg-reasoning[open] summary { margin-bottom: 6px; }
+.reasoning-content { color: var(--el-text-color-secondary); line-height: 1.5; }
 </style>

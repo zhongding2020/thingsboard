@@ -72,25 +72,7 @@
       </el-main>
     </el-container>
   </el-container>
-  <el-tooltip content="AI 分析助手" placement="left">
-    <el-button class="agent-float" circle @click="agentVisible = !agentVisible">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M12 6v6l4 2"/>
-      </svg>
-    </el-button>
-  </el-tooltip>
-  <Teleport to="body">
-    <Transition name="agent-panel">
-      <div v-if="agentVisible" class="agent-panel">
-        <div class="agent-header">
-          <span>AI 分析助手</span>
-          <el-button text size="small" @click="agentVisible = false">✕</el-button>
-        </div>
-        <iframe src="http://localhost:5100" class="agent-iframe" />
-      </div>
-    </Transition>
-  </Teleport>
+  <AgentChat />
 </template>
 
 <script setup lang="ts">
@@ -100,6 +82,7 @@ import { Monitor, DocumentCopy, TrendCharts, DataAnalysis, Setting, Tools, Fold,
 import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import AgentChat from '@/components/AgentChat.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -107,7 +90,6 @@ const session = useSessionStore()
 const app = useAppStore()
 
 const collapsed = ref(false)
-const agentVisible = ref(false)
 const currentTime = ref('')
 let timer: number | undefined
 
@@ -302,71 +284,5 @@ function handleLogout() {
 .page-fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
-}
-
-.agent-float {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 9999;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--el-color-primary);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: none;
-  cursor: pointer;
-}
-.agent-float:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-}
-
-.agent-panel {
-  position: fixed;
-  right: 20px;
-  bottom: 72px;
-  z-index: 9998;
-  width: 800px;
-  height: 680px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.agent-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--el-border-color-light);
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.agent-iframe {
-  flex: 1;
-  width: 100%;
-  border: none;
-  background: #fff;
-}
-
-.agent-panel-enter-active,
-.agent-panel-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.agent-panel-enter-from,
-.agent-panel-leave-to {
-  opacity: 0;
-  transform: translateY(12px) scale(0.96);
-  pointer-events: none;
 }
 </style>

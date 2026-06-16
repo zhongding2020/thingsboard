@@ -98,6 +98,25 @@
         @update:selected-features="selectedFeatures = $event"
         @update:selected-targets="selectedTargets = $event"
       />
+      <div class="spec-section">
+        <h4 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:var(--el-text-color-primary);">Cpk 优化规格限</h4>
+        <el-form inline size="small">
+          <el-form-item label="目标字段">
+            <el-select v-model="cfgTargetField" style="width: 160px">
+              <el-option v-for="f in selectedTargets" :key="f" :label="f" :value="f" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="USL">
+            <el-input-number v-model="cfgUsl" :min="0" :step="1" style="width: 120px" />
+          </el-form-item>
+          <el-form-item label="LSL">
+            <el-input-number v-model="cfgLsl" :min="0" :step="1" style="width: 120px" />
+          </el-form-item>
+          <el-form-item label="目标值">
+            <el-input-number v-model="cfgTargetValue" :min="0" :step="0.5" style="width: 120px" />
+          </el-form-item>
+        </el-form>
+      </div>
       <div class="config-actions">
         <el-button type="primary" size="large" @click="goReport" :loading="analyzing">
           <el-icon style="margin-right: 4px;"><Search /></el-icon> 开始分析
@@ -161,6 +180,25 @@
             <h3><el-icon :size="16" color="#10B981"><Link /></el-icon> 相关性</h3>
             <CorrelationChart :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" :auto-mode="true" />
           </section>
+          <section id="report-pareto">
+            <h3><el-icon :size="16" color="#F59E0B"><Histogram /></el-icon> 帕累托图</h3>
+            <ParetoChart
+              :dataset-id="datasetId!"
+              :target-fields="selectedTargets"
+              :auto-mode="true"
+            />
+          </section>
+          <section id="report-cpk">
+            <h3><el-icon :size="16" color="#EF4444"><Aim /></el-icon> Cpk 优化</h3>
+            <CpkOptimizer
+              :dataset-id="datasetId!"
+              :feature-fields="selectedFeatures"
+              :target-field="cfgTargetField"
+              :usl="cfgUsl"
+              :lsl="cfgLsl"
+              :target-value="cfgTargetValue"
+            />
+          </section>
           <section id="report-regression">
             <h3><el-icon :size="16" color="#F59E0B"><TrendCharts /></el-icon> 回归分析</h3>
             <RegressionChart :dataset-id="datasetId!" :feature-fields="selectedFeatures" :target-fields="selectedTargets" :auto-mode="true" />
@@ -184,7 +222,9 @@ import FieldCheckboxGrid from '@/components/FieldCheckboxGrid.vue'
 import CorrelationChart from '@/components/CorrelationChart.vue'
 import RegressionChart from '@/components/RegressionChart.vue'
 import RecommendationForm from '@/components/RecommendationForm.vue'
-import { UploadFilled, Loading, DataBoard, FolderOpened, Search, Document, DataAnalysis, Link, TrendCharts, MagicStick } from '@element-plus/icons-vue'
+import ParetoChart from '@/components/ParetoChart.vue'
+import CpkOptimizer from '@/components/CpkOptimizer.vue'
+import { UploadFilled, Loading, DataBoard, FolderOpened, Search, Document, DataAnalysis, Link, TrendCharts, MagicStick, Histogram, Aim } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 
 type Step = 'import' | 'preview' | 'config' | 'loading' | 'report'
@@ -225,6 +265,10 @@ const selectedTargets = ref<string[]>([])
 
 const profileData = ref<{ field: string; mean: number | null; std: number | null; min: number | null; max: number | null; missing_count: number; missing_rate: number }[]>([])
 const missingCount = ref(0)
+const cfgTargetField = ref('')
+const cfgUsl = ref(100)
+const cfgLsl = ref(0)
+const cfgTargetValue = ref(50)
 
 const activeNav = ref('report-overview')
 const reportContentRef = ref<HTMLElement | null>(null)
@@ -233,6 +277,8 @@ const navItems = [
   { id: 'report-overview', icon: Document, label: '数据概览', color: '#3B82F6' },
   { id: 'report-profile', icon: DataAnalysis, label: '字段分析', color: '#8B5CF6' },
   { id: 'report-correlation', icon: Link, label: '相关性', color: '#10B981' },
+  { id: 'report-pareto', icon: Histogram, label: '帕累托图', color: '#F59E0B' },
+  { id: 'report-cpk', icon: Aim, label: 'Cpk 优化', color: '#EF4444' },
   { id: 'report-regression', icon: TrendCharts, label: '回归', color: '#F59E0B' },
   { id: 'report-recommendation', icon: MagicStick, label: '推荐', color: '#EC4899' },
 ]
@@ -312,6 +358,9 @@ function goConfig() {
   state.value = 'config'
   selectedFeatures.value = previewFields.value.features.map((f) => f.name)
   selectedTargets.value = previewFields.value.targets.filter((f) => f.type === 'numeric').map((f) => f.name)
+  if (selectedTargets.value.length) {
+    cfgTargetField.value = selectedTargets.value[0]
+  }
 }
 
 async function goReport() {

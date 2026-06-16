@@ -104,8 +104,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
-import { optimizeCpk, type OptimizationResult } from '@/api/analysis'
-import { createSet } from '@/api/parameters'
+import { optimizeCpk, submitRecommendation, type OptimizationResult } from '@/api/analysis'
 import * as echarts from 'echarts'
 import { Aim, Upload } from '@element-plus/icons-vue'
 
@@ -227,7 +226,7 @@ function renderConvergence() {
 
 async function handleSubmit() {
   if (!result.value) return
-  await createSet({
+  await submitRecommendation({
     name: `Cpk Optimization - ${props.targetField}`,
     device_type: 'imported',
     items: Object.entries(result.value.recommended_params).map(([key, value]) => ({

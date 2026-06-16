@@ -32,9 +32,10 @@
         <div class="heatmap-legend">
           <span class="legend-label">-1</span>
           <div class="legend-bar" />
-          <span class="legend-label">0</span>
-          <div class="legend-bar2" />
           <span class="legend-label">+1</span>
+        </div>
+        <div class="legend-scale">
+          <span>极弱</span><span>弱</span><span>中</span><span>强</span>
         </div>
       </div>
       <el-empty v-if="!results.length && !matrixData.length" :description="autoMode ? '请先执行分析' : '选择参数后点击计算'" />
@@ -64,13 +65,11 @@ const chartRef = ref<HTMLDivElement>()
 const allFields = computed(() => [...props.featureFields, ...props.targetFields])
 
 function coeffColor(r: number): string {
-  if (r > 0.7) return '#ef4444'
-  if (r > 0.4) return '#f97316'
-  if (r > 0.2) return '#eab308'
-  if (r < -0.7) return '#3b82f6'
-  if (r < -0.4) return '#06b6d4'
-  if (r < -0.2) return '#22c55e'
-  return '#9ca3af'
+  const absR = Math.abs(r)
+  if (absR > 0.7) return '#ef4444'
+  if (absR > 0.5) return '#f97316'
+  if (absR > 0.3) return '#eab308'
+  return '#3b82f6'
 }
 
 async function handleCompute() {
@@ -146,27 +145,20 @@ function renderHeatmap(xLabels: string[], yLabels: string[], items: { x: string;
     tooltip: {
       formatter: (p: any) => {
         const d = items[p.dataIndex]
-        return `${d.x} × ${d.y}<br/>r = ${d.value.toFixed(4)}`
+        const absR = Math.abs(d.value)
+        let strength = '极弱'
+        if (absR > 0.7) strength = '强'
+        else if (absR > 0.5) strength = '中'
+        else if (absR > 0.3) strength = '弱'
+        return `${d.x} × ${d.y}<br/>r = ${d.value.toFixed(4)} (${strength})`
       },
     },
-    grid: { left: 120, right: 60, top: 40, bottom: 40 },
-    xAxis: {
-      type: 'category',
-      data: xLabels,
-      axisLabel: { rotate: 30, fontSize: 11, interval: 0 },
-      splitArea: { show: true },
-    },
-    yAxis: {
-      type: 'category',
-      data: yLabels,
-      axisLabel: { fontSize: 11 },
-      splitArea: { show: true },
-    },
+    grid: { left: 120, right: 60, top: 40, bottom: 60 },
     visualMap: {
       min: -1,
       max: 1,
       inRange: {
-        color: ['#3b82f6', '#ffffff', '#ef4444'],
+        color: ['#3b82f6', '#eab308', '#f97316', '#ef4444'],
       },
       calculable: true,
       orient: 'horizontal',
@@ -228,7 +220,7 @@ function renderHeatmap(xLabels: string[], yLabels: string[], items: { x: string;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   margin-top: 4px;
 }
 .legend-label { font-size: 11px; color: var(--el-text-color-secondary); }
@@ -236,12 +228,13 @@ function renderHeatmap(xLabels: string[], yLabels: string[], items: { x: string;
   width: 80px;
   height: 10px;
   border-radius: 3px;
-  background: linear-gradient(to right, #3b82f6, #ffffff, #ef4444);
+  background: linear-gradient(to right, #3b82f6, #eab308, #f97316, #ef4444);
 }
 .legend-bar2 {
   width: 80px;
   height: 10px;
   border-radius: 3px;
-  background: linear-gradient(to right, #ef4444, #ffffff, #3b82f6);
+  background: linear-gradient(to right, #ef4444, #f97316, #eab308, #3b82f6);
 }
+.legend-scale { display: flex; justify-content: space-between; width: 80px; font-size: 10px; color: var(--el-text-color-secondary); }
 </style>

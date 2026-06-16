@@ -11,5 +11,5 @@ class Settings(BaseSettings):
     process_subject: str = "process_data"
     inspection_subject: str = "inspection_data"
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o"
+    openai_model: str = ""
     openai_base_url: str = ""

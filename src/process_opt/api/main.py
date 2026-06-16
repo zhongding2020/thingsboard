@@ -7,6 +7,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
+from process_opt.agent.config import read_opencode_config
 from process_opt.agent.service import OpenAIAgentService
 from process_opt.analysis import AnalysisService
 from process_opt.analysis.dataset import DatasetBuilder
@@ -206,10 +207,11 @@ def create_api_app_from_settings() -> FastAPI:
     parameter_service_proxy = ParameterServiceProxy()
     analysis_service_proxy = AnalysisServiceProxy()
     line_device_repo_proxy = LineDeviceRepositoryProxy()
+    oc_cfg = read_opencode_config()
     agent_service_proxy = OpenAIAgentService(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        base_url=settings.openai_base_url,
+        api_key=settings.openai_api_key or oc_cfg["api_key"],
+        model=settings.openai_model or oc_cfg["model"],
+        base_url=settings.openai_base_url or oc_cfg["base_url"],
     )
 
     @asynccontextmanager

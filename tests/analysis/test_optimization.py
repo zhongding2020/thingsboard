@@ -55,6 +55,7 @@ class TestRunOptimization:
         assert "temp" in result.recommended_params
         assert "pressure" in result.recommended_params
         assert result.initial_cpk > 0
+        assert result.optimized_cpk >= result.initial_cpk
         assert "temp" in result.parameter_adjustments
         assert "from" in result.parameter_adjustments["temp"]
         assert "to" in result.parameter_adjustments["temp"]

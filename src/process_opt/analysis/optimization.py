@@ -60,6 +60,12 @@ def run_optimization(
         )
 
     X, y = _extract_arrays(dataset, config.key_factors, config.target_field)
+    if np.any(np.isnan(X)) or np.any(np.isnan(y)):
+        raise AnalysisError(
+            code="MODEL_FIT_FAILED",
+            message="Input data contains NaN values",
+            suggestion="Check for missing or invalid values in the dataset",
+        )
     model = LinearRegression()
     model.fit(X, y)
     y_pred_all = model.predict(X)

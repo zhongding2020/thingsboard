@@ -41,23 +41,28 @@ class ContainerPoolManager:
         except Exception as e:
             raise RuntimeError(f"Cannot connect to Docker daemon: {e}") from e
 
+        self._cleanup_old_containers()
+
         for i in range(self._settings.pool_min_size):
             port = self._next_port
             self._next_port += 1
             name = f"opencode-pool-{i + 1}"
-            container = self._docker_client.containers.run(
-                image=self._settings.pool_image,
-                detach=True,
-                ports={f"5097/tcp": port},
-                name=name,
-                environment={"NODE_ENV": "production"},
-                network=self._settings.pool_network,
-                remove=True,
-            )
-            self._containers[container.id] = ContainerState(
-                container_id=container.id, port=port, name=name
-            )
-            logger.info("Started container %s on port %d", name, port)
+            try:
+                container = self._docker_client.containers.run(
+                    image=self._settings.pool_image,
+                    detach=True,
+                    ports={f"5097/tcp": port},
+                    name=name,
+                    environment={"NODE_ENV": "production"},
+                    network=self._settings.pool_network,
+                    remove=True,
+                )
+                self._containers[container.id] = ContainerState(
+                    container_id=container.id, port=port, name=name
+                )
+                logger.info("Started container %s on port %d", name, port)
+            except Exception as e:
+                logger.warning("Failed to start container %s: %s", name, e)
 
         self._running = True
         self._health_task = asyncio.create_task(self._health_check_loop())
@@ -166,6 +171,23 @@ class ContainerPoolManager:
 
     # ── internal helpers ──────────────────────────────────────────
 
+    def _cleanup_old_containers(self) -> None:
+        """Remove any existing pool containers with our naming pattern."""
+        try:
+            existing = self._docker_client.containers.list(
+                all=True,
+                filters={"name": "opencode-pool-"},
+            )
+            for c in existing:
+                try:
+                    c.stop(timeout=3)
+                    c.remove()
+                    logger.info("Cleaned up old container %s", c.name)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def _get_session_or_raise(self, session_id: str) -> SessionState:
         ss = self._sessions.get(session_id)
         if ss is None:
@@ -229,6 +251,7 @@ class ContainerPoolManager:
         return cs
 
     async def _health_check_loop(self) -> None:
+        await asyncio.sleep(10)
         while self._running:
             for cs in list(self._containers.values()):
                 try:
@@ -247,6 +270,7 @@ class ContainerPoolManager:
             await asyncio.sleep(self._settings.health_check_interval_seconds)
 
     async def _recycle_loop(self) -> None:
+        await asyncio.sleep(60)
         while self._running:
             now = time.monotonic()
             expired_ids = [

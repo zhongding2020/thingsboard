@@ -329,7 +329,7 @@ function scrollBottom() {
 
 .agent-sidebar {
   position: fixed; top: 0; right: 0; z-index: 10001; 
-  width: 420px; height: 100vh;
+  width: 40vw; max-width: 600px; min-width: 380px; height: 100vh;
   background: var(--el-bg-color);
   border-left: 1px solid var(--el-border-color-light);
   box-shadow: -4px 0 32px rgba(0,0,0,0.15);

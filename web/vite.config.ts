@@ -16,9 +16,8 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/opencode': {
-        target: 'http://localhost:5100',
+        target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/opencode/, ''),
       },
     },
   },

@@ -254,7 +254,7 @@ class OptimizationResult(BaseModel):
 
     initial_cpk: float
     optimized_cpk: float
-    convergence: list[dict[str, float]]          # [{iteration, cpk_value}]
+    convergence: list[dict[str, float]]
     recommended_params: dict[str, float]
-    parameter_adjustments: dict[str, dict[str, float]]  # {因子: {from, to, delta}}
+    parameter_adjustments: dict[str, dict[str, float]]
     target_field: str

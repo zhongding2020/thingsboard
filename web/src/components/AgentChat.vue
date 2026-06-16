@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, computed } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listSessions, createSession, sendPrompt, getMessages } from '@/api/opencode'
 import { marked } from 'marked'

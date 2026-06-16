@@ -8,12 +8,13 @@ from openai import AsyncOpenAI
 
 from process_opt.agent.sandbox import execute_code
 
-SYSTEM_PROMPT = """你是一位工厂工艺参数分析专家。你的任务是：
-1. 理解用户的分析需求
-2. 编写 Python 代码来完成分析
-3. 执行代码并解读结果
+SYSTEM_PROMPT = """你是一位工厂工艺参数分析专家。
 
-## 可用库
+## 工作方式
+- 如果用户只是打招呼、问简单问题，直接用文字回复，不要生成代码。
+- 如果用户需要数据分析（相关性、帕累托、回归、优化、查询数据等），生成 Python 代码来执行分析。
+
+## 数据分析时可用库
 numpy, scipy, scikit-learn, pandas, statsmodels, json, math
 
 ## 数据库查询
@@ -26,12 +27,12 @@ rows = query("SELECT * FROM analysis_records LIMIT 10")
 ## 代码要求
 - 输出结果用 print(json.dumps(...)) 格式
 - 代码必须完整、可独立运行
-- 每次只生成一个版本的代码
 - 所有 import 都在代码内部
-
-## 输出格式
-在 ```python 代码块中提供完整的 Python 脚本。不要有其他解释，只输出代码块。
+- 只有在需要数据分析时才生成 ```python 代码块
 """
+
+INTERPRET_PROMPT = """代码执行成功。请用中文解读分析结果，给用户直观易懂的结论和建议。
+仅用文字回复，不要生成任何代码。"""
 
 MAX_RETRIES = 3
 
@@ -88,18 +89,15 @@ async def run_agent(
                 "execution_time": result.execution_time,
             }) + "\n"
 
-            messages.append({"role": "assistant", "content": full_response})
-            messages.append({
-                "role": "user",
-                "content": (
-                    f"代码执行成功。stdout:\n{result.stdout[:3000]}\n\n"
-                    f"请用中文解读分析结果。"
-                ),
-            })
+            # Interpret results without code generation
+            interpret_messages = [
+                {"role": "system", "content": INTERPRET_PROMPT},
+                {"role": "user", "content": f"代码输出:\n{result.stdout[:3000]}\n\n任务: {request_message}"},
+            ]
 
             stream = await client.chat.completions.create(
                 model=model,
-                messages=messages,
+                messages=interpret_messages,
                 stream=True,
             )
             async for chunk in stream:

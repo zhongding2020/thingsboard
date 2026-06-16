@@ -420,8 +420,14 @@ onMounted(loadDevices)
 .page-title { font-family: 'Fira Code', monospace; font-size: 18px; font-weight: 600; margin: 0; color: var(--el-text-color-primary); }
 .page-desc { font-size: 11px; color: var(--el-text-color-secondary); margin: 0; }
 
-.analysis-steps { margin: 8px 0 12px; }
-.analysis-steps :deep(.el-step__description) { padding-top: 2px; font-size: 11px; }
+.analysis-steps { margin: 4px 0 8px; }
+.analysis-steps :deep(.el-step) { flex-basis: auto !important; }
+.analysis-steps :deep(.el-step__head) { width: 22px; height: 22px; }
+.analysis-steps :deep(.el-step__icon) { width: 22px; height: 22px; font-size: 11px; }
+.analysis-steps :deep(.el-step__main) { padding: 0 4px; }
+.analysis-steps :deep(.el-step__title) { font-size: 12px; line-height: 1.3; }
+.analysis-steps :deep(.el-step__description) { padding-top: 0; font-size: 10px; line-height: 1.2; }
+.analysis-steps :deep(.el-step__line) { top: 11px; }
 
 .step-wrap { margin-top: 8px; }
 .step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

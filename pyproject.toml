@@ -21,6 +21,7 @@ dependencies = [
     "click",
     "openpyxl",
     "python-multipart",
+    "openai",
 ]
 
 [project.optional-dependencies]

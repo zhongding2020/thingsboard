@@ -1,4 +1,11 @@
-const API_URL = import.meta.env.DEV ? '/opencode' : 'http://localhost:5100'
+import { useSessionStore } from '@/stores/session'
+
+const API_URL = import.meta.env.DEV ? '/opencode' : 'http://localhost:8000/api/opencode'
+
+function getCurrentUser(): string {
+  const store = useSessionStore()
+  return store.currentUser || 'anonymous'
+}
 
 interface OpencodeSession {
   id: string
@@ -17,10 +24,19 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
     ...opts,
     headers: {
       'Content-Type': 'application/json',
+      'X-User': getCurrentUser(),
       ...opts?.headers,
     },
   })
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    const body = await res.text()
+    let detail = `${res.status} ${res.statusText}`
+    try {
+      const json = JSON.parse(body)
+      detail = json.detail || detail
+    } catch {}
+    throw new Error(detail)
+  }
   return res.json() as Promise<T>
 }
 

@@ -63,6 +63,14 @@ services:
       postgres:
         condition: service_healthy
 
+  opencode-web:
+    build: docker/opencode-web
+    restart: unless-stopped
+    ports:
+      - "5098:5097"
+    environment:
+      OPENCODE_WEB_PORT: "5097"
+
 volumes:
   pgdata:
   nats-data:

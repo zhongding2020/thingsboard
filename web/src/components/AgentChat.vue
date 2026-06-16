@@ -45,42 +45,47 @@
               AI
             </div>
             <div class="agent-header-right">
-              <el-popover placement="bottom-end" :width="260" trigger="click">
-                <template #reference>
-                  <el-button text size="small" title="历史会话">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-                      <circle cx="12" cy="12" r="10"/>
-                      <path d="M12 6v6l4 2"/>
-                      <path d="M8 12h8"/>
-                    </svg>
-                  </el-button>
-                </template>
-                <div class="session-list">
-                  <div class="session-list-header">
-                    <span>历史会话</span>
-                    <el-button link size="small" @click="newSession">新建</el-button>
-                  </div>
-                  <div
-                    v-for="s in sessions"
-                    :key="s.id"
-                    class="session-item"
-                    :class="{ active: s.id === sessionId }"
-                    @click="switchSession(s.id)"
-                  >
-                    <div class="session-item-name">{{ s.title || '会话 ' + s.id.slice(0, 8) }}</div>
-                    <el-button link size="small" class="session-delete" @click.stop="deleteSession(s.id)">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                    </el-button>
-                  </div>
-                  <div v-if="!sessions.length" class="session-empty">暂无历史会话</div>
-                </div>
-              </el-popover>
+              <el-button text size="small" @click="showSessions = !showSessions" :title="showSessions ? '返回对话' : '历史会话'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+              </el-button>
+              <el-button text size="small" @click="newSession" title="新建会话">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </el-button>
               <el-button text size="small" @click="visible = false" title="关闭">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </el-button>
             </div>
           </div>
           <div class="agent-messages" ref="msgRef">
+            <div v-if="showSessions" class="session-list-inline">
+              <div class="session-list-header">
+                <span>历史会话 ({{ sessions.length }})</span>
+              </div>
+              <div
+                v-for="s in sessions"
+                :key="s.id"
+                class="session-item"
+                :class="{ active: s.id === sessionId }"
+                @click="switchSession(s.id); showSessions = false"
+              >
+                <div class="session-item-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                </div>
+                <div class="session-item-name">{{ s.title || '会话 ' + s.id.slice(0, 8) }}</div>
+                <el-button link size="small" class="session-delete" @click.stop="deleteSession(s.id)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </el-button>
+              </div>
+              <div v-if="!sessions.length" class="session-empty">暂无历史会话，开始提问即可创建</div>
+            </div>
+            <template v-else>
             <div v-if="!messages.length && !loading" class="agent-welcome">
               <div class="welcome-icon">
                 <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
@@ -98,6 +103,7 @@
               <div v-if="msg.role === 'user'" class="msg-bubble user-msg">{{ msg.text }}</div>
               <div v-else-if="msg.role === 'assistant'" class="msg-bubble assistant-msg">{{ msg.text }}</div>
             </div>
+            </template>
           </div>
           <div v-if="error" class="agent-error">{{ error }}</div>
           <div class="agent-input">
@@ -144,6 +150,7 @@ interface SessionItem {
 }
 
 const visible = ref(false)
+const showSessions = ref(false)
 const input = ref('')
 const loading = ref(false)
 const error = ref('')
@@ -354,23 +361,26 @@ function scrollBottom() {
 
 .model-btn { font-size: 12px; color: var(--el-text-color-secondary); }
 
-.session-list { max-height: 320px; overflow-y: auto; }
+.session-list-inline {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+}
 .session-list-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 0 8px; font-size: 13px; font-weight: 600;
+  padding: 4px 4px 10px; font-size: 13px; font-weight: 600;
   color: var(--el-text-color-primary);
 }
 .session-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
   color: var(--el-text-color-primary);
 }
 .session-item:hover { background: var(--el-fill-color); }
 .session-item.active { background: var(--el-color-primary-light-8); color: var(--el-color-primary); }
-.session-item-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.session-item-icon { flex-shrink: 0; color: var(--el-text-color-secondary); }
+.session-item.active .session-item-icon { color: var(--el-color-primary); }
+.session-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-delete { opacity: 0; flex-shrink: 0; }
 .session-item:hover .session-delete { opacity: 1; }
-.session-empty { font-size: 12px; color: var(--el-text-color-secondary); padding: 20px 0; text-align: center; }
+.session-empty { font-size: 12px; color: var(--el-text-color-secondary); padding: 20px; text-align: center; }
 
 .agent-messages {
   flex: 1; overflow-y: auto; padding: 14px;

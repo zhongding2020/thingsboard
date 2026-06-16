@@ -64,3 +64,34 @@ class TestComputePareto:
         with pytest.raises(AnalysisError) as exc:
             compute_pareto(ds, "y")
         assert exc.value.code == "EMPTY_DATASET"
+
+    def test_nonnumeric_target_raises_error(self) -> None:
+        ds = AnalysisDataset(
+            features=[{"x": 1.0}, {"x": 2.0}],
+            targets=[{"y": "abc"}, {"y": "def"}],
+            metadata=[{} for _ in range(2)],
+            field_summary={}, sample_count=2,
+        )
+        from process_opt.analysis.pareto import compute_pareto
+        with pytest.raises(AnalysisError) as exc:
+            compute_pareto(ds, "y")
+        assert exc.value.code == "NON_NUMERIC_FIELD"
+
+    def test_strength_classification(self) -> None:
+        rng = np.random.default_rng(42)
+        n = 200
+        x1 = rng.normal(0, 1, n)
+        x2 = rng.normal(0, 1, n) * 0.5
+        y = x1 * 3 + rng.normal(0, 0.3, n)
+
+        features = [{"x1": float(x1[i]), "x2": float(x2[i])} for i in range(n)]
+        targets = [{"y": float(y[i])} for i in range(n)]
+        ds = AnalysisDataset(
+            features=features, targets=targets,
+            metadata=[{} for _ in range(n)],
+            field_summary={}, sample_count=n,
+        )
+        from process_opt.analysis.pareto import compute_pareto
+        items = compute_pareto(ds, "y")
+        strengths = {i.field: i.strength for i in items}
+        assert strengths["x1"] == "strong"

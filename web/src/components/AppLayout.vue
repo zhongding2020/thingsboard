@@ -72,6 +72,14 @@
       </el-main>
     </el-container>
   </el-container>
+  <el-tooltip content="OpenCode AI" placement="left">
+    <a href="http://localhost:5100" target="_blank" class="opencode-float" title="OpenCode AI">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 6v6l4 2"/>
+      </svg>
+    </a>
+  </el-tooltip>
 </template>
 
 <script setup lang="ts">
@@ -282,5 +290,27 @@ function handleLogout() {
 .page-fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+.opencode-float {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9999;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+}
+.opencode-float:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
 }
 </style>

@@ -10,3 +10,6 @@ class Settings(BaseSettings):
     nats_stream: str = "PROCESS_OPT"
     process_subject: str = "process_data"
     inspection_subject: str = "inspection_data"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o"
+    openai_base_url: str = ""

@@ -7,6 +7,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 
+from process_opt.agent.service import OpenAIAgentService
 from process_opt.analysis import AnalysisService
 from process_opt.analysis.dataset import DatasetBuilder
 from process_opt.analysis.schemas import AnalysisDataset, AnalysisDatasetRequest, CorrelationRequest, CorrelationResult, ImportanceRequest, ImportanceResult, ProfilingResult, RecommendationRequest, RecommendationResult, RegressionRequest, RegressionResult, SpcRequest, SpcResult
@@ -205,6 +206,11 @@ def create_api_app_from_settings() -> FastAPI:
     parameter_service_proxy = ParameterServiceProxy()
     analysis_service_proxy = AnalysisServiceProxy()
     line_device_repo_proxy = LineDeviceRepositoryProxy()
+    agent_service_proxy = OpenAIAgentService(
+        api_key=settings.openai_api_key,
+        model=settings.openai_model,
+        base_url=settings.openai_base_url,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -238,6 +244,7 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_service=parameter_service_proxy,
         analysis_service=analysis_service_proxy,
         line_device_repo=line_device_repo_proxy,
+        agent_service=agent_service_proxy,
     )
     app.router.lifespan_context = lifespan
     return app

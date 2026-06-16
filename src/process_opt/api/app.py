@@ -1,12 +1,15 @@
 import logging
+from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from process_opt.agent.schemas import AgentChatRequest
 from process_opt.analysis.errors import AnalysisError
 from process_opt.analysis.schemas import (
     AnalysisDataset,
@@ -86,6 +89,10 @@ class LineDeviceRepositoryProtocol(Protocol):
     async def reorder_devices(self, line_id: str, device_ids: list[str]) -> None: ...
 
 
+class AgentService(Protocol):
+    async def chat(self, request: AgentChatRequest) -> AsyncIterator[str]: ...
+
+
 class StatusTransitionRequest(BaseModel):
     actor: str = Field(min_length=1)
     note: str | None = None
@@ -120,6 +127,7 @@ def create_app(
     parameter_service: ParameterService | None = None,
     analysis_service: AnalysisService | None = None,
     line_device_repo: LineDeviceRepositoryProtocol | None = None,
+    agent_service: AgentService | None = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -605,5 +613,24 @@ def create_app(
                 target = web_dist / "index.html"
             media_type = _MIME_TYPES.get(target.suffix, "application/octet-stream")
             return Response(content=target.read_bytes(), media_type=media_type)
+
+    if agent_service is not None:
+
+        @app.post("/api/v1/agent/chat")
+        async def agent_chat_route(request: AgentChatRequest) -> StreamingResponse:
+            async def event_stream():
+                async for chunk in agent_service.chat(request):
+                    yield f"data: {chunk}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(
+                event_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
 
     return app

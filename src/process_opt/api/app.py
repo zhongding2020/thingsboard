@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from process_opt.container_pool.proxy import ContainerPoolProxy
 
 from process_opt.analysis.errors import AnalysisError
 from process_opt.analysis.schemas import (
@@ -120,6 +125,7 @@ def create_app(
     parameter_service: ParameterService | None = None,
     analysis_service: AnalysisService | None = None,
     line_device_repo: LineDeviceRepositoryProtocol | None = None,
+    container_pool: "ContainerPoolProxy | None" = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -571,6 +577,10 @@ def create_app(
             )
             async def recommendation_submit_route(body: ParameterSetCreate) -> ParameterSet:
                 return await parameter_service.create_draft(body)
+
+    if container_pool is not None:
+        from process_opt.container_pool.routes import register_routes as register_pool_routes
+        register_pool_routes(app, container_pool)
 
     _web_dist = (
         candidate

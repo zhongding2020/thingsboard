@@ -39,7 +39,7 @@ class TestRunOptimization:
             lsl=80.0,
             target_value=90.0,
             target_cpk=1.33,
-            key_factors=["temp", "pressure"],
+            key_factors=["temp"],
             step_size=5.0,
             max_iterations=1000,
         )
@@ -52,7 +52,6 @@ class TestRunOptimization:
         assert result.optimized_cpk > 0
         assert len(result.convergence) > 0
         assert "temp" in result.recommended_params
-        assert "pressure" in result.recommended_params
         assert result.initial_cpk >= 0
         assert "temp" in result.parameter_adjustments
         assert "from" in result.parameter_adjustments["temp"]

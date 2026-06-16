@@ -73,13 +73,26 @@
     </el-container>
   </el-container>
   <el-tooltip content="OpenCode AI" placement="left">
-    <a href="http://localhost:5100" target="_blank" class="opencode-float" title="OpenCode AI">
+    <el-button class="opencode-float" @click="opencodeVisible = !opencodeVisible" circle>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <path d="M12 6v6l4 2"/>
       </svg>
-    </a>
+    </el-button>
   </el-tooltip>
+  <Teleport to="body">
+    <Transition name="opencode-panel">
+      <div v-if="opencodeVisible" class="opencode-panel">
+        <div class="opencode-panel-header">
+          <span>OpenCode AI</span>
+          <el-button text size="small" @click="opencodeVisible = false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </el-button>
+        </div>
+        <iframe src="http://localhost:5100" class="opencode-iframe" />
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -96,6 +109,7 @@ const session = useSessionStore()
 const app = useAppStore()
 
 const collapsed = ref(false)
+const opencodeVisible = ref(false)
 const currentTime = ref('')
 let timer: number | undefined
 
@@ -308,9 +322,53 @@ function handleLogout() {
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   transition: transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
 }
 .opencode-float:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+.opencode-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 68px;
+  z-index: 9998;
+  width: 480px;
+  height: 640px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.opencode-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.opencode-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+}
+
+.opencode-panel-enter-active,
+.opencode-panel-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.opencode-panel-enter-from,
+.opencode-panel-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  pointer-events: none;
 }
 </style>

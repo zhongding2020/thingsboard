@@ -59,20 +59,46 @@ services:
     environment:
       PROCESS_OPT_POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/process_opt"
       PROCESS_OPT_API_PORT: "8000"
-      PROCESS_OPT_OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
-    volumes:
-      - ~/.config/opencode/opencode.jsonc:/root/.config/opencode/opencode.jsonc:ro
     depends_on:
       postgres:
         condition: service_healthy
 
-  opencode-web:
-    build: docker/opencode-web
+  openclaw-gateway:
+    image: ghcr.io/openclaw/openclaw:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5100:5097"
+      - "18789:18789"
+      - "18790:18790"
     environment:
-      OPENCODE_WEB_PORT: "5097"
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      TZ: Asia/Shanghai
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1"
+    volumes:
+      - ./openclaw/config:/home/node/.openclaw
+      - ./openclaw/workspace:/home/node/.openclaw/workspace
+      - ./openclaw/auth-secrets:/home/node/.config/openclaw
+    command:
+      - "node"
+      - "dist/index.js"
+      - "gateway"
+      - "--bind"
+      - "lan"
+      - "--port"
+      - "18789"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "curl -fsS http://127.0.0.1:18789/healthz"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   pgdata:

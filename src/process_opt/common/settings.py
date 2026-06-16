@@ -10,3 +10,12 @@ class Settings(BaseSettings):
     nats_stream: str = "PROCESS_OPT"
     process_subject: str = "process_data"
     inspection_subject: str = "inspection_data"
+
+    # Container pool settings
+    pool_min_size: int = 5
+    pool_max_size: int = 20
+    pool_image: str = "opencode-web"
+    pool_base_port: int = 5101
+    pool_network: str = "thingsboard_default"
+    session_ttl_seconds: int = 1800
+    health_check_interval_seconds: int = 30

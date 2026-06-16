@@ -31,6 +31,10 @@
           <el-icon class="nav-icon-analysis"><DataAnalysis /></el-icon>
           <span>参数调优</span>
         </el-menu-item>
+        <el-menu-item index="/chat">
+          <el-icon class="nav-icon-chat"><Star /></el-icon>
+          <span>AI 助手</span>
+        </el-menu-item>
         <el-menu-item index="/parameters">
           <el-icon class="nav-icon-params"><Setting /></el-icon>
           <span>参数管理</span>
@@ -78,7 +82,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Monitor, DocumentCopy, TrendCharts, DataAnalysis, Setting, Tools, Fold, Expand } from '@element-plus/icons-vue'
+import { Monitor, DocumentCopy, TrendCharts, DataAnalysis, Setting, Tools, Fold, Expand, Star } from '@element-plus/icons-vue'
 import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
 import ThemeToggle from '@/components/ThemeToggle.vue'

@@ -22,6 +22,7 @@ const router = createRouter({
         { path: 'analysis', component: () => import('@/views/AnalysisView.vue') },
         { path: 'parameters', component: () => import('@/views/ParametersView.vue') },
         { path: 'settings', component: () => import('@/views/SettingsView.vue') },
+        { path: 'chat', component: () => import('@/views/ChatView.vue') },
       ],
     },
   ],

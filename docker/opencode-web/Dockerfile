@@ -2,8 +2,13 @@ FROM node:20-slim
 
 ENV NODE_ENV=production
 
-RUN npm install -g opencode-ai@latest && \
-    npm cache clean --force
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-venv \
+      build-essential libpython3-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g opencode-ai@latest \
+    && npm cache clean --force
 
 EXPOSE 5097
 

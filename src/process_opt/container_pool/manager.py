@@ -85,7 +85,7 @@ class ContainerPoolManager:
 
     async def create_session(self, user: str) -> Session:
         cs = await self._acquire_container(user)
-        url = f"http://localhost:{cs.port}/session"
+        url = f"http://{self._settings.docker_host_ip}:{cs.port}/session"
         body = SessionCreateRequest(title=f"{user}-工厂分析", cwd=f"/workspace/user-{user}")
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(url, json=body.model_dump(exclude_none=True))
@@ -104,7 +104,7 @@ class ContainerPoolManager:
     async def forward_message(self, session_id: str, body: dict[str, Any]) -> Message:
         ss = self._get_session_or_raise(session_id)
         cs = self._containers[ss.container_id]
-        url = f"http://localhost:{cs.port}/session/{session_id}/message"
+        url = f"http://{self._settings.docker_host_ip}:{cs.port}/session/{session_id}/message"
         ss.last_active = time.monotonic()
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(url, json=body)
@@ -117,7 +117,7 @@ class ContainerPoolManager:
     async def get_messages(self, session_id: str) -> list[Message]:
         ss = self._get_session_or_raise(session_id)
         cs = self._containers[ss.container_id]
-        url = f"http://localhost:{cs.port}/session/{session_id}/message"
+        url = f"http://{self._settings.docker_host_ip}:{cs.port}/session/{session_id}/message"
         ss.last_active = time.monotonic()
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(url)
@@ -135,7 +135,7 @@ class ContainerPoolManager:
             cs = self._containers.get(ss.container_id)
             if cs is None:
                 continue
-            url = f"http://localhost:{cs.port}/session"
+            url = f"http://{self._settings.docker_host_ip}:{cs.port}/session"
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     resp = await client.get(url)
@@ -157,7 +157,7 @@ class ContainerPoolManager:
         cs = self._containers.get(ss.container_id)
         if cs is None:
             return
-        url = f"http://localhost:{cs.port}/session/{session_id}"
+        url = f"http://{self._settings.docker_host_ip}:{cs.port}/session/{session_id}"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 await client.delete(url)
@@ -233,7 +233,7 @@ class ContainerPoolManager:
             for cs in list(self._containers.values()):
                 try:
                     _, writer = await asyncio.wait_for(
-                        asyncio.open_connection("localhost", cs.port),
+                        asyncio.open_connection(self._settings.docker_host_ip, cs.port),
                         timeout=5.0,
                     )
                     writer.close()

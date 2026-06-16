@@ -1,12 +1,16 @@
 <template>
   <div>
-    <el-tooltip content="AI 分析助手" placement="left">
-      <el-button class="agent-float" circle @click="visible = !visible">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l2.5 5.5L20 9.5l-4 4 .5 5.5L12 16l-4.5 3 .5-5.5-4-4L9.5 8.5z"/>
-        </svg>
-      </el-button>
-    </el-tooltip>
+    <el-button
+      class="agent-float"
+      circle
+      :style="{ top: floatY + 'px', bottom: 'auto', right: 'auto', left: floatX + 'px' }"
+      @click="visible = !visible"
+      @mousedown.prevent="startDrag"
+    >
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l2.5 5.5L20 9.5l-4 4 .5 5.5L12 16l-4.5 3 .5-5.5-4-4L9.5 8.5z"/>
+      </svg>
+    </el-button>
     <Teleport to="body">
       <Transition name="agent-backdrop">
         <div v-if="visible" class="agent-backdrop" @click="visible = false" />
@@ -148,6 +152,33 @@ const messages = ref<ChatMessage[]>([])
 const sessionId = ref('')
 const sessions = ref<SessionItem[]>([])
 const currentModel = ref('deepseek-v4-flash')
+const floatX = ref(window.innerWidth - 64)
+const floatY = ref(window.innerHeight / 2 - 22)
+let dragging = false
+let dragStartX = 0
+let dragStartY = 0
+let dragStartFloatX = 0
+let dragStartFloatY = 0
+
+function startDrag(e: MouseEvent) {
+  dragging = true
+  dragStartX = e.clientX
+  dragStartY = e.clientY
+  dragStartFloatX = floatX.value
+  dragStartFloatY = floatY.value
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+}
+function onDrag(e: MouseEvent) {
+  if (!dragging) return
+  floatX.value = Math.max(0, Math.min(window.innerWidth - 44, dragStartFloatX + dragStartX - e.clientX))
+  floatY.value = Math.max(0, Math.min(window.innerHeight - 44, dragStartFloatY + e.clientY - dragStartY))
+}
+function stopDrag() {
+  dragging = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+}
 
 const models = [
   { label: 'DeepSeek V4 Flash', value: 'deepseek-v4-flash' },
@@ -277,14 +308,15 @@ function scrollBottom() {
 
 <style scoped>
 .agent-float {
-  position: fixed; right: 18px; bottom: 18px; z-index: 10001;
+  position: fixed; z-index: 10000;
   width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; color: #fff; border: none; cursor: pointer;
+  border-radius: 50%; color: #fff; border: none; cursor: grab;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   box-shadow: 0 4px 20px rgba(99,102,241,0.4);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: box-shadow 0.2s;
 }
-.agent-float:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(99,102,241,0.55); }
+.agent-float:active { cursor: grabbing; }
+.agent-float:hover { box-shadow: 0 6px 24px rgba(99,102,241,0.55); }
 
 .agent-backdrop {
   position: fixed; inset: 0; z-index: 9999;
@@ -296,7 +328,7 @@ function scrollBottom() {
 .agent-backdrop-leave-to { opacity: 0; }
 
 .agent-sidebar {
-  position: fixed; top: 0; right: 0; z-index: 10000;
+  position: fixed; top: 0; right: 0; z-index: 10001; 
   width: 420px; height: 100vh;
   background: var(--el-bg-color);
   border-left: 1px solid var(--el-border-color-light);

@@ -84,3 +84,40 @@ export function recommendation(data: RecommendationRequest): Promise<unknown> {
 export function submitRecommendation(data?: Record<string, unknown>): Promise<unknown> {
   return client.post('/analysis/recommendation/submit', data).then((res) => res.data)
 }
+
+export interface ParetoItem {
+  field: string
+  coefficient: number
+  contribution_pct: number
+  cumulative_pct: number
+  strength: string
+}
+
+export interface OptimizationConfig {
+  dataset_id: string
+  target_field: string
+  usl: number
+  lsl: number
+  target_value: number
+  target_cpk: number
+  key_factors: string[]
+  step_size: number
+  max_iterations?: number
+}
+
+export interface OptimizationResult {
+  initial_cpk: number
+  optimized_cpk: number
+  convergence: { iteration: number; cpk_value: number }[]
+  recommended_params: Record<string, number>
+  parameter_adjustments: Record<string, { from: number; to: number; delta: number }>
+  target_field: string
+}
+
+export function computePareto(data: { dataset_id: string; field_y: string }): Promise<ParetoItem[]> {
+  return client.post('/analysis/pareto', data).then((r) => r.data)
+}
+
+export function optimizeCpk(data: OptimizationConfig): Promise<OptimizationResult> {
+  return client.post('/analysis/optimize', data).then((r) => r.data)
+}

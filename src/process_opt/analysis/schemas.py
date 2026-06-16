@@ -216,3 +216,45 @@ class SpcResult(BaseModel):
     capability: Capability | None = None
     p_chart: PChart | None = None
     summary: SummaryStats | None = None
+
+
+class ParetoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_id: str
+    field_y: str
+
+
+class ParetoItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    field: str
+    coefficient: float
+    contribution_pct: float
+    cumulative_pct: float
+    strength: str  # "strong"|"medium"|"weak"|"negligible"
+
+
+class OptimizationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_id: str
+    target_field: str
+    usl: float
+    lsl: float
+    target_value: float
+    target_cpk: float = 1.33
+    key_factors: list[str] = Field(min_length=1)
+    step_size: float = Field(gt=0)
+    max_iterations: int = Field(default=5000, ge=100, le=50000)
+
+
+class OptimizationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    initial_cpk: float
+    optimized_cpk: float
+    convergence: list[dict[str, float]]          # [{iteration, cpk_value}]
+    recommended_params: dict[str, float]
+    parameter_adjustments: dict[str, dict[str, float]]  # {因子: {from, to, delta}}
+    target_field: str

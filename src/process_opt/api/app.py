@@ -15,6 +15,10 @@ from process_opt.analysis.schemas import (
     CorrelationResult,
     ImportanceRequest,
     ImportanceResult,
+    OptimizationConfig,
+    OptimizationResult,
+    ParetoItem,
+    ParetoRequest,
     ProfilingResult,
     RecommendationRequest,
     RecommendationResult,
@@ -540,6 +544,24 @@ def create_app(
                 "fields": {"features": feature_fields, "targets": target_fields},
                 "sample_count": ds.sample_count if ds else 0,
             }
+
+        @app.post("/api/v1/analysis/pareto")
+        async def pareto_route(body: ParetoRequest) -> list[ParetoItem]:
+            from process_opt.analysis.excel import get_dataset
+            from process_opt.analysis.pareto import compute_pareto
+            ds = get_dataset(body.dataset_id)
+            if ds is None:
+                raise HTTPException(status_code=404, detail="Dataset not found or expired")
+            return compute_pareto(ds, body.field_y)
+
+        @app.post("/api/v1/analysis/optimize")
+        async def optimize_route(body: OptimizationConfig) -> OptimizationResult:
+            from process_opt.analysis.excel import get_dataset
+            from process_opt.analysis.optimization import run_optimization
+            ds = get_dataset(body.dataset_id)
+            if ds is None:
+                raise HTTPException(status_code=404, detail="Dataset not found or expired")
+            return run_optimization(ds, body)
 
         if parameter_service is not None:
 

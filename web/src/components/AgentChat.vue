@@ -97,18 +97,26 @@
           </div>
           <div v-if="error" class="agent-error">{{ error }}</div>
           <div class="agent-input">
-            <el-input
-              v-model="input"
-              placeholder="输入分析需求..."
-              @keyup.enter="send"
-              :disabled="loading"
-            >
-              <template #append>
-                <el-button @click="send" :disabled="!input.trim() || loading" :loading="loading">
-                  {{ loading ? '分析中...' : '发送' }}
-                </el-button>
-              </template>
-            </el-input>
+            <div class="input-wrapper">
+              <textarea
+                v-model="input"
+                class="input-textarea"
+                placeholder="输入分析需求..."
+                :disabled="loading"
+                rows="3"
+                @keydown.enter.exact.prevent="send"
+              />
+              <el-button
+                class="input-send"
+                type="primary"
+                size="small"
+                @click="send"
+                :disabled="!input.trim() || loading"
+                :loading="loading"
+              >
+                {{ loading ? '分析中' : '发送' }}
+              </el-button>
+            </div>
           </div>
         </div>
       </Transition>
@@ -338,8 +346,25 @@ function scrollBottom() {
 }
 
 .agent-input {
-  padding: 10px 14px; border-top: 1px solid var(--el-border-color-light);
+  padding: 10px 14px 14px; border-top: 1px solid var(--el-border-color-light);
 }
+.input-wrapper {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--el-fill-color); border-radius: 14px;
+  padding: 8px 10px; border: 1px solid var(--el-border-color-light);
+  transition: border-color 0.2s;
+}
+.input-wrapper:focus-within {
+  border-color: var(--el-color-primary);
+}
+.input-textarea {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-size: 13px; line-height: 1.5; resize: none;
+  font-family: inherit; color: var(--el-text-color-primary);
+  padding: 2px 4px;
+}
+.input-textarea::placeholder { color: var(--el-text-color-placeholder); }
+.input-send { flex-shrink: 0; border-radius: 10px; }
 .agent-error {
   padding: 6px 14px; font-size: 12px; color: var(--el-color-danger);
   border-top: 1px solid var(--el-border-color-light);

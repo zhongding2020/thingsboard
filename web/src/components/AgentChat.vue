@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { getClient } from '@/api/opencode'
+import { listSessions, createSession, sendPrompt, getMessages } from '@/api/opencode'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -72,54 +72,46 @@ const loading = ref(false)
 const error = ref('')
 const msgRef = ref<HTMLDivElement>()
 const messages = ref<ChatMessage[]>([])
-const sessionId = ref<string>('')
+const sessionId = ref('')
 
 onMounted(async () => {
   try {
-    const client = getClient()
-    const res = await client.session.list()
-    if (res.data?.length) {
-      sessionId.value = res.data[0].id
+    const sessions = await listSessions()
+    if (sessions.length) {
+      sessionId.value = sessions[0].id
       await loadHistory()
     } else {
-      await createSession()
+      await createNewSession()
     }
   } catch (e: any) {
-    error.value = '连接 OpenCode 服务失败: ' + (e.message || '未知错误')
+    error.value = '连接失败: ' + (e.message || '未知错误')
   }
 })
 
-async function createSession() {
-  const client = getClient()
-  const res = await client.session.create({
-    body: { title: '工厂分析' },
-  })
-  if (res.data) {
-    sessionId.value = res.data.id
-  }
+async function createNewSession() {
+  const res = await createSession()
+  sessionId.value = res.id
 }
 
 async function newSession() {
   sessionId.value = ''
   messages.value = []
-  await createSession()
+  await createNewSession()
 }
 
 async function loadHistory() {
   if (!sessionId.value) return
-  const client = getClient()
   try {
-    const res = await client.session.messages({ path: { id: sessionId.value } })
-    if (res.data) {
-      messages.value = res.data
-        .filter((m: any) => m.info?.role !== 'system')
+    const msgs = await getMessages(sessionId.value)
+    if (msgs) {
+      messages.value = msgs
+        .filter((m: any) => m.role !== 'system')
         .flatMap((m: any) => {
-          const role = m.info?.role || 'assistant'
           const texts: ChatMessage[] = []
           if (m.parts) {
             for (const p of m.parts) {
               if (p.type === 'text' && p.text?.trim()) {
-                texts.push({ role, text: p.text })
+                texts.push({ role: m.role || 'assistant', text: p.text })
               }
             }
           }
@@ -128,7 +120,7 @@ async function loadHistory() {
       scrollBottom()
     }
   } catch {
-    // history load is best-effort
+    // best-effort
   }
 }
 
@@ -143,26 +135,19 @@ async function send() {
   scrollBottom()
 
   try {
-    const client = getClient()
     if (!sessionId.value) {
-      await createSession()
+      await createNewSession()
     }
 
-    const res = await client.session.prompt({
-      path: { id: sessionId.value },
-      body: {
-        parts: [{ type: 'text', text }],
-      },
-    })
+    const res = await sendPrompt(sessionId.value, text)
 
-    if (res.data?.parts) {
-      for (const p of res.data.parts) {
+    if (res.parts) {
+      for (const p of res.parts) {
         if (p.type === 'text' && p.text?.trim()) {
           messages.value.push({ role: 'assistant', text: p.text })
         }
       }
     }
-
     scrollBottom()
   } catch (e: any) {
     error.value = '请求失败: ' + (e.message || '未知错误')

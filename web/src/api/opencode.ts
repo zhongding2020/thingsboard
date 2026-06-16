@@ -1,12 +1,48 @@
-import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk'
+const API_URL = import.meta.env.DEV ? '/opencode' : 'http://localhost:5100'
 
-const BASE_URL = import.meta.env.VITE_OPENCODE_URL || 'http://localhost:5100'
+interface OpencodeSession {
+  id: string
+  title?: string
+}
 
-let _client: OpencodeClient | null = null
+interface OpencodeMessage {
+  id: string
+  role: string
+  parts: { type: string; text?: string }[]
+}
 
-export function getClient(): OpencodeClient {
-  if (!_client) {
-    _client = createOpencodeClient({ baseUrl: BASE_URL })
-  }
-  return _client
+async function request<T>(path: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...opts?.headers,
+    },
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+  return res.json() as Promise<T>
+}
+
+export async function listSessions(): Promise<OpencodeSession[]> {
+  return request<OpencodeSession[]>('/session')
+}
+
+export async function createSession(): Promise<OpencodeSession> {
+  return request<OpencodeSession>('/session', {
+    method: 'POST',
+    body: JSON.stringify({ title: '工厂分析' }),
+  })
+}
+
+export async function sendPrompt(sessionId: string, text: string): Promise<OpencodeMessage> {
+  return request<OpencodeMessage>(`/session/${encodeURIComponent(sessionId)}/message`, {
+    method: 'POST',
+    body: JSON.stringify({
+      parts: [{ type: 'text', text }],
+    }),
+  })
+}
+
+export async function getMessages(sessionId: string): Promise<OpencodeMessage[]> {
+  return request<OpencodeMessage[]>(`/session/${encodeURIComponent(sessionId)}/message`)
 }

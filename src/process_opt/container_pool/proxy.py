@@ -27,6 +27,13 @@ class ContainerPoolProxy:
     async def forward_message(self, session_id: str, body: dict[str, Any]) -> Message:
         return await self._mgr.forward_message(session_id, body)
 
+    async def send_prompt_async(self, session_id: str, body: dict[str, Any]) -> None:
+        await self._mgr.send_prompt_async(session_id, body)
+
+    async def stream_events(self, session_id: str):
+        async for line in self._mgr.stream_events(session_id):
+            yield line
+
     async def get_messages(self, session_id: str) -> list[Message]:
         return await self._mgr.get_messages(session_id)
 

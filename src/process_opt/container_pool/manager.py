@@ -156,6 +156,50 @@ class ContainerPoolManager:
             data = {"info": {"role": "assistant"}, "parts": [{"type": "text", "text": str(data)}]}
         return Message(**data)
 
+    async def send_prompt_async(self, session_id: str, body: dict[str, Any]) -> None:
+        """Send a prompt via the async endpoint (returns immediately, no waiting)."""
+        import json
+
+        ss = self._get_session_or_raise(session_id)
+        cs = self._containers[ss.container_id]
+        url = f"http://{self._settings.docker_host_ip}:{cs.port}/session/{session_id}/prompt_async"
+        ss.last_active = time.monotonic()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(url, json=body)
+            resp.raise_for_status()
+
+    async def stream_events(self, session_id: str):
+        """Stream SSE events for a specific session from the container.
+
+        Yields SSE-formatted lines. Stops when the session becomes idle.
+        """
+        import json
+
+        ss = self._get_session_or_raise(session_id)
+        cs = self._containers[ss.container_id]
+        url = f"http://{self._settings.docker_host_ip}:{cs.port}/event"
+        ss.last_active = time.monotonic()
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                buffer = ""
+                async for chunk in resp.aiter_text():
+                    buffer += chunk
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])
+                                props = data.get("properties", {})
+                                if props.get("sessionID") == session_id:
+                                    yield f"data: {json.dumps(data)}\n\n"
+                                    if data.get("type") == "session.status":
+                                        if props.get("status", {}).get("type") == "idle":
+                                            return
+                            except (json.JSONDecodeError, KeyError):
+                                pass
+
     async def get_messages(self, session_id: str) -> list[Message]:
         ss = self._get_session_or_raise(session_id)
         cs = self._containers[ss.container_id]

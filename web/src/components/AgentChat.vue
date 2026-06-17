@@ -72,11 +72,19 @@
                 <div v-if="msg.role === 'user'" class="msg-bubble user-msg">{{ msg.text }}</div>
                 <template v-else-if="msg.role === 'assistant'">
                   <div v-for="(part, j) in msg.parts" :key="j" class="msg-part">
-                    <details v-if="part.type === 'reasoning'" class="msg-reasoning" :open="loading && i === messages.length - 1">
-                      <summary>{{ loading && i === messages.length - 1 ? '思考中...' : '已思考' }}</summary>
+                    <details v-if="part.type === 'reasoning' || part.type === 'thinking'" class="msg-reasoning" :open="loading && i === messages.length - 1">
+                      <summary>{{ loading && i === messages.length - 1 ? '思考中...' : '思考过程' }}</summary>
                       <div class="reasoning-content" v-html="renderMd(part.text)"></div>
                     </details>
-                    <div v-else-if="part.type === 'text'" class="msg-bubble assistant-msg" v-html="renderContent(part.text)"></div>
+                    <div v-else-if="part.type === 'tool_call'" class="msg-tool">
+                      <div class="tool-label">调用工具: {{ part.tool || part.name || '' }}</div>
+                      <pre class="tool-args" v-if="part.args">{{ part.args }}</pre>
+                    </div>
+                    <div v-else-if="part.type === 'tool_result'" class="msg-tool">
+                      <div class="tool-label">工具返回</div>
+                      <pre class="tool-args">{{ part.text }}</pre>
+                    </div>
+                    <div v-else-if="part.type === 'text' || !part.type || part.type === 'step-start' || part.type === 'step-finish'" class="msg-bubble assistant-msg" v-html="renderContent(part.text)"></div>
                   </div>
                 </template>
               </div>
@@ -99,9 +107,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { listSessions, createSession, sendPrompt, getMessages } from '@/api/opencode'
+import { listSessions, createSession, sendPromptAsync, streamEvents, getMessages, type StreamEvents } from '@/api/opencode'
 import { marked } from 'marked'
 import mermaid from 'mermaid'
 import * as echarts from 'echarts'
@@ -190,6 +198,9 @@ function stopDrag() { dragging = false; document.removeEventListener('mousemove'
 
 onMounted(async () => { await refreshSessions(); const saved = sessionStorage.getItem('opencode-session'); if (saved && sessions.value.some(s => s.id === saved)) { sessionId.value = saved; await loadHistory() } else if (!sessionId.value && sessions.value.length) { sessionId.value = sessions.value[0].id; await loadHistory() } })
 
+let activeStream: StreamEvents | null = null
+onUnmounted(() => { if (activeStream) activeStream.cancel() })
+
 async function refreshSessions() { try { sessions.value = await listSessions(); const saved = sessionStorage.getItem('opencode-session'); if (!sessionId.value) { if (saved && sessions.value.some(s => s.id === saved)) sessionId.value = saved; else if (sessions.value.length) sessionId.value = sessions.value[0].id } } catch (e: any) { error.value = '连接失败: ' + e.message } }
 async function createNewSession() { try { const res = await createSession(); sessionId.value = res.id; sessionStorage.setItem('opencode-session', res.id); sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
 async function newSession() { sessionStorage.removeItem('opencode-session'); await createNewSession() }
@@ -213,7 +224,52 @@ async function send() {
   input.value = ''; error.value = ''
   messages.value.push({ role: 'user', text, parts: [{ type: 'text', text }] })
   loading.value = true; scrollBottom()
-  try { if (!sessionId.value) { await createNewSession(); sessionStorage.setItem('opencode-session', sessionId.value) }; const res = await sendPrompt(sessionId.value, text); if ((res as any).parts) { messages.value.push({ role: 'assistant', text: '', parts: (res as any).parts.map((p: any) => ({ type: p.type || 'text', text: p.text || '' })) }) }; scrollBottom() } catch (e: any) { error.value = '请求失败: ' + (e.message || '') } finally { loading.value = false; scrollBottom() }
+  try {
+    if (!sessionId.value) { await createNewSession(); sessionStorage.setItem('opencode-session', sessionId.value) }
+
+    const assistantIdx = messages.value.length
+    messages.value.push({ role: 'assistant', text: '', parts: [] })
+    scrollBottom()
+
+    const sid = sessionId.value
+    await sendPromptAsync(sid, text)
+
+    activeStream = streamEvents(
+      sid,
+      (delta: string) => {
+        const parts = messages.value[assistantIdx]?.parts
+        if (parts && parts.length > 0) {
+          const last = parts[parts.length - 1]
+          if (last.type === 'text') {
+            last.text = (last.text || '') + delta
+          }
+        }
+        scrollBottom()
+      },
+      (partType: string) => {
+        const parts = messages.value[assistantIdx]?.parts
+        if (parts) {
+          parts.push({ type: partType, text: '' })
+        }
+      },
+      () => {
+        loading.value = false
+        activeStream = null
+        scrollBottom()
+      },
+      (err: string) => {
+        error.value = err
+        loading.value = false
+        activeStream = null
+        scrollBottom()
+      },
+    )
+  } catch (e: any) {
+    error.value = '请求失败: ' + (e.message || '')
+    loading.value = false
+    activeStream = null
+    scrollBottom()
+  }
 }
 function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight }) }
 </script>
@@ -276,6 +332,10 @@ function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scroll
 .msg-reasoning summary { cursor: pointer; color: var(--el-text-color-secondary); }
 .msg-reasoning[open] summary { margin-bottom: 6px; }
 .reasoning-content { color: var(--el-text-color-secondary); line-height: 1.5; }
+
+.msg-tool { margin: 2px 0; border: 1px solid var(--el-border-color-light); border-radius: 8px; padding: 6px 10px; font-size: 12px; background: var(--el-fill-color); max-width: 95%; align-self: flex-start; }
+.tool-label { color: var(--el-color-primary); margin-bottom: 4px; font-weight: 500; }
+.tool-args { margin: 0; font-size: 11px; white-space: pre-wrap; word-break: break-all; color: var(--el-text-color-secondary); }
 
 .sessions-view { padding: 4px 0; }
 .sessions-title { font-size: 13px; font-weight: 600; padding: 0 0 10px; color: var(--el-text-color-primary); }

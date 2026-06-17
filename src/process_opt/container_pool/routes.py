@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from starlette.responses import StreamingResponse
 
 from process_opt.container_pool.manager import ContainerPoolFullError
 from process_opt.container_pool.proxy import ContainerPoolProxy
@@ -22,10 +23,10 @@ def register_routes(app: Any, pool_proxy: ContainerPoolProxy) -> None:
             )
 
     @router.post("/session/{session_id}/message")
-    async def send_message(session_id: str, body: dict[str, Any]) -> Any:
+    async def send_message(session_id: str, body: dict[str, Any]) -> Response:
         try:
-            msg = await pool_proxy.forward_message(session_id, body)
-            return msg.model_dump()
+            await pool_proxy.send_prompt_async(session_id, body)
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         except HTTPException:
             raise
         except Exception as e:
@@ -33,6 +34,27 @@ def register_routes(app: Any, pool_proxy: ContainerPoolProxy) -> None:
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"请求失败: {e}",
             )
+
+    @router.get("/session/{session_id}/events")
+    async def stream_events(session_id: str) -> StreamingResponse:
+        async def generate():
+            try:
+                async for line in pool_proxy.stream_events(session_id):
+                    yield line.encode()
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @router.get("/session/{session_id}/message")
     async def get_messages(session_id: str) -> Any:

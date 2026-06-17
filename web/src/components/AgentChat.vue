@@ -107,10 +107,18 @@
             </template>
           </div>
           <div v-if="error" class="agent-error">{{ error }}</div>
-          <div class="agent-input">
+          <div v-if="!loading" class="agent-input">
             <div class="input-wrapper">
+              <div class="upload-btn-wrapper">
+                <input type="file" ref="fileInput" accept=".xlsx,.xls,.csv" @change="handleFileUpload" style="display:none" />
+                <el-button text size="small" @click="($refs.fileInput as HTMLInputElement).click()" title="上传数据文件">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </el-button>
+              </div>
               <textarea v-model="input" class="input-textarea" placeholder="输入分析需求... &#8629; 发送" :disabled="loading" rows="3" @keydown.enter.exact.prevent="send" />
-              <el-button class="input-send" type="primary" size="small" @click="send" :disabled="!input.trim() || loading" :loading="loading">{{ loading ? '分析中' : '发送' }}</el-button>
+              <el-button class="input-send" type="primary" size="small" @click="send" :disabled="!input.trim() || loading" :loading="loading">
+                <svg v-if="!loading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+              </el-button>
             </div>
           </div>
         </div>
@@ -294,6 +302,72 @@ async function send() {
     scrollBottom()
   }
 }
+
+async function handleFileUpload(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+    error.value = '仅支持 .xlsx / .xls / .csv 文件'
+    return
+  }
+  error.value = ''
+  loading.value = true
+  try {
+    if (!sessionId.value) { await createNewSession(); sessionStorage.setItem('opencode-session', sessionId.value) }
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`/api/v1/agent/upload`, {
+      method: 'POST',
+      headers: { 'X-User': getCurrentUser() },
+      body: form,
+    })
+    if (!res.ok) throw new Error('上传失败')
+    const data = await res.json()
+
+    const sid = sessionId.value
+    messages.value.push({ role: 'user', text: `上传文件: ${file.name}`, parts: [{ type: 'text', text: `上传文件: ${file.name}` }] })
+    const assistantIdx = messages.value.length
+    messages.value.push({ role: 'assistant', text: '', parts: [{ type: 'text', text: '' }] })
+    scrollBottom()
+
+    const msg = `对数据集 ${data.dataset_id} 做完整相关性分析，包含相关性热力图。特征字段: ${data.fields.features.join(',')}，目标字段: ${data.fields.targets.join(',')}`
+    await sendMessageAsync(sid, msg)
+
+    activeStream = streamEvents(
+      sid,
+      (delta: string) => {
+        const parts = messages.value[assistantIdx]?.parts
+        if (parts && parts.length > 0) {
+          const last = parts[parts.length - 1]
+          if (last.type === 'text') last.text = (last.text || '') + delta
+        }
+        scrollBottom()
+      },
+      (name: string, args: any) => {
+        messages.value[assistantIdx]?.parts.push({ type: 'tool_call', text: '', tool: name, args: JSON.stringify(args) })
+        scrollBottom()
+      },
+      (name: string, data: string) => {
+        messages.value[assistantIdx]?.parts.push({ type: 'tool_result', text: data.slice(0, 500), tool: name })
+        scrollBottom()
+      },
+      (node: string) => {},
+      () => { loading.value = false; activeStream = null; scrollBottom() },
+      (err: string) => { error.value = err; loading.value = false; activeStream = null; scrollBottom() },
+    )
+  } catch (e: any) {
+    error.value = '文件上传失败: ' + (e.message || '')
+    loading.value = false
+  } finally {
+    target.value = ''
+  }
+}
+
+function getCurrentUser(): string {
+  const store = useSessionStore()
+  return store.currentUser || 'anonymous'
+}
 function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight }) }
 </script>
 
@@ -378,6 +452,8 @@ function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scroll
 .input-textarea { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; line-height: 1.5; resize: none; font-family: inherit; color: var(--el-text-color-primary); padding: 2px 4px; }
 .input-textarea::placeholder { color: var(--el-text-color-placeholder); }
 .input-send { flex-shrink: 0; border-radius: 10px; }
+
+.upload-btn-wrapper { display: flex; align-items: center; padding: 2px; }
 
 .mermaid-block { margin: 8px 0; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--el-border-color-light); overflow-x: auto; }
 .mermaid-block svg { max-width: 100%; height: auto; }

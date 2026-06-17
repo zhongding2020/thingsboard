@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, status
 from langchain_core.messages import AIMessageChunk
 from starlette.responses import StreamingResponse
 
@@ -89,6 +89,24 @@ def register_agent_routes(
     @router.get("/processes")
     async def list_processes() -> list[dict]:
         return knowledge_loader.list_processes()
+
+    @router.post("/upload")
+    async def upload_dataset_route(file: UploadFile) -> dict:
+        from process_opt.analysis.excel import parse_excel, save_dataset
+
+        if not file.filename or not file.filename.lower().endswith((".xlsx", ".xls", ".csv")):
+            raise HTTPException(status_code=400, detail="仅支持 .xlsx / .xls / .csv 文件")
+
+        content = await file.read()
+        ds = parse_excel(content)
+        ds_id = save_dataset(ds)
+        feature_fields = sorted({k for f in ds.features for k in f})
+        target_fields = sorted({k for t in ds.targets for k in t})
+        return {
+            "dataset_id": ds_id,
+            "fields": {"features": feature_fields, "targets": target_fields},
+            "sample_count": ds.sample_count,
+        }
 
     app.include_router(router)
 

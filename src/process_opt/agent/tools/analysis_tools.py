@@ -306,4 +306,68 @@ def create_analysis_tools(
 
     tool_list.append(generate_report)
 
+    @tool
+    async def upload_and_analyze(dataset_id: str) -> str:
+        """对上传的数据集自动进行完整分析：数据画像 + 相关性矩阵 + ECharts可视化。
+        返回 ECharts 热力图配置，可直接渲染为图表。
+        dataset_id 通过上传文件接口获取，或从 build_dataset 获取。"""
+        from process_opt.analysis.excel import get_dataset
+        from process_opt.analysis.profiling import profile_dataset
+        from process_opt.analysis.correlation import compute_correlation
+
+        ds = get_dataset(dataset_id)
+        if ds is None:
+            return "Dataset not found"
+
+        feature_fields = sorted({k for f in ds.features for k in f})
+        target_fields = sorted({k for t in ds.targets for k in t})
+        all_fields = feature_fields + target_fields
+
+        profile = profile_dataset(ds)
+        profile_items = [
+            {"field": p.field, "mean": round(p.mean, 3) if p.mean else None,
+             "std": round(p.std, 3) if p.std else None, "min": p.min, "max": p.max,
+             "missing": p.missing_count, "outlier_count": p.outlier_count}
+            for p in profile
+        ]
+
+        corr_results = compute_correlation(ds, feature_fields, target_fields, "pearson")
+        corr_matrix: list[list[float | str]] = []
+        for c in corr_results:
+            corr_matrix.append([c.field_x, c.field_y, round(c.coefficient, 3)])
+
+        heatmap_data: list[list] = []
+        x_axis = target_fields
+        y_axis = feature_fields
+        for fy in y_axis:
+            for fx in x_axis:
+                for c in corr_results:
+                    if c.field_x == fy and c.field_y == fx:
+                        heatmap_data.append([x_axis.index(fx), y_axis.index(fy), round(c.coefficient, 3)])
+                        break
+
+        max_val = max((abs(c[2]) for c in heatmap_data), default=1)
+
+        chart = {
+            "tooltip": {"position": "top"},
+            "xAxis": {"data": x_axis, "type": "category", "splitArea": {"show": True}},
+            "yAxis": {"data": y_axis, "type": "category", "splitArea": {"show": True}},
+            "visualMap": {"min": -max_val, "max": max_val, "calculable": True,
+                          "orient": "horizontal", "left": "center", "bottom": "0%",
+                          "inRange": {"color": ["#313695", "#4575b4", "#74add1", "#abd9e9", "#fee090", "#fdae61", "#f46d43", "#d73027"]}},
+            "series": [{"type": "heatmap", "data": heatmap_data,
+                        "label": {"show": True, "fontSize": 11},
+                        "emphasis": {"itemStyle": {"shadowBlur": 10, "shadowColor": "rgba(0,0,0,0.3)"}}}]
+        }
+
+        return json.dumps({
+            "sample_count": ds.sample_count,
+            "fields": {"features": feature_fields, "targets": target_fields},
+            "profile": profile_items,
+            "correlation_matrix": corr_matrix,
+            "echarts_heatmap": chart,
+        }, ensure_ascii=False)
+
+    tool_list.append(upload_and_analyze)
+
     return tool_list

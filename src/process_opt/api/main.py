@@ -221,6 +221,28 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_service = ParameterService(parameter_repo)
         dataset_builder = DatasetBuilder(pool)
         analysis_service = AnalysisService(dataset_builder)
+
+        from process_opt.agent.graph import build_graph, SessionManager
+        from process_opt.agent.tools.analysis_tools import create_analysis_tools
+        from process_opt.knowledge.loader import KnowledgeLoader
+        from langchain_openai import ChatOpenAI
+
+        knowledge_loader = KnowledgeLoader()
+        tools = create_analysis_tools(
+            repository_proxy, analysis_service_proxy, parameter_service_proxy, knowledge_loader,
+        )
+
+        llm = ChatOpenAI(
+            model=settings.agent_model,
+            base_url=settings.agent_api_base,
+            api_key=settings.agent_api_key,
+            temperature=settings.agent_temperature,
+            streaming=True,
+        )
+        llm_with_tools = llm.bind_tools(tools)
+        agent_graph = build_graph(llm, llm_with_tools, tools, knowledge_loader)
+        session_manager = SessionManager(ttl_seconds=settings.agent_session_ttl)
+
         manager = ContainerPoolManager(settings)
         container_pool_proxy.set_manager(manager)
         await manager.start()
@@ -239,6 +261,8 @@ def create_api_app_from_settings() -> FastAPI:
             line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None
             analysis_service_proxy._service = None
+            import gc
+            gc.collect()
             await pool.close()
 
     app = create_app(
@@ -247,6 +271,9 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service=analysis_service_proxy,
         line_device_repo=line_device_repo_proxy,
         container_pool=container_pool_proxy,
+        agent_graph=agent_graph,
+        session_manager=session_manager,
+        knowledge_loader=knowledge_loader,
     )
     app.router.lifespan_context = lifespan
     return app

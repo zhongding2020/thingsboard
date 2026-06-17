@@ -20,3 +20,10 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = 1800
     health_check_interval_seconds: int = 120
     docker_host_ip: str = "127.0.0.1"
+
+    # Agent settings
+    agent_model: str = "ark-code-latest"
+    agent_api_base: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
+    agent_api_key: str = "REDACTED"
+    agent_temperature: float = 0.0
+    agent_session_ttl: int = 1800

@@ -126,6 +126,9 @@ def create_app(
     analysis_service: AnalysisService | None = None,
     line_device_repo: LineDeviceRepositoryProtocol | None = None,
     container_pool: "ContainerPoolProxy | None" = None,
+    agent_graph: Any = None,
+    session_manager: Any = None,
+    knowledge_loader: Any = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -581,6 +584,10 @@ def create_app(
     if container_pool is not None:
         from process_opt.container_pool.routes import register_routes as register_pool_routes
         register_pool_routes(app, container_pool)
+
+    if agent_graph is not None and session_manager is not None and knowledge_loader is not None:
+        from process_opt.api.agent_routes import register_agent_routes
+        register_agent_routes(app, session_manager, knowledge_loader, agent_graph)
 
     _web_dist = (
         candidate

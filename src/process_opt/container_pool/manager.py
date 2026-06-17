@@ -148,7 +148,7 @@ class ContainerPoolManager:
         cs = self._containers[ss.container_id]
         url = f"http://{self._settings.docker_host_ip}:{cs.port}/session/{session_id}/message"
         ss.last_active = time.monotonic()
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             resp = await client.post(url, json=body)
             resp.raise_for_status()
             data = resp.json()

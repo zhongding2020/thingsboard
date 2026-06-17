@@ -20,14 +20,19 @@ interface OpencodeMessage {
 }
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User': getCurrentUser(),
-      ...opts?.headers,
-    },
-  })
+  const controller = new AbortController()
+  const isPost = opts?.method === 'POST'
+  const timeout = setTimeout(() => controller.abort(), isPost ? 300000 : 15000)
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...opts,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User': getCurrentUser(),
+        ...opts?.headers,
+      },
+    })
   if (!res.ok) {
     const body = await res.text()
     let detail = `${res.status} ${res.statusText}`
@@ -38,6 +43,9 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
     throw new Error(detail)
   }
   return res.json() as Promise<T>
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export async function listSessions(): Promise<OpencodeSession[]> {

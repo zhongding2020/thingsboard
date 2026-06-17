@@ -1357,7 +1357,7 @@ Append before the closing of the Settings class:
     # Agent settings
     agent_model: str = "ark-code-latest"
     agent_api_base: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
-    agent_api_key: str = "REDACTED"
+    agent_api_key: str = ""  # set via PROCESS_OPT_AGENT_API_KEY env var
     agent_temperature: float = 0.0
     agent_session_ttl: int = 1800
 ```

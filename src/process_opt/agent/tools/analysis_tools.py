@@ -21,6 +21,7 @@ def create_analysis_tools(
     analysis_service: Any,
     parameter_service: Any | None,
     knowledge_loader: KnowledgeLoader,
+    experiment_repo: Any = None,
 ) -> list:
     @tool
     async def query_records(
@@ -225,10 +226,69 @@ def create_analysis_tools(
             "summary": anova.summary,
         }, ensure_ascii=False)
 
-    return [
+    tool_list = [
         query_records, get_devices, get_stats, profile_data,
         analyze_correlation, analyze_pareto, run_regression,
         recommend_params, run_spc, get_parameters,
         get_process_knowledge, build_dataset,
         design_experiment, analyze_experiment,
     ]
+
+    if experiment_repo is not None:
+        @tool
+        async def save_experiment_plan(
+            plan_json: str,
+        ) -> str:
+            """保存实验方案到数据库。plan_json 为实验方案 JSON，包含 name,method,factors,design_runs 等字段。
+            返回保存后的实验方案 ID。"""
+            from process_opt.experiment.repository import ExperimentPlanCreate
+
+            data = json.loads(plan_json)
+            plan = await experiment_repo.create_plan(ExperimentPlanCreate(**data))
+            return json.dumps({"plan_id": plan.id, "name": plan.name, "status": plan.status}, ensure_ascii=False)
+
+        @tool
+        async def record_experiment_result_for_plan(
+            plan_id: int, run_order: int, response_value: float, notes: str = "",
+        ) -> str:
+            """记录单个实验运行的结果。plan_id 为实验方案ID，run_order 为运行序号，response_value 为响应值。"""
+            from process_opt.experiment.repository import ExperimentResultCreate
+
+            await experiment_repo.record_result(plan_id, ExperimentResultCreate(
+                run_order=run_order, response_value=response_value, notes=notes or None,
+            ))
+            return json.dumps({"status": "recorded", "plan_id": plan_id, "run_order": run_order}, ensure_ascii=False)
+
+        @tool
+        async def get_experiment_results(plan_id: int) -> str:
+            """获取实验方案的完整结果，包括所有运行记录。"""
+            plan = await experiment_repo.get_plan(plan_id)
+            if plan is None:
+                return "Experiment plan not found"
+            return json.dumps(plan.model_dump(), default=str, ensure_ascii=False)
+
+        tool_list.extend([save_experiment_plan, record_experiment_result_for_plan, get_experiment_results])
+
+    @tool
+    async def trace_product(barcode: str) -> str:
+        """追溯单个产品（barcode）的完整生产链路：工艺参数、检测结果、当前有效参数集。"""
+        record = await repository.get_analysis_record(barcode)
+        if record is None:
+            return f"未找到条码 {barcode} 的生产记录"
+
+        params = record.get("params", {})
+        if isinstance(params, str):
+            params = json.loads(params)
+
+        return json.dumps({
+            "barcode": barcode,
+            "device_id": record.get("device_id", ""),
+            "product_model": record.get("product_model", ""),
+            "process_params": params,
+            "inspection_result": record.get("inspection_result", {}),
+            "processed_at": str(record.get("processed_at", "")),
+        }, default=str, ensure_ascii=False)
+
+    tool_list.append(trace_product)
+
+    return tool_list

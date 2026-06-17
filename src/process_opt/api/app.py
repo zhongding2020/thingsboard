@@ -129,6 +129,7 @@ def create_app(
     agent_graph: Any = None,
     session_manager: Any = None,
     knowledge_loader: Any = None,
+    experiment_repo: Any = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -193,6 +194,43 @@ def create_app(
                     status_code=status.HTTP_404_NOT_FOUND, detail="Analysis record not found"
                 )
             return jsonable_encoder(record)
+
+        @app.get("/api/v1/analysis/trace/{barcode}")
+        async def trace_barcode(barcode: str) -> Any:
+            record = await repository.get_analysis_record(barcode)
+            if record is None:
+                raise HTTPException(status_code=404, detail="Barcode not found")
+
+            device_id = record.get("device_id", "")
+            params = record.get("params", {})
+            if isinstance(params, str):
+                import json as _j
+                params = _j.loads(params)
+
+            param_history: list[dict] = []
+            if device_id and app.state.pool:
+                from process_opt.parameters.repository import ParameterRepository
+                param_repo = ParameterRepository(app.state.pool)
+                device_row = await app.state.pool.fetchrow(
+                    "SELECT type FROM device_registry WHERE id=$1", device_id,
+                )
+                if device_row:
+                    latest = await param_repo.get_latest_active(device_row["type"])
+                    if latest is not None:
+                        param_history = [
+                            {"param_key": pi.param_key, "param_value": pi.param_value, "unit": pi.unit}
+                            for pi in latest.items
+                        ]
+
+            return {
+                "barcode": barcode,
+                "device_id": device_id,
+                "product_model": record.get("product_model", ""),
+                "process_params": params,
+                "inspection_result": record.get("inspection_result", {}),
+                "processed_at": str(record.get("processed_at", "")),
+                "active_parameter_set": param_history,
+            }
 
         @app.get("/api/v1/analysis/devices")
         async def list_devices_route() -> Any:
@@ -588,7 +626,43 @@ def create_app(
             result = run_anova(req)
             return result.model_dump()
 
-        if parameter_service is not None:
+    if experiment_repo is not None:
+        from process_opt.experiment.repository import ExperimentPlanCreate, ExperimentResultCreate
+
+        @app.get("/api/v1/experiment/plans")
+        async def list_experiment_plans(limit: int = 20) -> list[dict]:
+            plans = await experiment_repo.list_plans(limit)
+            return [p.model_dump() for p in plans]
+
+        @app.post("/api/v1/experiment/plans", status_code=status.HTTP_201_CREATED)
+        async def create_experiment_plan(body: dict[str, Any]) -> dict:
+            plan = await experiment_repo.create_plan(ExperimentPlanCreate(**body))
+            return plan.model_dump()
+
+        @app.get("/api/v1/experiment/plans/{plan_id}")
+        async def get_experiment_plan(plan_id: int) -> dict:
+            plan = await experiment_repo.get_plan(plan_id)
+            if plan is None:
+                raise HTTPException(status_code=404, detail="Plan not found")
+            return plan.model_dump()
+
+        @app.post("/api/v1/experiment/plans/{plan_id}/results")
+        async def record_experiment_result(plan_id: int, body: dict[str, Any]) -> dict:
+            result = await experiment_repo.record_result(plan_id, ExperimentResultCreate(**body))
+            return result.model_dump()
+
+        @app.post("/api/v1/experiment/plans/{plan_id}/results/batch")
+        async def batch_record_results(plan_id: int, body: list[dict]) -> list[dict]:
+            creates = [ExperimentResultCreate(**r) for r in body]
+            results = await experiment_repo.batch_record_results(plan_id, creates)
+            return [r.model_dump() for r in results]
+
+        @app.put("/api/v1/experiment/plans/{plan_id}/status")
+        async def update_plan_status(plan_id: int, body: dict[str, Any]) -> Response:
+            await experiment_repo.update_plan_status(plan_id, body["status"])
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if parameter_service is not None:
 
             @app.post(
                 "/api/v1/analysis/recommendation/submit",

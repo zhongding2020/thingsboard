@@ -1,0 +1,24 @@
+{
+  "process_type": "welding",
+  "display_name": "焊接",
+  "description": "焊接工艺，通过高温熔化焊材和母材实现冶金结合。焊接质量由焊缝强度、气孔率和熔深决定。",
+  "parameters": [
+    {"key": "welding_current", "name": "焊接电流", "unit": "A", "type": "continuous", "range": {"min": 80, "max": 300}, "target": {"min": 120, "max": 220}, "importance": "critical", "description": "焊接电流决定热输入量和熔深"},
+    {"key": "welding_voltage", "name": "焊接电压", "unit": "V", "type": "continuous", "range": {"min": 16, "max": 36}, "target": {"min": 20, "max": 30}, "importance": "critical", "description": "焊接电压影响电弧稳定性和熔宽"},
+    {"key": "welding_speed", "name": "焊接速度", "unit": "mm/min", "type": "continuous", "range": {"min": 100, "max": 800}, "target": {"min": 200, "max": 500}, "importance": "critical", "description": "焊接速度影响热输入时间和焊缝成型"},
+    {"key": "gas_flow", "name": "保护气流量", "unit": "L/min", "type": "continuous", "range": {"min": 10, "max": 30}, "target": {"min": 15, "max": 25}, "importance": "important", "description": "保护气防止焊缝氧化"},
+    {"key": "wire_feed_speed", "name": "送丝速度", "unit": "m/min", "type": "continuous", "range": {"min": 3, "max": 15}, "target": {"min": 5, "max": 10}, "importance": "important", "description": "送丝速度影响熔敷率和焊缝填充"}
+  ],
+  "quality_metrics": [
+    {"key": "tensile_strength", "name": "抗拉强度", "unit": "MPa", "lsl": 400.0, "description": "焊缝抗拉强度"},
+    {"key": "porosity_rate", "name": "气孔率", "unit": "%", "usl": 2.0, "description": "焊缝内部气孔占比"},
+    {"key": "penetration_depth", "name": "熔深", "unit": "mm", "lsl": 3.0, "description": "焊缝熔深"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "welding_current > 300", "message": "焊接电流不得超过300A，否则烧穿"},
+    {"type": "hard_constraint", "expression": "gas_flow < 10", "message": "保护气流量不足导致焊缝氧化"},
+    {"type": "soft_guideline", "expression": "welding_speed > 600 and welding_current < 150", "message": "高速低电流可能导致熔深不足"},
+    {"type": "dependency", "trigger": "welding_current increase", "effect": "welding_speed increase", "message": "电流增大时可适当提高焊接速度以控制热输入"}
+  ],
+  "analysis_hints": ["焊接电流和焊接速度是影响熔深的主要因素", "气孔率高时检查保护气流量和焊接速度组合", "抗拉强度不足时先优化焊接电流和电压"]
+}

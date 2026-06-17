@@ -291,4 +291,19 @@ def create_analysis_tools(
 
     tool_list.append(trace_product)
 
+    @tool
+    async def generate_report(
+        title: str, sections_json: str, metadata_json: str = "{}",
+    ) -> str:
+        """生成工艺分析 Markdown 报告。title 报告标题，sections_json 为章节列表 JSON，
+        每章含 title 和 content。metadata_json 可包含设备ID、工艺类型等元信息。"""
+        from process_opt.analysis.report import generate_markdown_report
+
+        sections = json.loads(sections_json)
+        metadata = json.loads(metadata_json) if metadata_json else None
+        report = generate_markdown_report(title=title, sections=sections, metadata=metadata)
+        return report
+
+    tool_list.append(generate_report)
+
     return tool_list

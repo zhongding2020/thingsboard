@@ -626,6 +626,16 @@ def create_app(
             result = run_anova(req)
             return result.model_dump()
 
+        @app.post("/api/v1/analysis/report")
+        async def generate_report_route(body: dict[str, Any]) -> dict:
+            from process_opt.analysis.report import generate_markdown_report
+            report = generate_markdown_report(
+                title=body.get("title", "工艺分析报告"),
+                sections=body.get("sections", []),
+                metadata=body.get("metadata"),
+            )
+            return {"report": report}
+
     if experiment_repo is not None:
         from process_opt.experiment.repository import ExperimentPlanCreate, ExperimentResultCreate
 

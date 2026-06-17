@@ -17,6 +17,42 @@ from process_opt.container_pool.schemas import (
 
 logger = logging.getLogger(__name__)
 
+AGENTS_MD = """# 角色定义
+
+你是工厂工艺参数分析助手，不是软件开发者。不要讨论代码实现细节。
+
+## 输出环境
+
+你的对话界面是一个 **Web 浏览器**，不是终端。你需要适配 Web 显示：
+- 使用 **Markdown** 格式输出（标题、列表、加粗、表格等）
+- 不要输出 ANSI 转义码、ASCII 艺术字、终端进度条
+- 不要输出原始 JSON，用表格或图表替代
+
+## 你能做什么
+
+你连接到一个工艺参数分析平台的数据接口。平台运行在 `http://localhost:8000`。
+你是一个服务 API 端点的智能体，使用 HTTP 工具来调用平台提供的 API。
+
+### 数据分析能力
+1. 查询生产数据 - GET /api/v1/analysis/records?device_id=xxx&page=1&page_size=20
+2. 获取设备列表 - GET /api/v1/analysis/devices
+3. 获取统计概要 - GET /api/v1/analysis/stats
+4. 相关性分析 - POST /api/v1/analysis/correlation { "dataset_id": "xxx", "method": "pearson" }
+5. 帕累托分析 - POST /api/v1/analysis/pareto { "dataset_id": "xxx", "field_y": "strength" }
+6. 回归分析 - POST /api/v1/analysis/regression { "dataset_id": "xxx", "feature_fields": [...], "target_field": "strength", "model_type": "linear" }
+7. 参数推荐 - POST /api/v1/analysis/recommendation { "dataset_id": "xxx", "feature_fields": [...], "target_field": "strength", "target_value": 90.0, "constraints": [...] }
+8. SPC 监控 - POST /api/v1/analysis/spc { "device_id": "xxx", "field": "temperature" }
+9. Cpk 优化 - POST /api/v1/analysis/optimize { "dataset_id": "xxx", "target_field": "strength", "usl": 100.0, "lsl": 80.0, "target_value": 90.0, "target_cpk": 1.33, "key_factors": [...], "step_size": 1.0 }
+10. 参数管理 - GET/POST /api/v1/parameters/sets
+11. 数据查询 - GET /api/v1/analysis/records?barcode=xxx
+
+### 工作流程
+1. 理解用户的工艺分析需求
+2. 使用 HTTP 工具调用对应的分析 API
+3. 用中文解读分析结果，用表格或图表展示数据，结合工艺背景给出可操作的建议
+4. 如果单次分析不够，可以串联多个 API 调用
+5. 不要输出原始 JSON 数据"""
+
 
 class ContainerPoolFullError(Exception):
     pass
@@ -41,8 +77,6 @@ class ContainerPoolManager:
         except Exception as e:
             raise RuntimeError(f"Cannot connect to Docker daemon: {e}") from e
 
-        self._ensure_config_volume()
-
         self._cleanup_old_containers()
 
         for i in range(self._settings.pool_min_size):
@@ -57,14 +91,12 @@ class ContainerPoolManager:
                     name=name,
                     environment={"NODE_ENV": "production"},
                     network=self._settings.pool_network,
-                    volumes={
-                        "opencode-config": {"bind": "/root/.config", "mode": "ro"},
-                    },
                     remove=True,
                 )
                 self._containers[container.id] = ContainerState(
                     container_id=container.id, port=port, name=name
                 )
+                self._ensure_agent_md(container)
                 logger.info("Started container %s on port %d", name, port)
             except Exception as e:
                 logger.warning("Failed to start container %s: %s", name, e)
@@ -192,13 +224,16 @@ class ContainerPoolManager:
         except Exception as e:
             logger.warning("Cleanup error: %s", e)
 
-    def _ensure_config_volume(self) -> None:
-        """Ensure the opencode-config Docker volume exists."""
+    def _ensure_agent_md(self, container: Any) -> None:
+        """Write AGENTS.md into the container so opencode knows its role."""
         try:
-            self._docker_client.volumes.get("opencode-config")
-        except Exception:
-            self._docker_client.volumes.create("opencode-config")
-            logger.info("Created opencode-config volume")
+            import base64
+            encoded = base64.b64encode(AGENTS_MD.encode()).decode()
+            container.exec_run(
+                ["sh", "-c", f"mkdir -p /root/.opencode && echo '{encoded}' | base64 -d > /root/.opencode/AGENTS.md"],
+            )
+        except Exception as e:
+            logger.warning("Failed to write AGENTS.md: %s", e)
 
     def _get_session_or_raise(self, session_id: str) -> SessionState:
         ss = self._sessions.get(session_id)
@@ -254,13 +289,14 @@ class ContainerPoolManager:
             environment={"NODE_ENV": "production"},
             network=self._settings.pool_network,
             volumes={
-                "opencode-config": {"bind": "/root/.config", "mode": "ro"},
+                "opencode-config": {"bind": "/root", "mode": "ro"},
             },
             remove=True,
         )
         cs = ContainerState(container_id=container.id, port=port, name=name)
         cs.status = "busy"
         self._containers[container.id] = cs
+        self._ensure_agent_md(container)
         await asyncio.sleep(2)
         logger.info("Spawned new container %s on port %d", name, port)
         return cs
@@ -349,13 +385,14 @@ class ContainerPoolManager:
                 environment={"NODE_ENV": "production"},
                 network=self._settings.pool_network,
                 volumes={
-                    "opencode-config": {"bind": "/root/.config", "mode": "ro"},
+                    "opencode-config": {"bind": "/root", "mode": "ro"},
                 },
                 remove=True,
             )
             new_cs = ContainerState(container_id=container.id, port=port, name=name)
             new_cs.status = "idle"
             self._containers[container.id] = new_cs
+            self._ensure_agent_md(container)
             logger.info("Replaced dead container %s", name)
         except Exception as e:
             logger.error("Failed to replace container %s: %s", name, e)

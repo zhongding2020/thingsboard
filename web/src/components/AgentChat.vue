@@ -80,6 +80,9 @@
                   </div>
                 </template>
               </div>
+              <div v-if="loading" class="loading-indicator">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              </div>
             </template>
           </div>
           <div v-if="error" class="agent-error">{{ error }}</div>
@@ -247,4 +250,21 @@ function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scroll
 .input-textarea { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; line-height: 1.5; resize: none; font-family: inherit; color: var(--el-text-color-primary); padding: 2px 4px; }
 .input-textarea::placeholder { color: var(--el-text-color-placeholder); }
 .input-send { flex-shrink: 0; border-radius: 10px; }
+
+.loading-indicator {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 14px; align-self: flex-start;
+}
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--el-color-primary); opacity: 0.35;
+  animation: dot-bounce 1.4s ease-in-out infinite both;
+}
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.16s; }
+.dot:nth-child(3) { animation-delay: 0.32s; }
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
 </style>

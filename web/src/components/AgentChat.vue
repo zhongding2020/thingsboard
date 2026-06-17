@@ -143,14 +143,14 @@ function onDrag(e: MouseEvent) {
 }
 function stopDrag() { dragging = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', stopDrag) }
 
-onMounted(async () => { await refreshSessions(); if (sessionId.value) await loadHistory() })
+onMounted(async () => { await refreshSessions(); const saved = sessionStorage.getItem('opencode-session'); if (saved && sessions.value.some(s => s.id === saved)) { sessionId.value = saved; await loadHistory() } else if (!sessionId.value && sessions.value.length) { sessionId.value = sessions.value[0].id; await loadHistory() } })
 
-async function refreshSessions() { try { sessions.value = await listSessions(); if (!sessionId.value && sessions.value.length) sessionId.value = sessions.value[0].id } catch (e: any) { error.value = '连接失败: ' + e.message } }
-async function createNewSession() { try { const res = await createSession(); sessionId.value = res.id; sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
-async function newSession() { await createNewSession() }
-async function switchSession(id: string) { sessionId.value = id; messages.value = []; await loadHistory() }
+async function refreshSessions() { try { sessions.value = await listSessions(); const saved = sessionStorage.getItem('opencode-session'); if (!sessionId.value) { if (saved && sessions.value.some(s => s.id === saved)) sessionId.value = saved; else if (sessions.value.length) sessionId.value = sessions.value[0].id } } catch (e: any) { error.value = '连接失败: ' + e.message } }
+async function createNewSession() { try { const res = await createSession(); sessionId.value = res.id; sessionStorage.setItem('opencode-session', res.id); sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
+async function newSession() { sessionStorage.removeItem('opencode-session'); await createNewSession() }
+async function switchSession(id: string) { sessionId.value = id; sessionStorage.setItem('opencode-session', id); messages.value = []; await loadHistory() }
 function switchModel(val: string) { currentModel.value = val }
-function deleteSession(id: string) { sessions.value = sessions.value.filter(s => s.id !== id); if (sessionId.value === id) { sessionId.value = sessions.value[0]?.id || ''; messages.value = []; loadHistory() } }
+function deleteSession(id: string) { sessions.value = sessions.value.filter(s => s.id !== id); if (sessionId.value === id) { const next = sessions.value[0]; sessionId.value = next?.id || ''; if (next) sessionStorage.setItem('opencode-session', next.id); else sessionStorage.removeItem('opencode-session'); messages.value = []; if (next) loadHistory() } }
 
 async function loadHistory() {
   if (!sessionId.value) return
@@ -168,7 +168,7 @@ async function send() {
   input.value = ''; error.value = ''
   messages.value.push({ role: 'user', text, parts: [{ type: 'text', text }] })
   loading.value = true; scrollBottom()
-  try { if (!sessionId.value) await createNewSession(); const res = await sendPrompt(sessionId.value, text); if ((res as any).parts) { messages.value.push({ role: 'assistant', text: '', parts: (res as any).parts.map((p: any) => ({ type: p.type || 'text', text: p.text || '' })) }) }; scrollBottom() } catch (e: any) { error.value = '请求失败: ' + (e.message || '') } finally { loading.value = false; scrollBottom() }
+  try { if (!sessionId.value) { await createNewSession(); sessionStorage.setItem('opencode-session', sessionId.value) }; const res = await sendPrompt(sessionId.value, text); if ((res as any).parts) { messages.value.push({ role: 'assistant', text: '', parts: (res as any).parts.map((p: any) => ({ type: p.type || 'text', text: p.text || '' })) }) }; scrollBottom() } catch (e: any) { error.value = '请求失败: ' + (e.message || '') } finally { loading.value = false; scrollBottom() }
 }
 function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight }) }
 </script>

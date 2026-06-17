@@ -40,6 +40,7 @@ class ContainerState:
         self.status: Literal["idle", "busy", "draining", "dead"] = "idle"
         self.last_health: float = 0.0
         self.last_allocated: float = 0.0
+        self._fail_count: int = 0
 
 
 class SessionState:

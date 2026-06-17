@@ -1,0 +1,24 @@
+{
+  "process_type": "reflow_soldering",
+  "display_name": "回流焊",
+  "description": "SMT回流焊接工艺，通过精确控温曲线将锡膏熔化实现元器件与PCB的焊接连接。",
+  "parameters": [
+    {"key": "preheat_temp", "name": "预热温度", "unit": "°C", "type": "continuous", "range": {"min": 120, "max": 180}, "target": {"min": 140, "max": 170}, "importance": "critical", "description": "预热阶段激活助焊剂，缓慢升温防止器件热冲击"},
+    {"key": "peak_temp", "name": "峰值温度", "unit": "°C", "type": "continuous", "range": {"min": 230, "max": 260}, "target": {"min": 235, "max": 250}, "importance": "critical", "description": "峰值温度需超过锡膏熔点使锡粉完全熔化"},
+    {"key": "time_above_liquidus", "name": "液相线以上时间", "unit": "s", "type": "continuous", "range": {"min": 30, "max": 90}, "target": {"min": 45, "max": 75}, "importance": "critical", "description": "TAL 决定金属间化合物形成和焊点强度"},
+    {"key": "conveyor_speed", "name": "传送带速度", "unit": "cm/min", "type": "continuous", "range": {"min": 30, "max": 120}, "target": {"min": 50, "max": 90}, "importance": "important", "description": "传送带速度控制各温区停留时间"},
+    {"key": "cooling_rate", "name": "冷却速率", "unit": "°C/s", "type": "continuous", "range": {"min": 1, "max": 6}, "target": {"min": 2, "max": 4}, "importance": "important", "description": "冷却速率影响焊点晶粒结构和机械强度"}
+  ],
+  "quality_metrics": [
+    {"key": "solder_joint_strength", "name": "焊点强度", "unit": "N", "lsl": 20.0, "description": "焊点剪切强度"},
+    {"key": "void_rate", "name": "空洞率", "unit": "%", "usl": 25.0, "description": "X-ray检测焊点内部空洞占比"},
+    {"key": "bridging_rate", "name": "桥连率", "unit": "%", "usl": 2.0, "description": "相邻焊点短路比例"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "peak_temp > 260", "message": "峰值温度不得超过260°C，否则损坏器件和PCB"},
+    {"type": "hard_constraint", "expression": "time_above_liquidus > 90", "message": "TAL超过90秒会导致过量IMC生长，焊点脆化"},
+    {"type": "soft_guideline", "expression": "cooling_rate > 5", "message": "冷却速率过快可能导致焊点内部应力集中"},
+    {"type": "dependency", "trigger": "peak_temp increase", "effect": "time_above_liquidus decrease", "message": "提高峰值温度时可适当缩短TAL，防止过烧"}
+  ],
+  "analysis_hints": ["空洞率高时检查预热温度是否足够，确保助焊剂充分活化", "桥连率高时降低峰值温度或提高传送带速度", "用DOE分析预热温度、峰值温度、TAL对焊点强度的交互影响"]
+}

@@ -1,0 +1,24 @@
+{
+  "process_type": "heat_treatment",
+  "display_name": "热处理",
+  "description": "金属热处理工艺，通过加热、保温、冷却改变材料内部组织，提高硬度、强度或韧性。",
+  "parameters": [
+    {"key": "austenitizing_temp", "name": "奥氏体化温度", "unit": "°C", "type": "continuous", "range": {"min": 750, "max": 1100}, "target": {"min": 820, "max": 950}, "importance": "critical", "description": "钢材完全奥氏体化的温度，影响晶粒度和淬硬性"},
+    {"key": "holding_time", "name": "保温时间", "unit": "min", "type": "continuous", "range": {"min": 10, "max": 180}, "target": {"min": 30, "max": 90}, "importance": "critical", "description": "保温时间确保组织完全转变，过短导致硬度不均"},
+    {"key": "quench_temp", "name": "淬火介质温度", "unit": "°C", "type": "continuous", "range": {"min": 20, "max": 100}, "target": {"min": 25, "max": 60}, "importance": "critical", "description": "淬火冷速影响马氏体转变和变形量"},
+    {"key": "tempering_temp", "name": "回火温度", "unit": "°C", "type": "continuous", "range": {"min": 150, "max": 650}, "target": {"min": 200, "max": 550}, "importance": "important", "description": "回火消除淬火应力，调整硬度和韧性平衡"},
+    {"key": "tempering_time", "name": "回火时间", "unit": "min", "type": "continuous", "range": {"min": 30, "max": 240}, "target": {"min": 60, "max": 120}, "importance": "important", "description": "回火时间影响应力消除程度"}
+  ],
+  "quality_metrics": [
+    {"key": "hardness", "name": "硬度", "unit": "HRC", "lsl": 45.0, "usl": 62.0, "description": "洛氏硬度"},
+    {"key": "tensile_strength", "name": "抗拉强度", "unit": "MPa", "lsl": 800.0, "description": "热处理后抗拉强度"},
+    {"key": "deformation", "name": "变形量", "unit": "mm", "usl": 0.5, "description": "淬火后尺寸变形"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "austenitizing_temp > 1100", "message": "奥氏体化温度不得超过1100°C，否则晶粒粗化"},
+    {"type": "hard_constraint", "expression": "quench_temp > 80 and tempering_temp < 200", "message": "高温淬火+低温回火组合应谨慎，增大开裂风险"},
+    {"type": "soft_guideline", "expression": "tempering_temp > 550", "message": "回火温度超过550°C时硬度下降明显，需确认目标硬度"},
+    {"type": "dependency", "trigger": "austenitizing_temp increase", "effect": "tempering_temp increase", "message": "奥氏体化温度越高，回火温度需相应提高以消除残余应力"}
+  ],
+  "analysis_hints": ["奥氏体化温度和保温时间是决定硬度的主要因素", "变形量大时检查淬火介质温度和冷却均匀性", "回火温度对最终硬度的影响是线性的，可通过回归建模预测"]
+}

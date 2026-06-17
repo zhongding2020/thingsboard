@@ -1,0 +1,24 @@
+{
+  "process_type": "powder_coating",
+  "display_name": "粉末涂装",
+  "description": "静电粉末喷涂+固化工艺，将带电粉末颗粒吸附在工件表面后加热固化形成均匀涂层。",
+  "parameters": [
+    {"key": "curing_temp", "name": "固化温度", "unit": "°C", "type": "continuous", "range": {"min": 160, "max": 220}, "target": {"min": 180, "max": 200}, "importance": "critical", "description": "固化温度使粉末熔融交联，温度不足导致固化不完全"},
+    {"key": "curing_time", "name": "固化时间", "unit": "min", "type": "continuous", "range": {"min": 10, "max": 40}, "target": {"min": 15, "max": 25}, "importance": "critical", "description": "固化时间需保证涂层完全交联"},
+    {"key": "voltage", "name": "静电电压", "unit": "kV", "type": "continuous", "range": {"min": 40, "max": 100}, "target": {"min": 60, "max": 85}, "importance": "important", "description": "静电电压影响粉末吸附效率和上粉率"},
+    {"key": "powder_flow", "name": "供粉量", "unit": "g/min", "type": "continuous", "range": {"min": 50, "max": 300}, "target": {"min": 100, "max": 200}, "importance": "important", "description": "供粉量决定涂膜厚度和均匀性"},
+    {"key": "air_pressure", "name": "雾化气压", "unit": "bar", "type": "continuous", "range": {"min": 0.5, "max": 4.0}, "target": {"min": 1.0, "max": 2.5}, "importance": "auxiliary", "description": "雾化气压影响粉末流化和喷幅"}
+  ],
+  "quality_metrics": [
+    {"key": "coating_thickness", "name": "涂层厚度", "unit": "μm", "lsl": 50.0, "usl": 120.0, "description": "干膜厚度"},
+    {"key": "adhesion", "name": "附着力", "unit": "级", "lsl": null, "usl": 1.0, "description": "划格法附着力等级(0-5级, 0最佳)"},
+    {"key": "gloss", "name": "光泽度", "unit": "GU", "lsl": 80.0, "description": "60° 光泽度"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "curing_temp < 160", "message": "固化温度低于160°C时粉末无法充分交联，附着力不合格"},
+    {"type": "hard_constraint", "expression": "curing_temp > 220", "message": "固化温度超过220°C导致涂层黄变和降解"},
+    {"type": "soft_guideline", "expression": "voltage > 90 and powder_flow > 250", "message": "高电压大粉量组合可能导致粉末反弹和涂层不均匀"},
+    {"type": "dependency", "trigger": "curing_temp increase", "effect": "curing_time decrease", "message": "固化温度每升高10°C，固化时间可减少约3分钟"}
+  ],
+  "analysis_hints": ["涂层厚度不均时检查静电电压和供粉量的稳定性", "附着力不合格时先确认固化温度和时间是否满足要求", "光泽度低可能与固化温度过高或固化时间过长有关"]
+}

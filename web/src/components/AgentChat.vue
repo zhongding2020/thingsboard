@@ -30,6 +30,19 @@
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+              <el-dropdown trigger="click" @command="(v: string) => { currentProcessType = v; newSession() }">
+                <el-button text size="small" class="model-btn">
+                  {{ processTypes.find(p => p.process_type === currentProcessType)?.display_name || '胶固' }}
+                  <el-icon><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-for="p in processTypes" :key="p.process_type" :command="p.process_type">
+                      {{ p.display_name }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
             <div class="agent-header-title">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -109,7 +122,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { listSessions, createSession, sendPromptAsync, streamEvents, getMessages, type StreamEvents } from '@/api/opencode'
+import { listSessions, createSession, sendMessageAsync, streamEvents, getMessages, listProcesses, type StreamEvents } from '@/api/agent'
 import { marked } from 'marked'
 import mermaid from 'mermaid'
 import * as echarts from 'echarts'
@@ -174,6 +187,9 @@ const sessionId = ref('')
 const sessions = ref<SessionItem[]>([])
 const currentModel = ref('deepseek-v4-flash')
 
+const processTypes = ref<{process_type: string; display_name: string}[]>([])
+const currentProcessType = ref('adhesive_curing')
+
 const models = [
   { label: 'DeepSeek V4 Flash', value: 'deepseek-v4-flash' },
   { label: 'DeepSeek V4 Pro', value: 'deepseek-v4-pro' },
@@ -196,13 +212,13 @@ function onDrag(e: MouseEvent) {
 }
 function stopDrag() { dragging = false; document.removeEventListener('mousemove', onDrag); document.removeEventListener('mouseup', stopDrag) }
 
-onMounted(async () => { await refreshSessions(); const saved = sessionStorage.getItem('opencode-session'); if (saved && sessions.value.some(s => s.id === saved)) { sessionId.value = saved; await loadHistory() } else if (!sessionId.value && sessions.value.length) { sessionId.value = sessions.value[0].id; await loadHistory() } })
+onMounted(async () => { processTypes.value = await listProcesses(); await refreshSessions(); const saved = sessionStorage.getItem('opencode-session'); if (saved && sessions.value.some(s => s.id === saved)) { sessionId.value = saved; await loadHistory() } else if (!sessionId.value && sessions.value.length) { sessionId.value = sessions.value[0].id; await loadHistory() } })
 
 let activeStream: StreamEvents | null = null
 onUnmounted(() => { if (activeStream) activeStream.cancel() })
 
 async function refreshSessions() { try { sessions.value = await listSessions(); const saved = sessionStorage.getItem('opencode-session'); if (!sessionId.value) { if (saved && sessions.value.some(s => s.id === saved)) sessionId.value = saved; else if (sessions.value.length) sessionId.value = sessions.value[0].id } } catch (e: any) { error.value = '连接失败: ' + e.message } }
-async function createNewSession() { try { const res = await createSession(); sessionId.value = res.id; sessionStorage.setItem('opencode-session', res.id); sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
+async function createNewSession() { try { const res = await createSession(currentProcessType.value); sessionId.value = res.id; sessionStorage.setItem('opencode-session', res.id); sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
 async function newSession() { sessionStorage.removeItem('opencode-session'); await createNewSession() }
 async function switchSession(id: string) { sessionId.value = id; sessionStorage.setItem('opencode-session', id); messages.value = []; await loadHistory() }
 function switchModel(val: string) { currentModel.value = val }
@@ -228,11 +244,11 @@ async function send() {
     if (!sessionId.value) { await createNewSession(); sessionStorage.setItem('opencode-session', sessionId.value) }
 
     const assistantIdx = messages.value.length
-    messages.value.push({ role: 'assistant', text: '', parts: [] })
+    messages.value.push({ role: 'assistant', text: '', parts: [{ type: 'text', text: '' }] })
     scrollBottom()
 
     const sid = sessionId.value
-    await sendPromptAsync(sid, text)
+    await sendMessageAsync(sid, text)
 
     activeStream = streamEvents(
       sid,
@@ -246,12 +262,19 @@ async function send() {
         }
         scrollBottom()
       },
-      (partType: string) => {
-        const parts = messages.value[assistantIdx]?.parts
-        if (parts) {
-          parts.push({ type: partType, text: '' })
-        }
+      (name: string, args: any) => {
+        messages.value[assistantIdx]?.parts.push({
+          type: 'tool_call', text: '', tool: name, args: JSON.stringify(args),
+        })
+        scrollBottom()
       },
+      (name: string, data: string) => {
+        messages.value[assistantIdx]?.parts.push({
+          type: 'tool_result', text: data.slice(0, 500), tool: name,
+        })
+        scrollBottom()
+      },
+      (node: string) => {},
       () => {
         loading.value = false
         activeStream = null

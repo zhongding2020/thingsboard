@@ -61,7 +61,10 @@ class AgentSession:
         self.user_id = user_id
         self.process_type = process_type
         self.graph = graph
-        self.config = {"configurable": {"thread_id": session_id}}
+        self.config = {
+            "configurable": {"thread_id": session_id},
+            "recursion_limit": 50,
+        }
         self.state: dict = {
             "messages": [],
             "user_id": user_id,

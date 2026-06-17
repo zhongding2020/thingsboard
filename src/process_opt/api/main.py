@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import asyncio
 import uvicorn
 from fastapi import FastAPI
 
@@ -231,6 +232,13 @@ def create_api_app_from_settings() -> FastAPI:
         manager = ContainerPoolManager(settings)
         container_pool_proxy.set_manager(manager)
         await manager.start()
+
+        async def _expire_sessions():
+            while True:
+                await asyncio.sleep(300)
+                await session_manager.expire_stale()
+        expire_task = asyncio.create_task(_expire_sessions())
+
         app.state.pool = pool
         app.state.repository = repository
         repository_proxy.repository = repository
@@ -240,6 +248,7 @@ def create_api_app_from_settings() -> FastAPI:
         try:
             yield
         finally:
+            expire_task.cancel()
             await manager.stop()
             container_pool_proxy.reset()
             repository_proxy.repository = None

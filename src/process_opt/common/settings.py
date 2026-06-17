@@ -24,6 +24,6 @@ class Settings(BaseSettings):
     # Agent settings
     agent_model: str = "ark-code-latest"
     agent_api_base: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
-    agent_api_key: str = "REDACTED"
+    agent_api_key: str = ""
     agent_temperature: float = 0.0
     agent_session_ttl: int = 1800

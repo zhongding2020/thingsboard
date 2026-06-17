@@ -126,10 +126,12 @@ def create_analysis_tools(
 
     @tool
     async def get_parameters(device_type: str = "") -> str:
-        """获取参数集列表。"""
+        """获取参数集列表。可指定 device_type 过滤。"""
         if parameter_service is None:
             return "Parameter service not available"
         sets = await parameter_service.list_sets()
+        if device_type:
+            sets = [s for s in sets if getattr(s, "device_type", "") == device_type]
         return json.dumps([s.model_dump() for s in sets], default=str, ensure_ascii=False)
 
     @tool

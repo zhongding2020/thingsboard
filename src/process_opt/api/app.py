@@ -572,6 +572,22 @@ def create_app(
                 raise HTTPException(status_code=404, detail="Dataset not found or expired")
             return run_optimization(ds, body)
 
+        @app.post("/api/v1/analysis/doe/design")
+        async def doe_design_route(body: dict[str, Any]) -> Any:
+            from process_opt.analysis.doe_schemas import DOEConfig
+            from process_opt.analysis.doe_service import generate_design
+            config = DOEConfig(**body)
+            result = generate_design(config)
+            return result.model_dump()
+
+        @app.post("/api/v1/analysis/doe/anova")
+        async def doe_anova_route(body: dict[str, Any]) -> Any:
+            from process_opt.analysis.doe_schemas import ANOVARequest
+            from process_opt.analysis.doe_service import run_anova
+            req = ANOVARequest(**body)
+            result = run_anova(req)
+            return result.model_dump()
+
         if parameter_service is not None:
 
             @app.post(

@@ -159,9 +159,76 @@ def create_analysis_tools(
             "sample_count": ds.sample_count if ds else 0,
         }, ensure_ascii=False)
 
+    @tool
+    async def design_experiment(factors_json: str, method: str = "full_factorial", center_points: int = 0) -> str:
+        """生成 DOE 实验设计方案。factors_json 为因子列表 JSON，格式 [{"name":"温度","low":100,"high":150,"unit":"°C"},...]。
+        method 可选: full_factorial, frac_factorial, central_composite, box_behnken, taguchi。
+        返回实验设计矩阵。"""
+        from process_opt.analysis.doe_schemas import DOEConfig, DesignMethod
+        from process_opt.analysis.doe_service import generate_design
+
+        factors = json.loads(factors_json)
+        config = DOEConfig(
+            method=DesignMethod(method),
+            factors=factors,
+            center_points=center_points,
+        )
+        design = generate_design(config)
+        result = {
+            "method": design.method.value,
+            "run_count": design.run_count,
+            "runs": [{"run": r.run_order, "factors": r.factor_values} for r in design.runs],
+        }
+        return json.dumps(result, ensure_ascii=False)
+
+    @tool
+    async def analyze_experiment(
+        factors_json: str, run_results_json: str, response_name: str = "response",
+    ) -> str:
+        """对实验结果进行 ANOVA 方差分析。factors_json 为因子列表（同 design_experiment），
+        run_results_json 为实验结果列表 [{"run_order":1,"response":85.2},...]。
+        返回各因子的效应、系数、p值和显著性。"""
+        from process_opt.analysis.doe_schemas import ANOVARequest, ExperimentResult, Factor
+        from process_opt.analysis.doe_service import run_anova
+
+        factors = [Factor(**f) for f in json.loads(factors_json)]
+        results_data = json.loads(run_results_json)
+        results = [ExperimentResult(**r) for r in results_data]
+
+        n_runs = len(results)
+        design_runs: list[Any] = []
+        for i in range(n_runs):
+            d = {}
+            half = len(factors) // 2
+            for j, f in enumerate(factors):
+                d[f.name] = f.low if (i & (1 << j)) == 0 else f.high
+            from process_opt.analysis.doe_schemas import DOERun
+            design_runs.append(DOERun(run_order=i+1, standard_order=i+1, factor_values=d))
+
+        req = ANOVARequest(
+            factors=factors, design_runs=design_runs, results=results,
+            response_name=response_name,
+        )
+        anova = run_anova(req)
+        return json.dumps({
+            "response": anova.response_name,
+            "r_squared": anova.r_squared,
+            "adj_r_squared": anova.adj_r_squared,
+            "model_significant": anova.model_significant,
+            "effects": [{
+                "factor": e.factor,
+                "effect": e.effect,
+                "coefficient": e.coefficient,
+                "p_value": e.p_value,
+                "significant": e.significant,
+            } for e in anova.effects if e.factor != "intercept"],
+            "summary": anova.summary,
+        }, ensure_ascii=False)
+
     return [
         query_records, get_devices, get_stats, profile_data,
         analyze_correlation, analyze_pareto, run_regression,
         recommend_params, run_spc, get_parameters,
         get_process_knowledge, build_dataset,
+        design_experiment, analyze_experiment,
     ]

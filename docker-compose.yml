@@ -59,11 +59,7 @@ services:
     environment:
       PROCESS_OPT_POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/process_opt"
       PROCESS_OPT_API_PORT: "8000"
-      PROCESS_OPT_POOL_NETWORK: "thingsboard_default"
-      PROCESS_OPT_DOCKER_HOST_IP: "172.17.0.1"
       PROCESS_OPT_AGENT_API_KEY: "${AGENT_API_KEY}"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy

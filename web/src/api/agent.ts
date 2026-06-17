@@ -1,9 +1,6 @@
 import { useSessionStore } from '@/stores/session'
 
-const ENGINE = import.meta.env.VITE_AGENT_ENGINE || 'langgraph'
-const API_URL = import.meta.env.DEV
-  ? (ENGINE === 'opencode' ? '/opencode' : '/api/v1/agent')
-  : (ENGINE === 'opencode' ? 'http://localhost:8000/api/opencode' : 'http://localhost:8000/api/v1/agent')
+const API_URL = import.meta.env.DEV ? '/api/v1/agent' : 'http://localhost:8000/api/v1/agent'
 
 function getCurrentUser(): string {
   const store = useSessionStore()
@@ -173,11 +170,10 @@ export async function getMessages(sessionId: string): Promise<ChatMessage[]> {
 }
 
 export async function listProcesses(): Promise<{process_type: string; display_name: string}[]> {
-  const PROC_API = import.meta.env.DEV ? '/api/v1/agent' : 'http://localhost:8000/api/v1/agent'
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15000)
   try {
-    const res = await fetch(`${PROC_API}/processes`, {
+    const res = await fetch(`${API_URL}/processes`, {
       signal: controller.signal,
       headers: { 'X-User': getCurrentUser() },
     })

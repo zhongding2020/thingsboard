@@ -18,8 +18,6 @@ from process_opt.common.settings import Settings
 from process_opt.parameters.repository import ParameterRepository
 from process_opt.parameters.schemas import ParameterSet, ParameterSetCreate, ParameterSetWithItems
 from process_opt.parameters.service import ParameterService
-from process_opt.container_pool.manager import ContainerPoolManager
-from process_opt.container_pool.proxy import ContainerPoolProxy
 from process_opt.experiment.repository import ExperimentRepository
 
 
@@ -232,7 +230,6 @@ def create_api_app_from_settings() -> FastAPI:
     parameter_service_proxy = ParameterServiceProxy()
     analysis_service_proxy = AnalysisServiceProxy()
     line_device_repo_proxy = LineDeviceRepositoryProxy()
-    container_pool_proxy = ContainerPoolProxy()
     experiment_repo_proxy = ExperimentRepositoryProxy()
 
     from process_opt.agent.graph import SessionManager
@@ -256,9 +253,7 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service = AnalysisService(dataset_builder)
         experiment_repo = ExperimentRepository(pool)
         experiment_repo_proxy._repo = experiment_repo
-        manager = ContainerPoolManager(settings)
-        container_pool_proxy.set_manager(manager)
-        await manager.start()
+        app.state.pool = pool
 
         async def _expire_sessions():
             while True:
@@ -276,8 +271,6 @@ def create_api_app_from_settings() -> FastAPI:
             yield
         finally:
             expire_task.cancel()
-            await manager.stop()
-            container_pool_proxy.reset()
             repository_proxy.repository = None
             line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None
@@ -308,7 +301,6 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_service=parameter_service_proxy,
         analysis_service=analysis_service_proxy,
         line_device_repo=line_device_repo_proxy,
-        container_pool=container_pool_proxy,
         agent_graph=agent_graph,
         session_manager=session_manager,
         knowledge_loader=knowledge_loader,

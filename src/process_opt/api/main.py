@@ -209,6 +209,13 @@ def create_api_app_from_settings() -> FastAPI:
     line_device_repo_proxy = LineDeviceRepositoryProxy()
     container_pool_proxy = ContainerPoolProxy()
 
+    from process_opt.agent.graph import SessionManager
+    from process_opt.knowledge.loader import KnowledgeLoader
+    from langchain_openai import ChatOpenAI
+
+    knowledge_loader = KnowledgeLoader()
+    session_manager = SessionManager(ttl_seconds=settings.agent_session_ttl)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         pool = await create_pool(settings.postgres_dsn)
@@ -221,28 +228,6 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_service = ParameterService(parameter_repo)
         dataset_builder = DatasetBuilder(pool)
         analysis_service = AnalysisService(dataset_builder)
-
-        from process_opt.agent.graph import build_graph, SessionManager
-        from process_opt.agent.tools.analysis_tools import create_analysis_tools
-        from process_opt.knowledge.loader import KnowledgeLoader
-        from langchain_openai import ChatOpenAI
-
-        knowledge_loader = KnowledgeLoader()
-        tools = create_analysis_tools(
-            repository_proxy, analysis_service_proxy, parameter_service_proxy, knowledge_loader,
-        )
-
-        llm = ChatOpenAI(
-            model=settings.agent_model,
-            base_url=settings.agent_api_base,
-            api_key=settings.agent_api_key,
-            temperature=settings.agent_temperature,
-            streaming=True,
-        )
-        llm_with_tools = llm.bind_tools(tools)
-        agent_graph = build_graph(llm, llm_with_tools, tools, knowledge_loader)
-        session_manager = SessionManager(ttl_seconds=settings.agent_session_ttl)
-
         manager = ContainerPoolManager(settings)
         container_pool_proxy.set_manager(manager)
         await manager.start()
@@ -264,6 +249,22 @@ def create_api_app_from_settings() -> FastAPI:
             import gc
             gc.collect()
             await pool.close()
+
+    from process_opt.agent.graph import build_graph
+    from process_opt.agent.tools.analysis_tools import create_analysis_tools
+
+    tools = create_analysis_tools(
+        repository_proxy, analysis_service_proxy, parameter_service_proxy, knowledge_loader,
+    )
+    llm = ChatOpenAI(
+        model=settings.agent_model,
+        base_url=settings.agent_api_base,
+        api_key=settings.agent_api_key,
+        temperature=settings.agent_temperature,
+        streaming=True,
+    )
+    llm_with_tools = llm.bind_tools(tools)
+    agent_graph = build_graph(llm, llm_with_tools, tools, knowledge_loader)
 
     app = create_app(
         repository=repository_proxy,

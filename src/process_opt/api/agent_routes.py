@@ -97,6 +97,9 @@ def _map_event(event: dict) -> bytes | None:
     kind = event.get("event", "")
 
     if kind == "on_chat_model_stream":
+        node_name = event.get("metadata", {}).get("langgraph_node", "")
+        if node_name == "supervisor":
+            return None
         chunk: Any = event.get("data", {}).get("chunk")
         if isinstance(chunk, AIMessageChunk) and chunk.content:
             text = chunk.content

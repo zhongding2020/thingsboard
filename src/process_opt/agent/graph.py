@@ -78,6 +78,10 @@ class AgentSession:
 
     async def send_message(self, text: str) -> None:
         from langchain_core.messages import HumanMessage
+
+        if self._running:
+            return
+
         self.state["messages"].append(HumanMessage(content=text))
         self.state["next"] = "supervisor"
         self._running = True

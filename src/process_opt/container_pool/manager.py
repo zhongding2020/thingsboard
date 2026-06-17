@@ -306,17 +306,16 @@ class ContainerPoolManager:
         while self._running:
             for cs in list(self._containers.values()):
                 try:
-                    _, writer = await asyncio.wait_for(
-                        asyncio.open_connection(self._settings.docker_host_ip, cs.port),
-                        timeout=5.0,
-                    )
-                    writer.close()
-                    await writer.wait_closed()
-                    cs.last_health = time.monotonic()
-                    cs._fail_count = 0
-                    if cs.status == "dead":
-                        logger.info("Container %s recovered", cs.name)
-                        cs.status = "idle"
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        resp = await client.get(f"http://{self._settings.docker_host_ip}:{cs.port}/session")
+                    if resp.status_code < 500:
+                        cs.last_health = time.monotonic()
+                        cs._fail_count = 0
+                        if cs.status == "dead":
+                            logger.info("Container %s recovered", cs.name)
+                            cs.status = "idle"
+                    else:
+                        raise Exception(f"status {resp.status_code}")
                 except Exception:
                     cs._fail_count += 1
                     if cs._fail_count >= 3:

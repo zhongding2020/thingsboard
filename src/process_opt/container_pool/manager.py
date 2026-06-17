@@ -319,10 +319,10 @@ class ContainerPoolManager:
                         cs.status = "idle"
                 except Exception:
                     cs._fail_count += 1
-                    if cs._fail_count >= 2:
+                    if cs._fail_count >= 3:
                         self._mark_dead(cs)
                     else:
-                        logger.warning("Container %s health check fail %d/2", cs.name, cs._fail_count)
+                        logger.warning("Container %s health check fail %d/3", cs.name, cs._fail_count)
             await asyncio.sleep(self._settings.health_check_interval_seconds)
 
     async def _recycle_loop(self) -> None:

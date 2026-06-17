@@ -18,5 +18,5 @@ class Settings(BaseSettings):
     pool_base_port: int = 5101
     pool_network: str = "thingsboard_default"
     session_ttl_seconds: int = 1800
-    health_check_interval_seconds: int = 30
+    health_check_interval_seconds: int = 120
     docker_host_ip: str = "127.0.0.1"

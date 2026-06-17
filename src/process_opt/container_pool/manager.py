@@ -41,6 +41,8 @@ class ContainerPoolManager:
         except Exception as e:
             raise RuntimeError(f"Cannot connect to Docker daemon: {e}") from e
 
+        self._ensure_config_volume()
+
         self._cleanup_old_containers()
 
         for i in range(self._settings.pool_min_size):
@@ -55,6 +57,9 @@ class ContainerPoolManager:
                     name=name,
                     environment={"NODE_ENV": "production"},
                     network=self._settings.pool_network,
+                    volumes={
+                        "opencode-config": {"bind": "/root/.config", "mode": "ro"},
+                    },
                     remove=True,
                 )
                 self._containers[container.id] = ContainerState(
@@ -180,13 +185,20 @@ class ContainerPoolManager:
             )
             for c in existing:
                 try:
-                    c.stop(timeout=3)
-                    c.remove()
+                    c.remove(force=True)
                     logger.info("Cleaned up old container %s", c.name)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to clean up %s: %s", c.name, e)
+        except Exception as e:
+            logger.warning("Cleanup error: %s", e)
+
+    def _ensure_config_volume(self) -> None:
+        """Ensure the opencode-config Docker volume exists."""
+        try:
+            self._docker_client.volumes.get("opencode-config")
         except Exception:
-            pass
+            self._docker_client.volumes.create("opencode-config")
+            logger.info("Created opencode-config volume")
 
     def _get_session_or_raise(self, session_id: str) -> SessionState:
         ss = self._sessions.get(session_id)
@@ -241,6 +253,9 @@ class ContainerPoolManager:
             name=name,
             environment={"NODE_ENV": "production"},
             network=self._settings.pool_network,
+            volumes={
+                "opencode-config": {"bind": "/root/.config", "mode": "ro"},
+            },
             remove=True,
         )
         cs = ContainerState(container_id=container.id, port=port, name=name)
@@ -333,6 +348,9 @@ class ContainerPoolManager:
                 name=name,
                 environment={"NODE_ENV": "production"},
                 network=self._settings.pool_network,
+                volumes={
+                    "opencode-config": {"bind": "/root/.config", "mode": "ro"},
+                },
                 remove=True,
             )
             new_cs = ContainerState(container_id=container.id, port=port, name=name)

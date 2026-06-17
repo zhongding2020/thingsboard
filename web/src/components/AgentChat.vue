@@ -76,7 +76,7 @@
                       <summary>{{ loading && i === messages.length - 1 ? '思考中...' : '已思考' }}</summary>
                       <div class="reasoning-content" v-html="renderMd(part.text)"></div>
                     </details>
-                    <div v-else-if="part.type === 'text'" class="msg-bubble assistant-msg" v-html="renderMd(part.text)"></div>
+                    <div v-else-if="part.type === 'text'" class="msg-bubble assistant-msg" v-html="renderContent(part.text)"></div>
                   </div>
                 </template>
               </div>
@@ -103,8 +103,53 @@ import { ref, nextTick, onMounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listSessions, createSession, sendPrompt, getMessages } from '@/api/opencode'
 import { marked } from 'marked'
+import mermaid from 'mermaid'
+import * as echarts from 'echarts'
+
+mermaid.initialize({ startOnLoad: false, theme: 'default' })
 
 function renderMd(text: string): string { if (!text) return ''; return marked.parse(text, { breaks: true, gfm: true }) as string }
+
+function renderContent(text: string): string {
+  if (!text) return ''
+  let html = marked.parse(text, { breaks: true, gfm: true }) as string
+  html = html.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
+    const id = 'mermaid-' + Math.random().toString(36).slice(2, 10)
+    setTimeout(() => renderMermaid(id, code), 50)
+    return `<div class="mermaid-block" id="${id}"><div class="mermaid-loading">渲染图表中...</div></div>`
+  })
+  html = html.replace(/<pre><code class="language-echarts">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
+    const id = 'echarts-' + Math.random().toString(36).slice(2, 10)
+    setTimeout(() => renderEcharts(id, code), 50)
+    return `<div class="echarts-block" id="${id}" style="width:100%;height:360px"><div class="echarts-loading">渲染图表中...</div></div>`
+  })
+  return html
+}
+
+async function renderMermaid(id: string, code: string) {
+  try {
+    const { svg } = await mermaid.render(id + '-svg', code.trim())
+    const el = document.getElementById(id)
+    if (el) el.innerHTML = svg
+  } catch (e: any) {
+    const el = document.getElementById(id)
+    if (el) el.innerHTML = `<pre style="color:red;font-size:12px">图表语法错误: ${e.message}</pre>`
+  }
+}
+
+function renderEcharts(id: string, code: string) {
+  try {
+    const option = JSON.parse(code.trim())
+    const el = document.getElementById(id)
+    if (!el) return
+    const chart = echarts.init(el)
+    chart.setOption(option)
+    new ResizeObserver(() => chart.resize()).observe(el)
+  } catch (e: any) {
+    const el = document.getElementById(id)
+    if (el) el.innerHTML = `<pre style="color:red;font-size:12px">图表配置错误: ${e.message}</pre>`
+  }
+}
 
 interface ChatMessage { role: 'user' | 'assistant'; text: string; parts?: any[] }
 interface SessionItem { id: string; title?: string }
@@ -250,6 +295,11 @@ function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scroll
 .input-textarea { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; line-height: 1.5; resize: none; font-family: inherit; color: var(--el-text-color-primary); padding: 2px 4px; }
 .input-textarea::placeholder { color: var(--el-text-color-placeholder); }
 .input-send { flex-shrink: 0; border-radius: 10px; }
+
+.mermaid-block { margin: 8px 0; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--el-border-color-light); overflow-x: auto; }
+.mermaid-block svg { max-width: 100%; height: auto; }
+.mermaid-loading, .echarts-loading { font-size: 12px; color: var(--el-text-color-placeholder); padding: 20px; text-align: center; }
+.echarts-block { margin: 8px 0; border-radius: 8px; border: 1px solid var(--el-border-color-light); }
 
 .loading-indicator {
   display: flex; align-items: center; gap: 6px;

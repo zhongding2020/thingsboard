@@ -15,6 +15,8 @@ from process_opt.analysis.schemas import (
 )
 from process_opt.knowledge.loader import KnowledgeLoader
 
+from process_opt.agent.tools.retry import with_retry
+
 
 def create_analysis_tools(
     repository: Any,
@@ -24,6 +26,7 @@ def create_analysis_tools(
     experiment_repo: Any = None,
 ) -> list:
     @tool
+    @with_retry()
     async def query_records(
         device_id: str = "",
         page: int = 1,
@@ -42,6 +45,7 @@ def create_analysis_tools(
         return json.dumps(devices, ensure_ascii=False)
 
     @tool
+    @with_retry()
     async def get_stats() -> str:
         """获取平台统计数据（今日记录数、总记录数、设备数等）。"""
         stats = await repository.get_stats()
@@ -67,6 +71,7 @@ def create_analysis_tools(
         return json.dumps(items, ensure_ascii=False)
 
     @tool
+    @with_retry()
     async def analyze_correlation(field_x: str, field_y: str, method: str = "pearson") -> str:
         """计算两个参数之间的相关性。method: pearson 或 spearman。"""
         req = CorrelationRequest(field_x=field_x, field_y=field_y, method=method)
@@ -89,6 +94,7 @@ def create_analysis_tools(
         return json.dumps([i.model_dump() for i in items], ensure_ascii=False)
 
     @tool
+    @with_retry()
     async def run_regression(
         dataset_id: str, feature_fields: list[str], target_field: str, model_type: str = "linear",
     ) -> str:
@@ -102,6 +108,7 @@ def create_analysis_tools(
         return json.dumps(result.model_dump(), ensure_ascii=False)
 
     @tool
+    @with_retry()
     async def recommend_params(
         dataset_id: str, feature_fields: list[str], target_field: str, target_value: float,
     ) -> str:
@@ -119,6 +126,7 @@ def create_analysis_tools(
         return json.dumps(result.model_dump(), ensure_ascii=False)
 
     @tool
+    @with_retry()
     async def run_spc(device_id: str, field: str = "") -> str:
         """对设备的工艺参数进行 SPC 监控分析。field 可选指定字段。"""
         req = SpcRequest(device_id=device_id, field=field or None)
@@ -270,6 +278,7 @@ def create_analysis_tools(
         tool_list.extend([save_experiment_plan, record_experiment_result_for_plan, get_experiment_results])
 
     @tool
+    @with_retry()
     async def trace_product(barcode: str) -> str:
         """追溯单个产品（barcode）的完整生产链路：工艺参数、检测结果、当前有效参数集。"""
         record = await repository.get_analysis_record(barcode)

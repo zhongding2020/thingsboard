@@ -104,8 +104,16 @@ class ErrorResponse(BaseModel):
 
 
 _SUGGESTIONS: dict[str, str] = {
-    "NOT_FOUND": "Check the set_id parameter and try again.",
+    "NOT_FOUND": "Check the ID parameter and try again. The resource may have been deleted.",
     "INVALID_TRANSITION": "Check allowed transitions: draft->proposed, proposed->approved, proposed->rejected, approved->active.",
+    "INVALID_PARAMS": "Check the request parameters. Ensure all required fields are provided and valid.",
+    "DATASET_NOT_FOUND": "Build or upload a dataset first. The dataset may have expired.",
+    "DEVICE_NOT_FOUND": "Check the device_id. List available devices with GET /devices.",
+    "RECORD_NOT_FOUND": "No data found for the given query. Check barcode or filters.",
+    "NO_DATA": "No data available for the specified filters. Try a wider time range.",
+    "TOO_FEW_POINTS": "At least 5 data points are required for this analysis. Upload more data.",
+    "COMPUTATION_FAILED": "Analysis computation failed. Check data quality for missing or invalid values.",
+    "FEATURE_MISMATCH": "Feature fields do not match the dataset columns. Check field names.",
 }
 
 

@@ -16,6 +16,7 @@ def register_agent_routes(
     session_manager: Any,
     knowledge_loader: Any,
     graph: Any,
+    llm: Any = None,
 ) -> None:
     router = APIRouter(prefix="/api/v1/agent")
 
@@ -57,6 +58,9 @@ def register_agent_routes(
                     event = await session.event_queue.get()
                     if event.get("type") == "done":
                         yield b'data: {"type":"session.status","status":"idle"}\n\n'
+                        if llm is not None and session.state.get("messages"):
+                            suggestions = await _generate_suggestions(llm, session.state["messages"])
+                            yield f'data: {{"type":"suggestions","questions":{json.dumps(suggestions)}}}\n\n'.encode()
                         break
                     if event.get("type") == "error":
                         err = json.dumps({"type":"error","message":event["message"]})
@@ -117,7 +121,29 @@ def _map_event(event: dict) -> bytes | None:
     if kind == "on_chat_model_stream":
         node_name = event.get("metadata", {}).get("langgraph_node", "")
         if node_name == "supervisor":
-            return None
+    return None
+
+
+async def _generate_suggestions(llm: Any, messages: list) -> list[str]:
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    context = ""
+    for msg in messages[-6:]:
+        role = getattr(msg, "type", "unknown")
+        content = msg.content if hasattr(msg, "content") else str(msg)
+        if isinstance(content, list):
+            content = " ".join(str(c) for c in content)
+        context += f"[{role}]: {str(content)[:300]}\n"
+
+    prompt = (
+        "基于以下对话，生成3个用户可能继续提问的简短问题。\n"
+        "问题要具体、与工艺分析相关，用中文。\n"
+        "只输出问题列表，每行一个，不要序号和标记。\n\n"
+        f"{context}"
+    )
+    response = await llm.ainvoke([SystemMessage(content=prompt)])
+    lines = [l.strip("- 1234567890. ") for l in (response.content or "").strip().split("\n") if l.strip()]
+    return [l for l in lines if len(l) > 3][:3]
         chunk: Any = event.get("data", {}).get("chunk")
         if isinstance(chunk, AIMessageChunk) and chunk.content:
             text = chunk.content

@@ -305,6 +305,7 @@ def create_api_app_from_settings() -> FastAPI:
         session_manager=session_manager,
         knowledge_loader=knowledge_loader,
         experiment_repo=experiment_repo_proxy,
+        suggestion_llm=llm,
     )
     app.router.lifespan_context = lifespan
     return app

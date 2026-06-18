@@ -129,6 +129,7 @@ def create_app(
     session_manager: Any = None,
     knowledge_loader: Any = None,
     experiment_repo: Any = None,
+    suggestion_llm: Any = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -682,7 +683,7 @@ def create_app(
 
     if agent_graph is not None and session_manager is not None and knowledge_loader is not None:
         from process_opt.api.agent_routes import register_agent_routes
-        register_agent_routes(app, session_manager, knowledge_loader, agent_graph)
+        register_agent_routes(app, session_manager, knowledge_loader, agent_graph, llm=suggestion_llm)
 
     _web_dist = (
         candidate

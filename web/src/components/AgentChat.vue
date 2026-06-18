@@ -104,6 +104,9 @@
               <div v-if="loading" class="loading-indicator">
                 <span class="dot"></span><span class="dot"></span><span class="dot"></span>
               </div>
+              <div v-if="suggestions.length && !loading" class="suggestions-bar">
+                <div v-for="(q, i) in suggestions" :key="i" class="suggestion-chip" @click="clickSuggestion(q)">{{ q }}</div>
+              </div>
             </template>
           </div>
           <div v-if="error" class="agent-error">{{ error }}</div>
@@ -247,6 +250,7 @@ const messages = ref<ChatMessage[]>([])
 const sessionId = ref('')
 const sessions = ref<SessionItem[]>([])
 const currentModel = ref('deepseek-v4-flash')
+const suggestions = ref<string[]>([])
 
 const processTypes = ref<{process_type: string; display_name: string}[]>([])
 const currentProcessType = ref('adhesive_curing')
@@ -279,9 +283,9 @@ let activeStream: StreamEvents | null = null
 onUnmounted(() => { if (activeStream) activeStream.cancel() })
 
 async function refreshSessions() { try { sessions.value = await listSessions(); const saved = sessionStorage.getItem('opencode-session'); if (!sessionId.value) { if (saved && sessions.value.some(s => s.id === saved)) sessionId.value = saved; else if (sessions.value.length) sessionId.value = sessions.value[0].id } } catch (e: any) { error.value = '连接失败: ' + e.message } }
-async function createNewSession() { try { const res = await createSession(currentProcessType.value); sessionId.value = res.id; sessionStorage.setItem('opencode-session', res.id); sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
+async function createNewSession() { try { const res = await createSession(currentProcessType.value); sessionId.value = res.id; sessionStorage.setItem('opencode-session', res.id); sessions.value.unshift({ id: res.id, title: res.title || '新会话' }); messages.value = []; suggestions.value = [] } catch (e: any) { error.value = '创建失败: ' + e.message } }
 async function newSession() { sessionStorage.removeItem('opencode-session'); await createNewSession() }
-async function switchSession(id: string) { sessionId.value = id; sessionStorage.setItem('opencode-session', id); messages.value = []; await loadHistory() }
+async function switchSession(id: string) { sessionId.value = id; sessionStorage.setItem('opencode-session', id); messages.value = []; suggestions.value = []; await loadHistory() }
 function switchModel(val: string) { currentModel.value = val }
 function deleteSession(id: string) { sessions.value = sessions.value.filter(s => s.id !== id); if (sessionId.value === id) { const next = sessions.value[0]; sessionId.value = next?.id || ''; if (next) sessionStorage.setItem('opencode-session', next.id); else sessionStorage.removeItem('opencode-session'); messages.value = []; if (next) loadHistory() } }
 
@@ -301,6 +305,7 @@ async function send() {
   input.value = ''; error.value = ''
   messages.value.push({ role: 'user', text, parts: [{ type: 'text', text }] })
   loading.value = true; scrollBottom()
+  suggestions.value = []
   try {
     if (!sessionId.value) { await createNewSession(); sessionStorage.setItem('opencode-session', sessionId.value) }
 
@@ -408,6 +413,7 @@ async function handleFileUpload(e: Event) {
       (node: string) => {},
       () => { loading.value = false; activeStream = null; scrollBottom() },
       (err: string) => { error.value = err; loading.value = false; activeStream = null; scrollBottom() },
+      (questions: string[]) => { suggestions.value = questions },
     )
   } catch (e: any) {
     error.value = '文件上传失败: ' + (e.message || '')
@@ -422,6 +428,11 @@ function getCurrentUser(): string {
   return store.currentUser || 'anonymous'
 }
 function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight }) }
+
+function clickSuggestion(question: string) {
+  input.value = question
+  send()
+}
 </script>
 
 <style scoped>
@@ -528,5 +539,20 @@ function scrollBottom() { nextTick(() => { if (msgRef.value) msgRef.value.scroll
 @keyframes dot-bounce {
   0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
   40% { transform: translateY(-6px); opacity: 1; }
+}
+
+.suggestions-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; align-self: flex-start;
+}
+.suggestion-chip {
+  padding: 6px 12px; border-radius: 14px; font-size: 12px; cursor: pointer;
+  background: linear-gradient(135deg, #667eea22, #764ba222);
+  border: 1px solid var(--el-color-primary-light-7);
+  color: var(--el-color-primary); transition: all 0.2s; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.suggestion-chip:hover {
+  background: linear-gradient(135deg, #667eea44, #764ba244);
+  border-color: var(--el-color-primary);
+  transform: translateY(-1px); box-shadow: 0 2px 8px rgba(99,102,241,0.2);
 }
 </style>

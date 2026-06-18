@@ -98,6 +98,7 @@ export function streamEvents(
   onNodeStart: (node: string) => void,
   onDone: () => void,
   onError: (err: string) => void,
+  onSuggestions?: (questions: string[]) => void,
 ): StreamEvents {
   const controller = new AbortController()
 
@@ -145,6 +146,11 @@ export function streamEvents(
                 if (event.status === 'idle') {
                   onDone()
                   return
+                }
+                break
+              case 'suggestions':
+                if (onSuggestions && event.questions) {
+                  onSuggestions(event.questions)
                 }
                 break
               case 'error':

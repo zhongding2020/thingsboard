@@ -56,19 +56,16 @@ def create_analysis_tools(
         """对设备数据进行统计画像。device_id 可选。"""
         req = AnalysisDatasetRequest(device_id=device_id, page=page, page_size=page_size)
         results = await analysis_service.profile_from_request(req)
-        items = [
-            {
-                "field": r.field, "count": r.count,
-                "mean": round(r.mean, 3) if r.mean is not None else None,
-                "std": round(r.std, 3) if r.std is not None else None,
-                "min": round(r.min, 3) if r.min is not None else None,
-                "max": round(r.max, 3) if r.max is not None else None,
-                "outlier_count": r.outlier_count,
-                "outlier_ratio": round(r.outlier_ratio, 3) if r.outlier_ratio else None,
-            }
-            for r in results
-        ]
-        return json.dumps(items, ensure_ascii=False)
+        lines = ["## 数据画像", f"**设备**: {device_id or '全部'} | **字段数**: {len(results)}", ""]
+        lines.append("| 字段 | 样本数 | 均值 | 标准差 | 最小值 | 最大值 | 异常值 |")
+        lines.append("|------|--------|------|--------|--------|--------|--------|")
+        for r in results:
+            mean_str = f"{r.mean:.4f}" if r.mean is not None else "N/A"
+            std_str = f"{r.std:.4f}" if r.std is not None else "N/A"
+            min_str = f"{r.min:.4f}" if r.min is not None else "N/A"
+            max_str = f"{r.max:.4f}" if r.max is not None else "N/A"
+            lines.append(f"| {r.field} | {r.count} | {mean_str} | {std_str} | {min_str} | {max_str} | {r.iqr_outliers} |")
+        return "\n".join(lines)
 
     @tool
     @with_retry()
@@ -76,11 +73,20 @@ def create_analysis_tools(
         """计算两个参数之间的相关性。method: pearson 或 spearman。"""
         req = CorrelationRequest(field_x=field_x, field_y=field_y, method=method)
         result = await analysis_service.correlation(req)
-        return json.dumps({
-            "field_x": result.field_x, "field_y": result.field_y,
-            "coefficient": round(result.coefficient, 4),
-            "p_value": round(result.p_value, 4), "method": result.method,
-        }, ensure_ascii=False)
+        coeff = result.coefficient
+        abs_coeff = abs(coeff)
+        if abs_coeff > 0.7:
+            strength = "强相关"
+        elif abs_coeff > 0.4:
+            strength = "中等相关"
+        else:
+            strength = "弱相关"
+        lines = [
+            f"## 相关性分析: {field_x} vs {field_y}",
+            f"**方法**: {method} | **相关系数**: {coeff:.4f} | **p值**: {result.p_value:.4f}",
+            f"**解释**: {strength}",
+        ]
+        return "\n".join(lines)
 
     @tool
     async def analyze_pareto(dataset_id: str, field_y: str) -> str:
@@ -91,7 +97,12 @@ def create_analysis_tools(
         if ds is None:
             return "Dataset not found or expired"
         items = compute_pareto(ds, field_y)
-        return json.dumps([i.model_dump() for i in items], ensure_ascii=False)
+        lines = [f"## 帕累托分析: {field_y}", ""]
+        lines.append("| 因子 | 相关系数 | 贡献% | 累计% | 强度 |")
+        lines.append("|------|----------|-------|-------|------|")
+        for item in items[:10]:
+            lines.append(f"| {item.field} | {item.coefficient:.4f} | {item.contribution_pct:.1f}% | {item.cumulative_pct:.1f}% | {item.strength} |")
+        return "\n".join(lines)
 
     @tool
     @with_retry()
@@ -105,7 +116,18 @@ def create_analysis_tools(
         if ds is None:
             return "Dataset not found or expired"
         result = fit_regression(ds, feature_fields, target_field, model_type)
-        return json.dumps(result.model_dump(), ensure_ascii=False)
+        lines = [
+            "## 回归分析",
+            f"**目标**: {target_field} | **R²**: {result.r_squared:.4f} | **RMSE**: {result.rmse:.4f}",
+            f"**模型**: {result.model_type}",
+            "",
+            "### 系数",
+            "| 特征 | 系数 |",
+            "|------|------|",
+        ]
+        for field, value in result.coefficients.items():
+            lines.append(f"| {field} | {value:.6f} |")
+        return "\n".join(lines)
 
     @tool
     @with_retry()
@@ -189,7 +211,32 @@ def create_analysis_tools(
         """对设备的工艺参数进行 SPC 监控分析。field 可选指定字段。"""
         req = SpcRequest(device_id=device_id, field=field or None)
         result = await analysis_service.spc(req)
-        return json.dumps(result.model_dump(), ensure_ascii=False)
+        lines = [f"## SPC 监控: {field or '全部字段'}", ""]
+        if result.overview:
+            lines.append("| 字段 | 均值 | 标准差 | USL | LSL | Cpk | 异常值 | 状态 |")
+            lines.append("|------|------|--------|-----|-----|-----|--------|------|")
+            for p in result.overview:
+                cpk_str = f"{p.cpk:.4f}" if p.cpk is not None else "N/A"
+                lines.append(f"| {p.field} | {p.mean:.4f} | {p.std:.4f} | {p.usl} | {p.lsl} | {cpk_str} | {p.outlier_count} | {p.status} |")
+        if result.capability:
+            cap = result.capability
+            lines.append("")
+            lines.append(f"**过程能力**: Cp={cap.cp:.4f} | Cpk={cap.cpk:.4f} | Pp={cap.pp:.4f} | Ppk={cap.ppk:.4f}")
+        if result.summary:
+            lines.append("")
+            lines.append(f"**数据统计**: 样本数={result.summary.n} | 均值={result.summary.mean:.4f} | 标准差={result.summary.std:.4f}")
+        if result.i_chart or result.mr_chart:
+            chart_data: dict = {}
+            if result.i_chart:
+                chart_data["i_chart"] = result.i_chart.model_dump()
+            if result.mr_chart:
+                chart_data["mr_chart"] = result.mr_chart.model_dump()
+            lines.append("")
+            lines.append(f"```echarts\n{json.dumps(chart_data, ensure_ascii=False)}\n```")
+        if result.histogram:
+            lines.append("")
+            lines.append(f"```echarts\n{json.dumps(result.histogram.model_dump(), ensure_ascii=False)}\n```")
+        return "\n".join(lines)
 
     @tool
     async def get_parameters(device_type: str = "") -> str:
@@ -207,7 +254,30 @@ def create_analysis_tools(
         template = knowledge_loader.load(process_type)
         if template is None:
             return f"未找到工艺 '{process_type}' 的知识模板"
-        return knowledge_loader.build_system_prompt(template)
+        lines = [f"## 工艺知识: {template.display_name}", ""]
+        if template.description:
+            lines.append(f"{template.description}")
+            lines.append("")
+        if template.parameters:
+            lines.append("### 工艺参数")
+            lines.append("| 参数 | 单位 | 范围 | 目标 | 重要性 |")
+            lines.append("|------|------|------|------|--------|")
+            for p in template.parameters:
+                lo = p.range.min
+                hi = p.range.max
+                t_lo = p.target.min
+                t_hi = p.target.max
+                lines.append(f"| {p.name}({p.key}) | {p.unit} | {lo}-{hi} | {t_lo}-{t_hi} | {p.importance.value} |")
+        if template.quality_metrics:
+            lines.append("")
+            lines.append("### 质量指标")
+            lines.append("| 指标 | 单位 | USL | LSL |")
+            lines.append("|------|------|-----|-----|")
+            for m in template.quality_metrics:
+                usl_str = f"{m.usl}" if m.usl is not None else "N/A"
+                lsl_str = f"{m.lsl}" if m.lsl is not None else "N/A"
+                lines.append(f"| {m.name}({m.key}) | {m.unit} | {usl_str} | {lsl_str} |")
+        return "\n".join(lines)
 
     @tool
     async def build_dataset(device_id: str, since: str = "") -> str:
@@ -241,12 +311,20 @@ def create_analysis_tools(
             center_points=center_points,
         )
         design = generate_design(config)
-        result = {
-            "method": design.method.value,
-            "run_count": design.run_count,
-            "runs": [{"run": r.run_order, "factors": r.factor_values} for r in design.runs],
-        }
-        return json.dumps(result, ensure_ascii=False)
+        factor_names = [f.name for f in design.factors]
+        lines = [
+            f"## DOE 实验设计: {design.method.value}",
+            f"**因素数**: {len(design.factors)} | **实验次数**: {design.run_count}",
+            "",
+        ]
+        header = "| 运行 | " + " | ".join(factor_names) + " |"
+        sep = "|------|" + "|".join(["------"] * len(factor_names)) + "|"
+        lines.append(header)
+        lines.append(sep)
+        for run in design.runs:
+            vals = " | ".join(f"{run.factor_values.get(name, 0):.2f}" for name in factor_names)
+            lines.append(f"| {run.run_order} | {vals} |")
+        return "\n".join(lines)
 
     @tool
     async def analyze_experiment(
@@ -291,20 +369,22 @@ def create_analysis_tools(
             response_name=response_name,
         )
         anova = run_anova(req)
-        return json.dumps({
-            "response": anova.response_name,
-            "r_squared": anova.r_squared,
-            "adj_r_squared": anova.adj_r_squared,
-            "model_significant": anova.model_significant,
-            "effects": [{
-                "factor": e.factor,
-                "effect": e.effect,
-                "coefficient": e.coefficient,
-                "p_value": e.p_value,
-                "significant": e.significant,
-            } for e in anova.effects if e.factor != "intercept"],
-            "summary": anova.summary,
-        }, ensure_ascii=False)
+        lines = [
+            f"## ANOVA 分析: {anova.response_name}",
+            f"**R²**: {anova.r_squared:.4f} | **Adj R²**: {anova.adj_r_squared:.4f}",
+            f"**模型显著性**: {'是' if anova.model_significant else '否'}",
+            f"**{anova.summary}**",
+            "",
+            "| 因子 | 效应 | 系数 | p值 | 显著 |",
+            "|------|------|------|------|------|",
+        ]
+        for e in anova.effects:
+            if e.factor == "intercept":
+                continue
+            p_str = f"{e.p_value:.4f}" if e.p_value >= 0.0001 else "<0.0001"
+            sig = "✓" if e.significant else ""
+            lines.append(f"| {e.factor} | {e.effect:.4f} | {e.coefficient:.4f} | {p_str} | {sig} |")
+        return "\n".join(lines)
 
     tool_list = [
         query_records, get_devices, get_stats, profile_data,

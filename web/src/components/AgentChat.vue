@@ -142,7 +142,15 @@ function renderMd(text: string): string { if (!text) return ''; return marked.pa
 
 function renderContent(text: string): string {
   if (!text) return ''
-  let html = marked.parse(text, { breaks: true, gfm: true }) as string
+
+  // Detect raw ECharts JSON blocks (not wrapped in ```echarts)
+  let processed = text
+  const jsonPatterns = findEchartsJson(text)
+  for (const json of jsonPatterns) {
+    processed = processed.replace(json, '\n```echarts\n' + json + '\n```\n')
+  }
+
+  let html = marked.parse(processed, { breaks: true, gfm: true }) as string
   html = html.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
     const id = 'mermaid-' + Math.random().toString(36).slice(2, 10)
     setTimeout(() => renderMermaid(id, code), 50)
@@ -154,6 +162,35 @@ function renderContent(text: string): string {
     return `<div class="echarts-block" id="${id}" style="width:100%;height:360px"><div class="echarts-loading">渲染图表中...</div></div>`
   })
   return html
+}
+
+function findEchartsJson(text: string): string[] {
+  const results: string[] = []
+  let i = 0
+  while (i < text.length) {
+    i = text.indexOf('"xAxis"', i)
+    if (i === -1) break
+    const start = text.lastIndexOf('{', i - 20)
+    if (start === -1 || start < i - 100) { i += 6; continue }
+    let depth = 0, end = -1
+    for (let j = start; j < text.length; j++) {
+      if (text[j] === '{') depth++
+      else if (text[j] === '}') { depth--; if (depth === 0) { end = j + 1; break } }
+    }
+    if (end > 0) {
+      try {
+        const candidate = text.slice(start, end)
+        const parsed = JSON.parse(candidate)
+        if (parsed.series && (parsed.xAxis || parsed.yAxis)) {
+          results.push(candidate)
+          i = end
+          continue
+        }
+      } catch {}
+    }
+    i += 6
+  }
+  return results
 }
 
 async function renderMermaid(id: string, code: string) {

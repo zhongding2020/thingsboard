@@ -69,11 +69,24 @@ def generate_design(config: DOEConfig) -> DOEDesign:
         )
         design_matrix.append(real_vals)
 
+    if config.replicates and config.replicates > 1:
+        original_runs = list(runs)
+        original_matrix = list(design_matrix)
+        for rep in range(1, config.replicates):
+            for run in original_runs:
+                runs.append(DOERun(
+                    run_order=len(runs) + 1,
+                    standard_order=run.standard_order,
+                    factor_values=dict(run.factor_values),
+                    replicate=rep + 1,
+                ))
+            design_matrix.extend([list(row) for row in original_matrix])
+
     return DOEDesign(
         method=config.method,
         factors=config.factors,
         runs=runs,
-        run_count=n_runs,
+        run_count=len(runs),
         design_matrix=design_matrix,
     )
 

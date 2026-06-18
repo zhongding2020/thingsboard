@@ -30,6 +30,7 @@ class DOERun(BaseModel):
     run_order: int
     standard_order: int
     factor_values: dict[str, float]
+    replicate: int = 1
 
 
 class DOEDesign(BaseModel):

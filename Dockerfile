@@ -8,6 +8,7 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src/ src/
+COPY db/ db/
 RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple . 2>&1
 
 COPY scripts/ scripts/

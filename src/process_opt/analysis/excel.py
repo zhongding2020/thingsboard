@@ -1,42 +1,31 @@
 from __future__ import annotations
 
-import time
 from io import BytesIO
-from uuid import uuid4
 
 import openpyxl
 
+from process_opt.analysis.dataset_repo import DatasetRepository
 from process_opt.analysis.errors import AnalysisError
 from process_opt.analysis.schemas import AnalysisDataset
 
-_DEFAULT_TTL = 1800
-_store: dict[str, AnalysisDataset] = {}
-_expiry: dict[str, float] = {}
+_dataset_repo: DatasetRepository | None = None
 
 
-def _uuid() -> str:
-    return uuid4().hex
+def set_dataset_repo(repo: DatasetRepository) -> None:
+    global _dataset_repo
+    _dataset_repo = repo
 
 
-def _purge_expired() -> None:
-    now = time.monotonic()
-    expired = [k for k, t in _expiry.items() if now >= t]
-    for k in expired:
-        _store.pop(k, None)
-        _expiry.pop(k, None)
-
-
-def save_dataset(dataset: AnalysisDataset, ttl: int = _DEFAULT_TTL) -> str:
-    _purge_expired()
-    key = _uuid()
-    _store[key] = dataset
-    _expiry[key] = time.monotonic() + ttl
-    return key
+def save_dataset(dataset: AnalysisDataset, ttl: int = 30) -> str:
+    if _dataset_repo is None:
+        raise RuntimeError("DatasetRepository not initialized")
+    return _dataset_repo.save(dataset, ttl=ttl)
 
 
 def get_dataset(key: str) -> AnalysisDataset | None:
-    _purge_expired()
-    return _store.get(key)
+    if _dataset_repo is None:
+        raise RuntimeError("DatasetRepository not initialized")
+    return _dataset_repo.get(key)
 
 
 def parse_excel(file_bytes: bytes) -> AnalysisDataset:

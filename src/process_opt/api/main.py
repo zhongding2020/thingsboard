@@ -1,15 +1,18 @@
+import asyncio
+import logging
 from datetime import datetime
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-import asyncio
 import uvicorn
 from fastapi import FastAPI
 
 from process_opt.analysis import AnalysisService
 from process_opt.analysis.dataset import DatasetBuilder
+from process_opt.analysis.dataset_repo import DatasetRepository
+from process_opt.analysis.excel import set_dataset_repo
 from process_opt.analysis.schemas import AnalysisDataset, AnalysisDatasetRequest, CorrelationRequest, CorrelationResult, ImportanceRequest, ImportanceResult, ProfilingResult, RecommendationRequest, RecommendationResult, RegressionRequest, RegressionResult, SpcRequest, SpcResult
 from process_opt.api.app import create_app
 from process_opt.common.db import apply_sql_file, create_pool
@@ -19,6 +22,8 @@ from process_opt.parameters.repository import ParameterRepository
 from process_opt.parameters.schemas import ParameterSet, ParameterSetCreate, ParameterSetWithItems
 from process_opt.parameters.service import ParameterService
 from process_opt.experiment.repository import ExperimentRepository
+
+logger = logging.getLogger(__name__)
 
 
 class RepositoryProxy:
@@ -261,6 +266,20 @@ def create_api_app_from_settings() -> FastAPI:
                 await session_manager.expire_stale()
         expire_task = asyncio.create_task(_expire_sessions())
 
+        dataset_repo = DatasetRepository(pool)
+        set_dataset_repo(dataset_repo)
+
+        async def cleanup_expired_datasets():
+            while True:
+                await asyncio.sleep(300)
+                try:
+                    count = await dataset_repo.purge_expired()
+                    if count > 0:
+                        logger.info("Purged %d expired datasets", count)
+                except Exception:
+                    pass
+
+        cleanup_task = asyncio.create_task(cleanup_expired_datasets())
         app.state.pool = pool
         app.state.repository = repository
         repository_proxy.repository = repository
@@ -271,6 +290,7 @@ def create_api_app_from_settings() -> FastAPI:
             yield
         finally:
             expire_task.cancel()
+            cleanup_task.cancel()
             repository_proxy.repository = None
             line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None

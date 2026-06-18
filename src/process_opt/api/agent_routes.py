@@ -57,10 +57,10 @@ def register_agent_routes(
                 while True:
                     event = await session.event_queue.get()
                     if event.get("type") == "done":
-                        yield b'data: {"type":"session.status","status":"idle"}\n\n'
                         if llm is not None and session.state.get("messages"):
                             suggestions = await _generate_suggestions(llm, session.state["messages"])
                             yield f'data: {{"type":"suggestions","questions":{json.dumps(suggestions)}}}\n\n'.encode()
+                        yield b'data: {"type":"session.status","status":"idle"}\n\n'
                         break
                     if event.get("type") == "error":
                         err = json.dumps({"type":"error","message":event["message"]})

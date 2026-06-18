@@ -123,7 +123,65 @@ def create_analysis_tools(
             target_field=target_field, target_value=target_value,
         )
         result = compute_recommendation(ds, feature_fields, req)
-        return json.dumps(result.model_dump(), ensure_ascii=False)
+
+        rule_violations: list[str] = []
+        try:
+            from process_opt.knowledge.rules import RuleEngine
+
+            engine = RuleEngine()
+            params_to_check = {k: v for k, v in result.recommended_parameters.items()}
+            for proc in knowledge_loader.list_processes():
+                template = knowledge_loader.load(proc["process_type"])
+                if template is None:
+                    continue
+                checks = engine.check_params(template, params_to_check)
+                for c in checks:
+                    if not c.triggered:
+                        continue
+                    if c.rule.type == "hard_constraint":
+                        rule_violations.append(f"❌ [{proc['display_name']}] {c.violation}")
+                    else:
+                        rule_violations.append(f"⚠ [{proc['display_name']}] {c.violation}")
+        except Exception:
+            pass
+
+        parts = [
+            "## 参数推荐结果",
+            f"**模型 R²**: {result.model_metrics.get('r_squared', 0):.4f}",
+            f"**RMSE**: {result.model_metrics.get('rmse', 0):.4f}",
+            f"**目标值**: {target_value} | **预测值**: {result.predicted_target:.2f}",
+            "",
+            "### 推荐参数",
+            "| 参数 | 推荐值 |",
+            "|------|--------|",
+        ]
+        for k, v in result.recommended_parameters.items():
+            parts.append(f"| {k} | {v:.2f} |")
+
+        if result.alternatives:
+            parts.append("")
+            parts.append("### 备选方案")
+            parts.append("| # | 参数组合 |")
+            parts.append("|---|----------|")
+            for i, alt in enumerate(result.alternatives[:5]):
+                params_str = ", ".join(f"{k}={v:.2f}" for k, v in alt.items())
+                parts.append(f"| {i + 1} | {params_str} |")
+
+        if result.risk_notes:
+            parts.append("")
+            parts.append("### 风险提示")
+            for note in result.risk_notes:
+                parts.append(f"- {note}")
+
+        if rule_violations:
+            parts.append("")
+            parts.append("### 规则校验")
+            parts.extend(rule_violations)
+        else:
+            parts.append("")
+            parts.append("✅ 所有推荐参数符合已知工艺规则。")
+
+        return "\n".join(parts)
 
     @tool
     @with_retry()

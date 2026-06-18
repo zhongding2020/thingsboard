@@ -331,32 +331,38 @@ def create_analysis_tools(
             for p in profile
         ]
 
-        corr_results = compute_correlation(ds, feature_fields, target_fields, "pearson")
-        corr_matrix: list[list[float | str]] = []
-        for c in corr_results:
-            corr_matrix.append([c.field_x, c.field_y, round(c.coefficient, 3)])
+        corr_all = compute_correlation(ds, all_fields, all_fields, "pearson")
+        corr_map: dict[tuple[str, str], float] = {}
+        for c in corr_all:
+            corr_map[(c.field_x, c.field_y)] = round(c.coefficient, 3)
+            corr_map[(c.field_y, c.field_x)] = round(c.coefficient, 3)
 
         heatmap_data: list[list] = []
-        x_axis = target_fields
-        y_axis = feature_fields
-        for fy in y_axis:
-            for fx in x_axis:
-                for c in corr_results:
-                    if c.field_x == fy and c.field_y == fx:
-                        heatmap_data.append([x_axis.index(fx), y_axis.index(fy), round(c.coefficient, 3)])
-                        break
+        labels = all_fields
+        for yi, fy in enumerate(labels):
+            for xi, fx in enumerate(labels):
+                val = corr_map.get((fy, fx), 1.0 if fy == fx else 0.0)
+                heatmap_data.append([xi, yi, val])
 
-        max_val = max((abs(c[2]) for c in heatmap_data), default=1)
+        corr_text = "\n".join(
+            f"| {c[0]} | {c[1]} | {c[2]:.3f} |" 
+            for c in sorted(
+                [[fx, fy, corr_map.get((fx, fy), 0)] for fx in feature_fields for fy in target_fields],
+                key=lambda x: abs(x[2]), reverse=True
+            )[:15]
+        )
 
         chart = {
-            "tooltip": {"position": "top"},
-            "xAxis": {"data": x_axis, "type": "category", "splitArea": {"show": True}},
-            "yAxis": {"data": y_axis, "type": "category", "splitArea": {"show": True}},
-            "visualMap": {"min": -max_val, "max": max_val, "calculable": True,
+            "title": {"text": "相关性矩阵 (Pearson)", "left": "center", "top": 5, "textStyle": {"fontSize": 14}},
+            "tooltip": {"position": "top", "formatter": "{b} ↔ {a}: {c}"},
+            "grid": {"top": 50, "bottom": 60, "left": 140, "right": 30},
+            "xAxis": {"data": labels, "type": "category", "axisLabel": {"rotate": 45, "fontSize": 11}},
+            "yAxis": {"data": labels, "type": "category", "axisLabel": {"fontSize": 11}},
+            "visualMap": {"min": -1, "max": 1, "calculable": True,
                           "orient": "horizontal", "left": "center", "bottom": "0%",
                           "inRange": {"color": ["#313695", "#4575b4", "#74add1", "#abd9e9", "#fee090", "#fdae61", "#f46d43", "#d73027"]}},
             "series": [{"type": "heatmap", "data": heatmap_data,
-                        "label": {"show": True, "fontSize": 11},
+                        "label": {"show": True, "fontSize": 10, "formatter": "{c}"},
                         "emphasis": {"itemStyle": {"shadowBlur": 10, "shadowColor": "rgba(0,0,0,0.3)"}}}]
         }
 
@@ -366,9 +372,9 @@ def create_analysis_tools(
             f"- 样本数: {ds.sample_count}\n"
             f"- 特征字段: {', '.join(feature_fields)}\n"
             f"- 目标字段: {', '.join(target_fields)}\n\n"
-            f"## 相关性矩阵\n"
-            + "\n".join(f"  {c[0]} ↔ {c[1]}: {c[2]:.3f}" for c in corr_matrix[:20]) +
-            f"\n\n## 相关性热力图\n\n```echarts\n{echarts_json}\n```\n"
+            f"## 相关系数表 (特征→目标)\n\n"
+            f"| 特征参数 | 目标指标 | 相关系数 |\n|------|------|------|\n{corr_text}\n\n"
+            f"## 相关性矩阵热力图\n\n```echarts\n{echarts_json}\n```\n"
         )
 
     tool_list.append(upload_and_analyze)

@@ -143,7 +143,7 @@ function renderMd(text: string): string { if (!text) return ''; return marked.pa
 function renderContent(text: string): string {
   if (!text) return ''
 
-  // Detect raw ECharts JSON blocks (not wrapped in ```echarts)
+  // Pre-process: detect raw ECharts JSON and wrap in ```echarts
   let processed = text
   const jsonPatterns = findEchartsJson(text)
   for (const json of jsonPatterns) {
@@ -151,15 +151,30 @@ function renderContent(text: string): string {
   }
 
   let html = marked.parse(processed, { breaks: true, gfm: true }) as string
-  html = html.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
-    const id = 'mermaid-' + Math.random().toString(36).slice(2, 10)
-    setTimeout(() => renderMermaid(id, code), 50)
-    return `<div class="mermaid-block" id="${id}"><div class="mermaid-loading">渲染图表中...</div></div>`
-  })
+
+  // Handle standard ```echarts blocks
   html = html.replace(/<pre><code class="language-echarts">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
     const id = 'echarts-' + Math.random().toString(36).slice(2, 10)
     setTimeout(() => renderEcharts(id, code), 50)
     return `<div class="echarts-block" id="${id}" style="width:100%;height:360px"><div class="echarts-loading">渲染图表中...</div></div>`
+  })
+  // Also handle ```json blocks that contain ECharts-like data
+  html = html.replace(/<pre><code class="language-json">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
+    try {
+      const parsed = JSON.parse(code.trim())
+      if (parsed.series && (parsed.xAxis || parsed.yAxis)) {
+        const id = 'echarts-' + Math.random().toString(36).slice(2, 10)
+        setTimeout(() => renderEcharts(id, code), 50)
+        return `<div class="echarts-block" id="${id}" style="width:100%;height:360px"><div class="echarts-loading">渲染图表中...</div></div>`
+      }
+    } catch {}
+    return _
+  })
+
+  html = html.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
+    const id = 'mermaid-' + Math.random().toString(36).slice(2, 10)
+    setTimeout(() => renderMermaid(id, code), 50)
+    return `<div class="mermaid-block" id="${id}"><div class="mermaid-loading">渲染图表中...</div></div>`
   })
   return html
 }

@@ -131,6 +131,7 @@
 import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listSessions, createSession, sendMessageAsync, streamEvents, getMessages, listProcesses, type StreamEvents } from '@/api/agent'
+import { useSessionStore } from '@/stores/session'
 import { marked } from 'marked'
 import mermaid from 'mermaid'
 import * as echarts from 'echarts'

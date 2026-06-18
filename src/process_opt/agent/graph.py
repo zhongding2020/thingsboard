@@ -10,7 +10,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from process_opt.agent.nodes.worker import create_worker_node
-from process_opt.agent.nodes.supervisor import create_supervisor_node
+from process_opt.agent.nodes.supervisor import create_supervisor_node, _has_pending_tool_calls
 from process_opt.agent.state import AgentState
 from process_opt.agent.tools.analysis_tools import create_analysis_tools
 from process_opt.knowledge.loader import KnowledgeLoader
@@ -18,6 +18,10 @@ from process_opt.knowledge.loader import KnowledgeLoader
 logger = logging.getLogger(__name__)
 
 WORKERS = ["chat", "analyzer", "recommender"]
+
+# Increased from 50 to prevent premature limit hits; each tool call + interpretation
+# round-trip consumes ~4 node transitions, so 50 only allows ~12 tool calls.
+RECURSION_LIMIT = 150
 
 
 def build_graph(
@@ -44,9 +48,19 @@ def build_graph(
         workflow.add_edge(worker, "supervisor")
     workflow.add_edge("tools", "supervisor")
 
+    # Routing function: checks for pending tool calls first, then falls back
+    # to the supervisor's decision. This provides a safety net even if the
+    # supervisor LLM fails to route tools correctly.
+    def _route(state: dict) -> str:
+        # Safety net: auto-detect pending tool calls
+        if _has_pending_tool_calls(state):
+            return "tools"
+        # Use supervisor's decision, default to FINISH
+        return state.get("next", "FINISH")
+
     workflow.add_conditional_edges(
         "supervisor",
-        lambda state: state.get("next", "FINISH"),
+        _route,
         {**{w: w for w in WORKERS}, "tools": "tools", "FINISH": END},
     )
 
@@ -61,7 +75,7 @@ class AgentSession:
         self.graph = graph
         self.config = {
             "configurable": {"thread_id": session_id},
-            "recursion_limit": 50,
+            "recursion_limit": RECURSION_LIMIT,
         }
         self.state: dict = {
             "messages": [],

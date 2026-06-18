@@ -1,0 +1,24 @@
+{
+  "process_type": "die_casting",
+  "display_name": "压铸",
+  "description": "压铸工艺，将熔融金属在高压下高速注入模具型腔，快速冷却成型。适用于铝合金、锌合金等有色金属精密铸造。",
+  "parameters": [
+    {"key": "metal_temp", "name": "金属液温度", "unit": "°C", "type": "continuous", "range": {"min": 630, "max": 720}, "target": {"min": 650, "max": 690}, "importance": "critical", "description": "铝液温度影响流动性和铸件质量"},
+    {"key": "injection_pressure", "name": "压射压力", "unit": "MPa", "type": "continuous", "range": {"min": 40, "max": 120}, "target": {"min": 60, "max": 100}, "importance": "critical", "description": "压射压力确保金属液充满型腔"},
+    {"key": "injection_speed", "name": "压射速度", "unit": "m/s", "type": "continuous", "range": {"min": 1, "max": 6}, "target": {"min": 2, "max": 4}, "importance": "critical", "description": "压射速度影响填充时间和气体卷入"},
+    {"key": "mold_temp", "name": "模具温度", "unit": "°C", "type": "continuous", "range": {"min": 150, "max": 300}, "target": {"min": 200, "max": 260}, "importance": "important", "description": "模具温度影响冷却速度和表面质量"},
+    {"key": "dwell_time", "name": "保压时间", "unit": "s", "type": "continuous", "range": {"min": 2, "max": 20}, "target": {"min": 5, "max": 12}, "importance": "important", "description": "保压时间影响铸件致密度和缩孔"}
+  ],
+  "quality_metrics": [
+    {"key": "porosity_rate", "name": "气孔率", "unit": "%", "usl": 5.0, "description": "铸件内部气孔体积占比"},
+    {"key": "tensile_strength", "name": "抗拉强度", "unit": "MPa", "lsl": 200.0, "description": "铸件抗拉强度"},
+    {"key": "surface_quality", "name": "表面质量", "unit": "级", "usl": 3.0, "description": "表面缺陷等级"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "metal_temp > 720", "message": "铝液温度超过720°C导致严重氧化和吸气"},
+    {"type": "hard_constraint", "expression": "injection_speed > 5 and mold_temp < 180", "message": "高速低压射+低模温容易产生冷隔缺陷"},
+    {"type": "soft_guideline", "expression": "dwell_time < 3", "message": "保压时间过短导致补缩不足，可能产生缩孔"},
+    {"type": "dependency", "trigger": "metal_temp increase", "effect": "mold_temp decrease", "message": "金属液温度升高时可适当降低模具温度以加快冷却"}
+  ],
+  "analysis_hints": ["气孔率高时优先检查压射速度和模具排气", "抗拉强度不足时检查金属液温度和保压时间", "压射速度和压射压力对气孔率有显著交互作用"]
+}

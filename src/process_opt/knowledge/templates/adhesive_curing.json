@@ -1,0 +1,25 @@
+{
+  "process_type": "adhesive_curing",
+  "display_name": "点胶固化",
+  "description": "点胶固化工艺，包含点胶（dispensing）和固化（curing）两个步骤。点胶步骤控制胶量、压力；固化步骤控制温度和时间。",
+  "parameters": [
+    {"key": "cure_temp", "name": "固化温度", "unit": "°C", "type": "continuous", "range": {"min": 80, "max": 180}, "target": {"min": 120, "max": 150}, "importance": "critical", "description": "固化温度直接影响胶水的交联反应速度"},
+    {"key": "cure_time", "name": "固化时间", "unit": "min", "type": "continuous", "range": {"min": 10, "max": 120}, "target": {"min": 30, "max": 60}, "importance": "critical", "description": "固化时间决定了交联反应的充分程度"},
+    {"key": "glue_amount", "name": "胶量", "unit": "mg", "type": "continuous", "range": {"min": 5, "max": 50}, "target": {"min": 15, "max": 30}, "importance": "critical", "description": "点胶量决定粘接强度"},
+    {"key": "dispense_pressure", "name": "点胶压力", "unit": "kPa", "type": "continuous", "range": {"min": 50, "max": 300}, "target": {"min": 100, "max": 200}, "importance": "important", "description": "点胶压力影响胶水流速和点胶精度"},
+    {"key": "ambient_humidity", "name": "环境湿度", "unit": "%RH", "type": "continuous", "range": {"min": 20, "max": 80}, "target": {"min": 30, "max": 60}, "importance": "auxiliary", "description": "环境湿度影响胶水固化速度和粘接强度"}
+  ],
+  "quality_metrics": [
+    {"key": "shear_strength", "name": "剪切强度", "unit": "kgf/cm²", "lsl": 80.0, "description": "粘接面的抗剪切能力"},
+    {"key": "bubble_rate", "name": "气泡率", "unit": "%", "usl": 5.0, "description": "固化后胶层内气泡占比"},
+    {"key": "glue_overflow", "name": "胶水溢出量", "unit": "mm", "usl": 1.0, "description": "胶水从粘接面溢出的宽度"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "cure_temp > 180", "message": "固化温度不得超过180°C，否则会导致胶水老化"},
+    {"type": "hard_constraint", "expression": "cure_time < 10", "message": "固化时间不得少于10分钟"},
+    {"type": "soft_guideline", "expression": "cure_temp > 150 and cure_time < 20", "message": "高温短时间可能导致固化不均匀"},
+    {"type": "soft_guideline", "expression": "glue_amount > 40", "message": "胶量偏大可能导致溢出，建议控制在15-30mg"},
+    {"type": "dependency", "expression": "cure_temp > 0", "trigger": "cure_temp increase", "effect": "可适当缩短 cure_time", "message": "温度每升高10°C，固化时间可减少约5分钟"}
+  ],
+  "analysis_hints": ["优先分析固化温度、固化时间、胶量与剪切强度的相关性", "如果气泡率高，检查固化温度和时间组合", "如果胶水溢出量大，检查胶量和点胶压力"]
+}

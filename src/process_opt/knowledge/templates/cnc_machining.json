@@ -1,0 +1,23 @@
+{
+  "process_type": "cnc_machining",
+  "display_name": "CNC加工",
+  "description": "数控机床切削加工，通过控制主轴转速、进给率和切削深度来实现精密零件加工。",
+  "parameters": [
+    {"key": "spindle_speed", "name": "主轴转速", "unit": "rpm", "type": "continuous", "range": {"min": 1000, "max": 20000}, "target": {"min": 3000, "max": 12000}, "importance": "critical", "description": "主轴转速决定切削线速度和表面质量"},
+    {"key": "feed_rate", "name": "进给率", "unit": "mm/min", "type": "continuous", "range": {"min": 50, "max": 2000}, "target": {"min": 200, "max": 800}, "importance": "critical", "description": "进给率影响加工效率和表面粗糙度"},
+    {"key": "cut_depth", "name": "切削深度", "unit": "mm", "type": "continuous", "range": {"min": 0.1, "max": 10.0}, "target": {"min": 0.5, "max": 3.0}, "importance": "critical", "description": "切削深度影响材料去除率和刀具负载"},
+    {"key": "coolant_flow", "name": "冷却液流量", "unit": "L/min", "type": "continuous", "range": {"min": 2, "max": 20}, "target": {"min": 5, "max": 12}, "importance": "important", "description": "冷却液流量影响刀具寿命和加工精度"},
+    {"key": "tool_overhang", "name": "刀具悬伸", "unit": "mm", "type": "continuous", "range": {"min": 5, "max": 100}, "target": {"min": 10, "max": 40}, "importance": "auxiliary", "description": "刀具悬伸影响振动和加工稳定性"}
+  ],
+  "quality_metrics": [
+    {"key": "surface_roughness", "name": "表面粗糙度", "unit": "Ra(μm)", "usl": 3.2, "description": "加工表面粗糙度"},
+    {"key": "dimension_error", "name": "尺寸误差", "unit": "mm", "usl": 0.05, "description": "与目标尺寸的偏差"},
+    {"key": "tool_wear", "name": "刀具磨损", "unit": "mm", "usl": 0.3, "description": "刀具后刀面磨损宽度"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "cut_depth > 8 and feed_rate > 1000", "message": "大切深高进给组合可能导致刀具断裂"},
+    {"type": "soft_guideline", "expression": "spindle_speed > 15000 and coolant_flow < 5", "message": "高速加工冷却不足，表面质量可能下降"},
+    {"type": "dependency", "trigger": "spindle_speed increase", "effect": "feed_rate increase", "message": "转速提高时可适当增加进给率以保持每齿进给量恒定"}
+  ],
+  "analysis_hints": ["主轴转速和进给率是影响表面粗糙度的关键因素", "刀具磨损快时检查切削深度和冷却液流量", "尺寸超差率升高时分析切削深度和进给率的组合"]
+}

@@ -1,0 +1,25 @@
+{
+  "process_type": "injection_molding",
+  "display_name": "注塑成型",
+  "description": "注塑成型工艺，将熔融塑料注入模具型腔，冷却固化成型。关键参数控制熔体流动性、填充完整性和制品尺寸精度。",
+  "parameters": [
+    {"key": "melt_temp", "name": "熔体温度", "unit": "°C", "type": "continuous", "range": {"min": 180, "max": 300}, "target": {"min": 200, "max": 260}, "importance": "critical", "description": "熔体温度影响塑料流动性和降解程度"},
+    {"key": "mold_temp", "name": "模具温度", "unit": "°C", "type": "continuous", "range": {"min": 20, "max": 120}, "target": {"min": 40, "max": 80}, "importance": "critical", "description": "模具温度影响制品冷却速度和表面质量"},
+    {"key": "injection_pressure", "name": "注射压力", "unit": "MPa", "type": "continuous", "range": {"min": 50, "max": 200}, "target": {"min": 80, "max": 150}, "importance": "critical", "description": "注射压力决定熔体填充能力"},
+    {"key": "injection_speed", "name": "注射速度", "unit": "mm/s", "type": "continuous", "range": {"min": 20, "max": 150}, "target": {"min": 50, "max": 100}, "importance": "important", "description": "注射速度影响填充均匀性和飞边"},
+    {"key": "holding_pressure", "name": "保压压力", "unit": "MPa", "type": "continuous", "range": {"min": 30, "max": 150}, "target": {"min": 60, "max": 120}, "importance": "important", "description": "保压压力补偿冷却收缩"},
+    {"key": "cooling_time", "name": "冷却时间", "unit": "s", "type": "continuous", "range": {"min": 5, "max": 60}, "target": {"min": 15, "max": 35}, "importance": "important", "description": "冷却时间影响成型周期和尺寸稳定性"}
+  ],
+  "quality_metrics": [
+    {"key": "weight", "name": "制品重量", "unit": "g", "lsl": null, "usl": null, "description": "制品重量一致性"},
+    {"key": "dimension_deviation", "name": "尺寸偏差", "unit": "mm", "usl": 0.2, "description": "关键尺寸与标称值偏差"},
+    {"key": "surface_defects", "name": "表面缺陷", "unit": "级", "usl": 2.0, "description": "表面质量等级，越低越好"}
+  ],
+  "rules": [
+    {"type": "hard_constraint", "expression": "melt_temp > 300", "message": "熔体温度不得超过300°C，否则材料降解"},
+    {"type": "hard_constraint", "expression": "melt_temp < 180", "message": "熔体温度不得低于180°C，否则流动性不足"},
+    {"type": "soft_guideline", "expression": "injection_speed > 120 and injection_pressure < 80", "message": "高速低压组合可能导致填充不足"},
+    {"type": "dependency", "trigger": "melt_temp increase", "effect": "cooling_time increase", "message": "熔温每升高10°C，冷却时间增加约3秒"}
+  ],
+  "analysis_hints": ["优先分析熔体温度、模具温度对尺寸偏差的影响", "制品重量波动大时检查注射压力和保压压力", "表面缺陷严重时降低注射速度"]
+}

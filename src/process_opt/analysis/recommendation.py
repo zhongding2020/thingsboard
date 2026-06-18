@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 
 import numpy as np
+from scipy.stats.qmc import LatinHypercube
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
@@ -85,11 +86,22 @@ def _generate_grid(
     for r in ranges:
         total *= len(r)
     if total > MAX_GRID_COMBINATIONS:
-        raise AnalysisError(
-            code="SEARCH_SPACE_TOO_LARGE",
-            message=f"Search space of {total} combinations exceeds limit of {MAX_GRID_COMBINATIONS}",
-            suggestion="Reduce the number of parameters or increase grid step size",
-        )
+        n_samples = 5000
+        free_fields = [f for f in feature_fields if f not in fixed]
+        d = len(free_fields)
+        if d > 0:
+            sampler = LatinHypercube(d=d)
+            sample = sampler.random(n=n_samples)
+            for i, field in enumerate(free_fields):
+                lo, hi = lower[field], upper[field]
+                sample[:, i] = lo + sample[:, i] * (hi - lo)
+            grid: list[dict[str, float]] = []
+            for j in range(n_samples):
+                row: dict[str, float] = dict(fixed)
+                for i, field in enumerate(free_fields):
+                    row[field] = float(sample[j, i])
+                grid.append(row)
+            return grid
 
     grid: list[dict[str, float]] = []
     for combo in itertools.product(*ranges):

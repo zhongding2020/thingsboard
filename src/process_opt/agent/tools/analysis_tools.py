@@ -250,27 +250,41 @@ def create_analysis_tools(
 
     @tool
     async def analyze_experiment(
-        factors_json: str, run_results_json: str, response_name: str = "response",
+        factors_json: str = "", run_results_json: str = "", response_name: str = "response",
+        plan_id: int = 0,
     ) -> str:
-        """对实验结果进行 ANOVA 方差分析。factors_json 为因子列表（同 design_experiment），
-        run_results_json 为实验结果列表 [{"run_order":1,"response":85.2},...]。
+        """对实验结果进行 ANOVA 方差分析。可传入 plan_id 使用已保存的实验方案，
+        或传入 factors_json 和 run_results_json 进行即时分析。
         返回各因子的效应、系数、p值和显著性。"""
-        from process_opt.analysis.doe_schemas import ANOVARequest, ExperimentResult, Factor
+        from process_opt.analysis.doe_schemas import ANOVARequest, ExperimentResult, Factor, DOERun
         from process_opt.analysis.doe_service import run_anova
 
-        factors = [Factor(**f) for f in json.loads(factors_json)]
-        results_data = json.loads(run_results_json)
-        results = [ExperimentResult(**r) for r in results_data]
+        if plan_id > 0 and experiment_repo is not None:
+            plan = await experiment_repo.get_plan(plan_id)
+            if plan is None:
+                return f"Experiment plan {plan_id} not found"
+            factors = [Factor(**f) if isinstance(f, dict) else f for f in plan.factors]
+            design_runs = [DOERun(
+                run_order=r.get("run_order", i + 1),
+                standard_order=r.get("standard_order", r.get("run_order", i + 1)),
+                factor_values=r.get("factor_values", {}),
+            ) for i, r in enumerate(plan.design_runs)]
+            results = [ExperimentResult(
+                run_order=r.run_order, response=r.response_value or 0.0,
+            ) for r in (plan.results or [])]
+            response_name = plan.response_name or response_name
+        else:
+            factors = [Factor(**f) for f in json.loads(factors_json)]
+            results_data = json.loads(run_results_json)
+            results = [ExperimentResult(**r) for r in results_data]
 
-        n_runs = len(results)
-        design_runs: list[Any] = []
-        for i in range(n_runs):
-            d = {}
-            half = len(factors) // 2
-            for j, f in enumerate(factors):
-                d[f.name] = f.low if (i & (1 << j)) == 0 else f.high
-            from process_opt.analysis.doe_schemas import DOERun
-            design_runs.append(DOERun(run_order=i+1, standard_order=i+1, factor_values=d))
+            n_runs = len(results)
+            design_runs: list[Any] = []
+            for i in range(n_runs):
+                d = {}
+                for j, f in enumerate(factors):
+                    d[f.name] = f.low if (i & (1 << j)) == 0 else f.high
+                design_runs.append(DOERun(run_order=i+1, standard_order=i+1, factor_values=d))
 
         req = ANOVARequest(
             factors=factors, design_runs=design_runs, results=results,

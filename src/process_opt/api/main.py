@@ -19,6 +19,13 @@ from process_opt.parameters.schemas import ParameterSet, ParameterSetCreate, Par
 from process_opt.parameters.service import ParameterService
 from process_opt.container_pool.manager import ContainerPoolManager
 from process_opt.container_pool.proxy import ContainerPoolProxy
+from process_opt.agent.tools.analysis_tools import create_analysis_tools
+from process_opt.agent.tools.system_tools import create_system_tools
+from process_opt.agent.tools.parameter_tools import create_parameter_tools
+from process_opt.agent.tools.experiment_tools import create_experiment_tools
+from process_opt.agent.graph import SessionManager, build_graph
+from process_opt.knowledge.loader import KnowledgeLoader
+from process_opt.experiment.repository import ExperimentRepository
 
 
 class RepositoryProxy:
@@ -201,6 +208,29 @@ class LineDeviceRepositoryProxy:
         return await self._repo.get_devices_by_line(line_id)
 
 
+class ExperimentRepositoryProxy:
+    def __init__(self) -> None:
+        self._repo: Any = None
+
+    async def create_plan(self, data: Any) -> Any:
+        return await self._repo.create_plan(data)
+
+    async def list_plans(self, limit: int = 20) -> list:
+        return await self._repo.list_plans(limit)
+
+    async def get_plan(self, plan_id: int) -> Any:
+        return await self._repo.get_plan(plan_id)
+
+    async def record_result(self, plan_id: int, data: Any) -> Any:
+        return await self._repo.record_result(plan_id, data)
+
+    async def batch_record_results(self, plan_id: int, results: list) -> list:
+        return await self._repo.batch_record_results(plan_id, results)
+
+    async def update_plan_status(self, plan_id: int, status: str) -> None:
+        await self._repo.update_plan_status(plan_id, status)
+
+
 def create_api_app_from_settings() -> FastAPI:
     settings = Settings()
     repository_proxy = RepositoryProxy()
@@ -208,6 +238,12 @@ def create_api_app_from_settings() -> FastAPI:
     analysis_service_proxy = AnalysisServiceProxy()
     line_device_repo_proxy = LineDeviceRepositoryProxy()
     container_pool_proxy = ContainerPoolProxy()
+    experiment_repo_proxy = ExperimentRepositoryProxy()
+
+    from langchain_openai import ChatOpenAI
+
+    knowledge_loader = KnowledgeLoader()
+    session_manager = SessionManager(ttl_seconds=settings.agent_session_ttl)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -221,6 +257,8 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_service = ParameterService(parameter_repo)
         dataset_builder = DatasetBuilder(pool)
         analysis_service = AnalysisService(dataset_builder)
+        experiment_repo = ExperimentRepository(pool)
+        experiment_repo_proxy._repo = experiment_repo
         manager = ContainerPoolManager(settings)
         container_pool_proxy.set_manager(manager)
         await manager.start()
@@ -241,12 +279,36 @@ def create_api_app_from_settings() -> FastAPI:
             analysis_service_proxy._service = None
             await pool.close()
 
+    tools = (
+        create_analysis_tools(
+            repository_proxy, analysis_service_proxy, parameter_service_proxy,
+            knowledge_loader, experiment_repo_proxy,
+        ) +
+        create_system_tools(line_device_repo_proxy, analysis_service_proxy) +
+        create_parameter_tools(parameter_service_proxy) +
+        create_experiment_tools(experiment_repo_proxy)
+    )
+    llm = ChatOpenAI(
+        model=settings.agent_model,
+        base_url=settings.agent_api_base,
+        api_key=settings.agent_api_key,
+        temperature=settings.agent_temperature,
+        streaming=True,
+    )
+    llm_with_tools = llm.bind_tools(tools)
+    agent_graph = build_graph(llm, llm_with_tools, tools, knowledge_loader)
+
     app = create_app(
         repository=repository_proxy,
         parameter_service=parameter_service_proxy,
         analysis_service=analysis_service_proxy,
         line_device_repo=line_device_repo_proxy,
         container_pool=container_pool_proxy,
+        agent_graph=agent_graph,
+        session_manager=session_manager,
+        knowledge_loader=knowledge_loader,
+        experiment_repo=experiment_repo_proxy,
+        suggestion_llm=llm,
     )
     app.router.lifespan_context = lifespan
     return app

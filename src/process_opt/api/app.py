@@ -126,6 +126,11 @@ def create_app(
     analysis_service: AnalysisService | None = None,
     line_device_repo: LineDeviceRepositoryProtocol | None = None,
     container_pool: "ContainerPoolProxy | None" = None,
+    agent_graph: Any = None,
+    session_manager: Any = None,
+    knowledge_loader: Any = None,
+    experiment_repo: Any = None,
+    suggestion_llm: Any = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -581,6 +586,46 @@ def create_app(
     if container_pool is not None:
         from process_opt.container_pool.routes import register_routes as register_pool_routes
         register_pool_routes(app, container_pool)
+
+    if experiment_repo is not None:
+        from process_opt.experiment.repository import ExperimentPlanCreate, ExperimentResultCreate
+
+        @app.get("/api/v1/experiment/plans")
+        async def list_experiment_plans(limit: int = 20) -> list[dict]:
+            plans = await experiment_repo.list_plans(limit)
+            return [p.model_dump() for p in plans]
+
+        @app.post("/api/v1/experiment/plans", status_code=status.HTTP_201_CREATED)
+        async def create_experiment_plan(body: dict[str, Any]) -> dict:
+            plan = await experiment_repo.create_plan(ExperimentPlanCreate(**body))
+            return plan.model_dump()
+
+        @app.get("/api/v1/experiment/plans/{plan_id}")
+        async def get_experiment_plan(plan_id: int) -> dict:
+            plan = await experiment_repo.get_plan(plan_id)
+            if plan is None:
+                raise HTTPException(status_code=404, detail="Plan not found")
+            return plan.model_dump()
+
+        @app.post("/api/v1/experiment/plans/{plan_id}/results")
+        async def record_experiment_result(plan_id: int, body: dict[str, Any]) -> dict:
+            result = await experiment_repo.record_result(plan_id, ExperimentResultCreate(**body))
+            return result.model_dump()
+
+        @app.post("/api/v1/experiment/plans/{plan_id}/results/batch")
+        async def batch_record_results(plan_id: int, body: list[dict]) -> list[dict]:
+            creates = [ExperimentResultCreate(**r) for r in body]
+            results = await experiment_repo.batch_record_results(plan_id, creates)
+            return [r.model_dump() for r in results]
+
+        @app.put("/api/v1/experiment/plans/{plan_id}/status")
+        async def update_plan_status(plan_id: int, body: dict[str, Any]) -> Response:
+            await experiment_repo.update_plan_status(plan_id, body["status"])
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if agent_graph is not None and session_manager is not None and knowledge_loader is not None:
+        from process_opt.api.agent_routes import register_agent_routes
+        register_agent_routes(app, session_manager, knowledge_loader, agent_graph, llm=suggestion_llm)
 
     _web_dist = (
         candidate

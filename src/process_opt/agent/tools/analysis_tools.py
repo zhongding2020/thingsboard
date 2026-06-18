@@ -239,16 +239,6 @@ def create_analysis_tools(
         return "\n".join(lines)
 
     @tool
-    async def get_parameters(device_type: str = "") -> str:
-        """获取参数集列表。可指定 device_type 过滤。"""
-        if parameter_service is None:
-            return "Parameter service not available"
-        sets = await parameter_service.list_sets()
-        if device_type:
-            sets = [s for s in sets if getattr(s, "device_type", "") == device_type]
-        return json.dumps([s.model_dump() for s in sets], default=str, ensure_ascii=False)
-
-    @tool
     async def get_process_knowledge(process_type: str) -> str:
         """获取指定工艺的参数模板、质量指标、规则约束和分析建议。"""
         template = knowledge_loader.load(process_type)
@@ -386,12 +376,252 @@ def create_analysis_tools(
             lines.append(f"| {e.factor} | {e.effect:.4f} | {e.coefficient:.4f} | {p_str} | {sig} |")
         return "\n".join(lines)
 
+    @tool
+    async def analyze_importance(dataset_id: str, target_field: str) -> str:
+        """分析各特征参数对目标质量指标的重要性排序。使用随机森林模型计算特征重要性。
+        dataset_id: 数据集ID（通过 build_dataset 获取）。
+        target_field: 目标质量指标字段名。"""
+        from process_opt.analysis.excel import get_dataset
+        from process_opt.analysis.importance import compute_importance
+
+        ds = get_dataset(dataset_id)
+        if ds is None:
+            return "数据集未找到或已过期，请重新构建数据集。"
+
+        feature_fields = sorted({k for f in ds.features for k in f})
+        if not feature_fields:
+            return "数据集中没有可用于重要性分析的特征字段。"
+
+        result = compute_importance(ds, feature_fields, target_field)
+
+        sorted_items = sorted(
+            result.importances.items(), key=lambda x: x[1], reverse=True
+        )
+        total = sum(v for _, v in sorted_items)
+        lines = [
+            f"## 特征重要性分析: {target_field}",
+            f"**方法**: {result.method} | **特征数**: {len(feature_fields)}",
+            "",
+            "| 排名 | 参数 | 重要性 | 占比 |",
+            "|------|------|--------|------|",
+        ]
+        for rank, (field, imp) in enumerate(sorted_items, 1):
+            pct = (imp / total * 100) if total > 0 else 0
+            lines.append(f"| {rank} | {field} | {imp:.4f} | {pct:.1f}% |")
+        return "\n".join(lines)
+
+    @tool
+    async def optimize_parameters(
+        dataset_id: str,
+        target_field: str,
+        usl: float,
+        lsl: float,
+        target_value: float,
+        key_factors_json: str,
+        step_size: float = 0.1,
+        target_cpk: float = 1.33,
+        max_iterations: int = 5000,
+    ) -> str:
+        """多目标优化：在约束条件下寻找最优参数组合以最大化过程能力。
+        dataset_id: 数据集ID（通过 build_dataset 获取）。
+        target_field: 优化目标的质量指标字段名。
+        usl: 规格上限。
+        lsl: 规格下限。
+        target_value: 目标值。
+        key_factors_json: 要优化的关键因子列表，JSON数组格式，如 ["temp","pressure"]。
+        step_size: 搜索步长（默认0.1）。
+        target_cpk: 目标Cpk值（默认1.33）。
+        max_iterations: 最大迭代次数（默认5000）。"""
+        import json as _json
+        from process_opt.analysis.excel import get_dataset
+        from process_opt.analysis.optimization import run_optimization
+        from process_opt.analysis.schemas import OptimizationConfig
+
+        ds = get_dataset(dataset_id)
+        if ds is None:
+            return "数据集未找到或已过期，请重新构建数据集。"
+
+        key_factors = _json.loads(key_factors_json)
+        if not isinstance(key_factors, list) or not key_factors:
+            return "key_factors_json 必须是非空的 JSON 数组，如 [\"temp\",\"pressure\"]。"
+
+        config = OptimizationConfig(
+            dataset_id=dataset_id,
+            target_field=target_field,
+            usl=usl,
+            lsl=lsl,
+            target_value=target_value,
+            target_cpk=target_cpk,
+            key_factors=key_factors,
+            step_size=step_size,
+            max_iterations=max_iterations,
+        )
+        result = run_optimization(ds, config)
+
+        lines = [
+            "## 参数优化结果",
+            "",
+            f"**目标指标**: {target_field}",
+            f"**初始 Cpk**: {result.initial_cpk:.4f} → **优化后 Cpk**: {result.optimized_cpk:.4f}",
+            "",
+            "### 推荐参数调整",
+            "| 参数 | 推荐值 | 调整幅度 |",
+            "|------|--------|----------|",
+        ]
+        for param, adj in result.parameter_adjustments.items():
+            delta = adj.get("delta", 0)
+            if isinstance(delta, (int, float)):
+                direction = f"{delta:+.2f}"
+            else:
+                direction = str(delta)
+            rec_val = result.recommended_params.get(param, "N/A")
+            lines.append(f"| {param} | {rec_val} | {direction} |")
+
+        if result.convergence:
+            lines.append("")
+            lines.append(f"**收敛**: {len(result.convergence)} 次迭代后收敛")
+
+        return "\n".join(lines)
+
+    @tool
+    async def trace_product_full(barcode: str) -> str:
+        """完整追溯单个产品（barcode）的生产链路。返回工艺参数、检测结果、及当前有效参数集对照。
+        barcode: 产品条码。"""
+        record = await repository.get_analysis_record(barcode)
+        if record is None:
+            return f"未找到条码 `{barcode}` 的生产记录。"
+
+        params = record.get("params", {})
+        if isinstance(params, str):
+            import json as _json
+            params = _json.loads(params)
+
+        inspection = record.get("inspection_result", {})
+        if isinstance(inspection, str):
+            import json as _json
+            inspection = _json.loads(inspection)
+
+        result = [
+            f"## 产品追溯: {barcode}",
+            "",
+            f"- **设备**: {record.get('device_id', '-')}",
+            f"- **生产时间**: {record.get('processed_at', '-')}",
+            "",
+            "### 工艺参数（实际值）",
+            "| 参数 | 实际值 |",
+            "|------|--------|",
+        ]
+        for k, v in params.items():
+            result.append(f"| {k} | {v} |")
+
+        result.append("")
+        result.append("### 检测结果")
+        result.append("| 指标 | 结果 |")
+        result.append("|------|------|")
+        if isinstance(inspection, list):
+            for item in inspection:
+                if isinstance(item, dict):
+                    result.append(
+                        f"| {item.get('name', '-')} | "
+                        f"{item.get('value', item.get('result', '-'))} |"
+                    )
+        elif isinstance(inspection, dict):
+            for k, v in inspection.items():
+                result.append(f"| {k} | {v} |")
+
+        # Compare with active parameter set
+        device_id = record.get("device_id", "")
+        if device_id and parameter_service is not None:
+            try:
+                device_type = record.get("product_model", "adhesive_curing")
+                latest = await parameter_service.get_latest(device_type)
+                if latest is not None:
+                    result.append("")
+                    result.append("### 当前激活参数集（标准值对照）")
+                    result.append("| 参数 | 实际值 | 标准值 | 偏差 |")
+                    result.append("|------|--------|--------|------|")
+                    for item in latest.items:
+                        actual = params.get(item.param_key, "N/A")
+                        standard = item.param_value
+                        deviation = ""
+                        if isinstance(actual, (int, float)) and isinstance(standard, (int, float)):
+                            deviation = f"{actual - standard:.2f}"
+                        result.append(
+                            f"| {item.param_key} | {actual} | {standard} | {deviation} |"
+                        )
+            except Exception:
+                pass
+
+        return "\n".join(result)
+
+    @tool
+    async def preview_dataset(dataset_id: str, page: int = 1, size: int = 20) -> str:
+        """预览数据集的内容，分页展示数据行和字段统计信息。
+        dataset_id: 数据集ID（通过 build_dataset 或文件上传获取）。
+        page: 页码（从1开始）。
+        size: 每页行数（默认20）。"""
+        from process_opt.analysis.excel import get_dataset
+
+        ds = get_dataset(dataset_id)
+        if ds is None:
+            return "数据集未找到或已过期，请重新构建数据集。"
+
+        feature_names = sorted({k for f in ds.features for k in f})
+        target_names = sorted({k for t in ds.targets for k in t})
+        all_columns = feature_names + target_names
+
+        total = ds.sample_count
+        start = (page - 1) * size
+        end = min(start + size, total)
+
+        lines = [
+            "## 数据集预览",
+            f"**总行数**: {total} | **特征字段**: {len(feature_names)} | **目标字段**: {len(target_names)}",
+            f"**当前页**: {page} (第 {start + 1}-{end} 行)",
+            "",
+        ]
+
+        if ds.field_summary:
+            lines.append("### 字段统计")
+            lines.append("| 字段 | 样本数 | 均值 | 最小值 | 最大值 |")
+            lines.append("|------|--------|------|--------|--------|")
+            for fn in all_columns:
+                s = ds.field_summary.get(fn, {})
+                mean_v = f"{s.get('mean', 0):.3f}" if s.get('mean') is not None else "N/A"
+                min_v = f"{s.get('min', 0):.3f}" if s.get('min') is not None else "N/A"
+                max_v = f"{s.get('max', 0):.3f}" if s.get('max') is not None else "N/A"
+                lines.append(f"| {fn} | {s.get('count', 0)} | {mean_v} | {min_v} | {max_v} |")
+
+        lines.append("")
+        lines.append(f"### 数据行 (第 {page} 页)")
+        header = "| # | " + " | ".join(all_columns) + " |"
+        sep = "|---|" + "|".join(["------"] * len(all_columns)) + "|"
+        lines.append(header)
+        lines.append(sep)
+
+        for i in range(start, end):
+            row_parts = [str(i + 1)]
+            for fn in all_columns:
+                val = "N/A"
+                if i < len(ds.features) and fn in ds.features[i]:
+                    val = ds.features[i][fn]
+                elif i < len(ds.targets) and fn in ds.targets[i]:
+                    val = ds.targets[i][fn]
+                if isinstance(val, float):
+                    val = f"{val:.4f}"
+                row_parts.append(str(val))
+            lines.append("| " + " | ".join(row_parts) + " |")
+
+        return "\n".join(lines)
+
     tool_list = [
         query_records, get_devices, get_stats, profile_data,
         analyze_correlation, analyze_pareto, run_regression,
-        recommend_params, run_spc, get_parameters,
+        recommend_params, run_spc,
         get_process_knowledge, build_dataset,
         design_experiment, analyze_experiment,
+        analyze_importance, optimize_parameters,
+        trace_product_full, preview_dataset,
     ]
 
     if experiment_repo is not None:

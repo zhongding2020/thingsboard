@@ -277,6 +277,7 @@ def create_api_app_from_settings() -> FastAPI:
             line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None
             analysis_service_proxy._service = None
+            experiment_repo_proxy._repo = None
             await pool.close()
 
     tools = (

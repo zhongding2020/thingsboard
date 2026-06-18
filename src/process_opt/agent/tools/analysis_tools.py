@@ -360,13 +360,16 @@ def create_analysis_tools(
                         "emphasis": {"itemStyle": {"shadowBlur": 10, "shadowColor": "rgba(0,0,0,0.3)"}}}]
         }
 
-        return json.dumps({
-            "sample_count": ds.sample_count,
-            "fields": {"features": feature_fields, "targets": target_fields},
-            "profile": profile_items,
-            "correlation_matrix": corr_matrix,
-            "echarts_heatmap": chart,
-        }, ensure_ascii=False)
+        echarts_json = json.dumps(chart, ensure_ascii=False)
+        return (
+            f"## 数据概览\n"
+            f"- 样本数: {ds.sample_count}\n"
+            f"- 特征字段: {', '.join(feature_fields)}\n"
+            f"- 目标字段: {', '.join(target_fields)}\n\n"
+            f"## 相关性矩阵\n"
+            + "\n".join(f"  {c[0]} ↔ {c[1]}: {c[2]:.3f}" for c in corr_matrix[:20]) +
+            f"\n\n## 相关性热力图\n\n```echarts\n{echarts_json}\n```\n"
+        )
 
     tool_list.append(upload_and_analyze)
 

@@ -13,46 +13,10 @@ from process_opt.analysis.schemas import (
     RecommendationRequest,
     RecommendationResult,
 )
+from process_opt.analysis.utils import extract_arrays
 
 MAX_GRID_COMBINATIONS = 10_000
 GRID_STEPS = 10
-
-
-def _extract_arrays(
-    dataset: AnalysisDataset,
-    feature_fields: list[str],
-    target_field: str,
-) -> tuple[np.ndarray, np.ndarray]:
-    n = dataset.sample_count
-    if n == 0:
-        raise AnalysisError(
-            code="EMPTY_DATASET",
-            message="Cannot compute recommendation on empty dataset",
-        )
-
-    feat_cols: list[list[float]] = [[] for _ in feature_fields]
-    tgt_vals: list[float] = []
-
-    for i in range(n):
-        for j, field in enumerate(feature_fields):
-            v = dataset.features[i].get(field)
-            if v is None or not isinstance(v, (int, float)):
-                raise AnalysisError(
-                    code="NON_NUMERIC_FIELD",
-                    message=f"Field '{field}' contains non-numeric or missing values",
-                )
-            feat_cols[j].append(float(v))
-        v = dataset.targets[i].get(target_field)
-        if v is None or not isinstance(v, (int, float)):
-            raise AnalysisError(
-                code="NON_NUMERIC_FIELD",
-                message=f"Target field '{target_field}' contains non-numeric or missing values",
-            )
-        tgt_vals.append(float(v))
-
-    X = np.column_stack([np.array(col, dtype=np.float64) for col in feat_cols])
-    y = np.array(tgt_vals, dtype=np.float64)
-    return X, y
 
 
 def _infer_bounds(
@@ -155,7 +119,7 @@ def compute_recommendation(
     request: RecommendationRequest,
     fixed_parameters: dict[str, float] | None = None,
 ) -> RecommendationResult:
-    X, y = _extract_arrays(dataset, feature_fields, request.target_field)
+    X, y = extract_arrays(dataset, feature_fields, request.target_field)
 
     model = LinearRegression()
     model.fit(X, y)

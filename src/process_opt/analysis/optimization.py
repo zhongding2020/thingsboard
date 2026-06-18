@@ -7,37 +7,7 @@ from sklearn.linear_model import LinearRegression
 
 from process_opt.analysis.errors import AnalysisError
 from process_opt.analysis.schemas import AnalysisDataset, OptimizationConfig, OptimizationResult
-
-
-def _extract_arrays(
-    dataset: AnalysisDataset,
-    feature_fields: list[str],
-    target_field: str,
-) -> tuple[np.ndarray, np.ndarray]:
-    n = dataset.sample_count
-    feat_cols: list[list[float]] = [[] for _ in feature_fields]
-    tgt_vals: list[float] = []
-
-    for i in range(n):
-        for j, field in enumerate(feature_fields):
-            v = dataset.features[i].get(field)
-            if v is None or not isinstance(v, (int, float)):
-                raise AnalysisError(
-                    code="NON_NUMERIC_FIELD",
-                    message=f"Field '{field}' contains non-numeric or missing values",
-                )
-            feat_cols[j].append(float(v))
-        v = dataset.targets[i].get(target_field)
-        if v is None or not isinstance(v, (int, float)):
-            raise AnalysisError(
-                code="NON_NUMERIC_FIELD",
-                message=f"Target field '{target_field}' contains non-numeric or missing values",
-            )
-        tgt_vals.append(float(v))
-
-    X = np.column_stack([np.array(col, dtype=np.float64) for col in feat_cols])
-    y = np.array(tgt_vals, dtype=np.float64)
-    return X, y
+from process_opt.analysis.utils import extract_arrays
 
 
 def _compute_cpk(y_pred: float, usl: float, lsl: float, rmse: float) -> float:
@@ -59,7 +29,7 @@ def run_optimization(
             message="Cannot run optimization on empty dataset",
         )
 
-    X, y = _extract_arrays(dataset, config.key_factors, config.target_field)
+    X, y = extract_arrays(dataset, config.key_factors, config.target_field)
     if np.any(np.isnan(X)) or np.any(np.isnan(y)):
         raise AnalysisError(
             code="MODEL_FIT_FAILED",

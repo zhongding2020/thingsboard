@@ -36,20 +36,70 @@ def create_analysis_tools(
         result = await repository.query_records(
             device_id=device_id or None, page=page, page_size=page_size,
         )
-        return json.dumps(result, default=str, ensure_ascii=False)
+        items = result.get("items", [])
+        total = result.get("total", 0)
+        if not items:
+            return f"未找到设备 `{device_id}` 的生产记录。" if device_id else "当前系统没有生产记录。"
+
+        lines = [
+            f"## 生产记录查询",
+            f"**设备**: {device_id or '全部'} | **共 {total} 条** | 第 {page} 页",
+            "",
+            "| 条码 | 设备 | 生产时间 | 参数摘要 | 检测结果 |",
+            "|------|------|----------|----------|----------|",
+        ]
+        for item in items:
+            params = item.get("params", {})
+            if isinstance(params, dict):
+                params_str = ", ".join(f"{k}={v}" for k, v in list(params.items())[:3])
+            else:
+                params_str = str(params)[:60]
+            results = item.get("results", {})
+            if isinstance(results, dict):
+                results_str = ", ".join(f"{k}={v}" for k, v in list(results.items())[:3])
+            else:
+                results_str = str(results)[:60]
+            lines.append(
+                f"| {item.get('barcode', '-')} | {item.get('device_id', '-')} | "
+                f"{item.get('processed_at', '-')} | {params_str} | {results_str} |"
+            )
+        return "\n".join(lines)
 
     @tool
     async def get_devices() -> str:
         """获取系统中所有设备的 ID 列表。"""
         devices = await repository.list_devices()
-        return json.dumps(devices, ensure_ascii=False)
+        if not devices:
+            return "当前系统没有注册的设备。"
+
+        lines = [f"## 设备列表 (共 {len(devices)} 台)", ""]
+        for d in devices:
+            lines.append(f"- `{d}`")
+        return "\n".join(lines)
 
     @tool
     @with_retry()
     async def get_stats() -> str:
         """获取平台统计数据（今日记录数、总记录数、设备数等）。"""
         stats = await repository.get_stats()
-        return json.dumps(stats, default=str, ensure_ascii=False)
+        lines = [
+            "## 平台统计",
+            "",
+            "| 指标 | 数值 |",
+            "|------|------|",
+            f"| 今日数据量 | {stats.get('today_data_count', 0)} |",
+            f"| 总记录数 | {stats.get('total_records', 0)} |",
+            f"| 设备数 | {stats.get('device_count', 0)} |",
+            f"| 待审批参数集 | {stats.get('pending_approvals', 0)} |",
+        ]
+        if stats.get("latest_records"):
+            lines.append("")
+            lines.append("### 最近记录")
+            lines.append("| 条码 | 设备 | 时间 |")
+            lines.append("|------|------|------|")
+            for r in stats["latest_records"]:
+                lines.append(f"| {r.get('barcode','-')} | {r.get('device_id','-')} | {r.get('processed_at','-')} |")
+        return "\n".join(lines)
 
     @tool
     async def profile_data(device_id: str = "", page: int = 1, page_size: int = 50) -> str:
@@ -280,11 +330,17 @@ def create_analysis_tools(
         ds = get_dataset(ds_id)
         feature_fields = sorted({k for f in ds.features for k in f}) if ds else []
         target_fields = sorted({k for t in ds.targets for k in t}) if ds else []
-        return json.dumps({
-            "dataset_id": ds_id,
-            "fields": {"features": feature_fields, "targets": target_fields},
-            "sample_count": ds.sample_count if ds else 0,
-        }, ensure_ascii=False)
+        sample_count = ds.sample_count if ds else 0
+        lines = [
+            "## 数据集已构建",
+            f"**数据集ID**: `{ds_id}`",
+            f"**样本数**: {sample_count}",
+            f"**特征字段** ({len(feature_fields)}): {', '.join(feature_fields) if feature_fields else '无'}",
+            f"**目标字段** ({len(target_fields)}): {', '.join(target_fields) if target_fields else '无'}",
+            "",
+            "此 dataset_id 可用于后续分析工具（如 analyze_correlation, run_regression, analyze_importance 等）。",
+        ]
+        return "\n".join(lines)
 
     @tool
     async def design_experiment(factors_json: str, method: str = "full_factorial", center_points: int = 0) -> str:
@@ -635,7 +691,14 @@ def create_analysis_tools(
 
             data = json.loads(plan_json)
             plan = await experiment_repo.create_plan(ExperimentPlanCreate(**data))
-            return json.dumps({"plan_id": plan.id, "name": plan.name, "status": plan.status}, ensure_ascii=False)
+            return (
+                f"## 实验方案已保存\n\n"
+                f"- **方案ID**: {plan.id}\n"
+                f"- **名称**: {plan.name}\n"
+                f"- **方法**: {plan.method}\n"
+                f"- **状态**: {plan.status}\n"
+                f"- **运行次数**: {len(plan.design_runs)}"
+            )
 
         @tool
         async def record_experiment_result_for_plan(
@@ -647,15 +710,33 @@ def create_analysis_tools(
             await experiment_repo.record_result(plan_id, ExperimentResultCreate(
                 run_order=run_order, response_value=response_value, notes=notes or None,
             ))
-            return json.dumps({"status": "recorded", "plan_id": plan_id, "run_order": run_order}, ensure_ascii=False)
+            return (
+                f"## 实验结果已记录\n\n"
+                f"- **方案ID**: {plan_id}\n"
+                f"- **运行序号**: {run_order}\n"
+                f"- **响应值**: {response_value}\n"
+                f"- **备注**: {notes or '无'}"
+            )
 
         @tool
         async def get_experiment_results(plan_id: int) -> str:
             """获取实验方案的完整结果，包括所有运行记录。"""
             plan = await experiment_repo.get_plan(plan_id)
             if plan is None:
-                return "Experiment plan not found"
-            return json.dumps(plan.model_dump(), default=str, ensure_ascii=False)
+                return f"未找到实验方案 `{plan_id}`。"
+            lines = [
+                f"## 实验方案: {plan.name}",
+                "",
+                f"- **ID**: {plan.id} | **工艺**: {plan.process_type} | **方法**: {plan.method}",
+                f"- **状态**: {plan.status} | **创建者**: {plan.created_by}",
+                "",
+                "### 实验结果",
+                "| 运行序号 | 响应值 | 备注 |",
+                "|----------|--------|------|",
+            ]
+            for r in (plan.results or []):
+                lines.append(f"| {r.run_order} | {r.response_value} | {r.notes or '-'} |")
+            return "\n".join(lines)
 
         tool_list.extend([save_experiment_plan, record_experiment_result_for_plan, get_experiment_results])
 
@@ -671,14 +752,36 @@ def create_analysis_tools(
         if isinstance(params, str):
             params = json.loads(params)
 
-        return json.dumps({
-            "barcode": barcode,
-            "device_id": record.get("device_id", ""),
-            "product_model": record.get("product_model", ""),
-            "process_params": params,
-            "inspection_result": record.get("inspection_result", {}),
-            "processed_at": str(record.get("processed_at", "")),
-        }, default=str, ensure_ascii=False)
+        inspection = record.get("inspection_result", {})
+        if isinstance(inspection, str):
+            inspection = json.loads(inspection)
+
+        lines = [
+            f"## 产品追溯: {barcode}",
+            "",
+            f"- **设备**: {record.get('device_id', '-')}",
+            f"- **生产时间**: {record.get('processed_at', '-')}",
+            "",
+            "### 工艺参数",
+            "| 参数 | 值 |",
+            "|------|----|",
+        ]
+        for k, v in params.items():
+            lines.append(f"| {k} | {v} |")
+
+        lines.append("")
+        lines.append("### 检测结果")
+        lines.append("| 指标 | 结果 |")
+        lines.append("|------|------|")
+        if isinstance(inspection, list):
+            for item in inspection:
+                if isinstance(item, dict):
+                    lines.append(f"| {item.get('name', '-')} | {item.get('value', item.get('result', '-'))} |")
+        elif isinstance(inspection, dict):
+            for k, v in inspection.items():
+                lines.append(f"| {k} | {v} |")
+
+        return "\n".join(lines)
 
     tool_list.append(trace_product)
 

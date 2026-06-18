@@ -10,7 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    pass
+    from process_opt.container_pool.proxy import ContainerPoolProxy
 
 from process_opt.analysis.errors import AnalysisError
 from process_opt.analysis.schemas import (
@@ -104,16 +104,8 @@ class ErrorResponse(BaseModel):
 
 
 _SUGGESTIONS: dict[str, str] = {
-    "NOT_FOUND": "Check the ID parameter and try again. The resource may have been deleted.",
+    "NOT_FOUND": "Check the set_id parameter and try again.",
     "INVALID_TRANSITION": "Check allowed transitions: draft->proposed, proposed->approved, proposed->rejected, approved->active.",
-    "INVALID_PARAMS": "Check the request parameters. Ensure all required fields are provided and valid.",
-    "DATASET_NOT_FOUND": "Build or upload a dataset first. The dataset may have expired.",
-    "DEVICE_NOT_FOUND": "Check the device_id. List available devices with GET /devices.",
-    "RECORD_NOT_FOUND": "No data found for the given query. Check barcode or filters.",
-    "NO_DATA": "No data available for the specified filters. Try a wider time range.",
-    "TOO_FEW_POINTS": "At least 5 data points are required for this analysis. Upload more data.",
-    "COMPUTATION_FAILED": "Analysis computation failed. Check data quality for missing or invalid values.",
-    "FEATURE_MISMATCH": "Feature fields do not match the dataset columns. Check field names.",
 }
 
 
@@ -133,6 +125,7 @@ def create_app(
     parameter_service: ParameterService | None = None,
     analysis_service: AnalysisService | None = None,
     line_device_repo: LineDeviceRepositoryProtocol | None = None,
+    container_pool: "ContainerPoolProxy | None" = None,
     agent_graph: Any = None,
     session_manager: Any = None,
     knowledge_loader: Any = None,
@@ -202,43 +195,6 @@ def create_app(
                     status_code=status.HTTP_404_NOT_FOUND, detail="Analysis record not found"
                 )
             return jsonable_encoder(record)
-
-        @app.get("/api/v1/analysis/trace/{barcode}")
-        async def trace_barcode(barcode: str) -> Any:
-            record = await repository.get_analysis_record(barcode)
-            if record is None:
-                raise HTTPException(status_code=404, detail="Barcode not found")
-
-            device_id = record.get("device_id", "")
-            params = record.get("params", {})
-            if isinstance(params, str):
-                import json as _j
-                params = _j.loads(params)
-
-            param_history: list[dict] = []
-            if device_id and app.state.pool:
-                from process_opt.parameters.repository import ParameterRepository
-                param_repo = ParameterRepository(app.state.pool)
-                device_row = await app.state.pool.fetchrow(
-                    "SELECT type FROM device_registry WHERE id=$1", device_id,
-                )
-                if device_row:
-                    latest = await param_repo.get_latest_active(device_row["type"])
-                    if latest is not None:
-                        param_history = [
-                            {"param_key": pi.param_key, "param_value": pi.param_value, "unit": pi.unit}
-                            for pi in latest.items
-                        ]
-
-            return {
-                "barcode": barcode,
-                "device_id": device_id,
-                "product_model": record.get("product_model", ""),
-                "process_params": params,
-                "inspection_result": record.get("inspection_result", {}),
-                "processed_at": str(record.get("processed_at", "")),
-                "active_parameter_set": param_history,
-            }
 
         @app.get("/api/v1/analysis/devices")
         async def list_devices_route() -> Any:
@@ -618,31 +574,18 @@ def create_app(
                 raise HTTPException(status_code=404, detail="Dataset not found or expired")
             return run_optimization(ds, body)
 
-        @app.post("/api/v1/analysis/doe/design")
-        async def doe_design_route(body: dict[str, Any]) -> Any:
-            from process_opt.analysis.doe_schemas import DOEConfig
-            from process_opt.analysis.doe_service import generate_design
-            config = DOEConfig(**body)
-            result = generate_design(config)
-            return result.model_dump()
+        if parameter_service is not None:
 
-        @app.post("/api/v1/analysis/doe/anova")
-        async def doe_anova_route(body: dict[str, Any]) -> Any:
-            from process_opt.analysis.doe_schemas import ANOVARequest
-            from process_opt.analysis.doe_service import run_anova
-            req = ANOVARequest(**body)
-            result = run_anova(req)
-            return result.model_dump()
-
-        @app.post("/api/v1/analysis/report")
-        async def generate_report_route(body: dict[str, Any]) -> dict:
-            from process_opt.analysis.report import generate_markdown_report
-            report = generate_markdown_report(
-                title=body.get("title", "工艺分析报告"),
-                sections=body.get("sections", []),
-                metadata=body.get("metadata"),
+            @app.post(
+                "/api/v1/analysis/recommendation/submit",
+                status_code=status.HTTP_201_CREATED,
             )
-            return {"report": report}
+            async def recommendation_submit_route(body: ParameterSetCreate) -> ParameterSet:
+                return await parameter_service.create_draft(body)
+
+    if container_pool is not None:
+        from process_opt.container_pool.routes import register_routes as register_pool_routes
+        register_pool_routes(app, container_pool)
 
     if experiment_repo is not None:
         from process_opt.experiment.repository import ExperimentPlanCreate, ExperimentResultCreate
@@ -679,15 +622,6 @@ def create_app(
         async def update_plan_status(plan_id: int, body: dict[str, Any]) -> Response:
             await experiment_repo.update_plan_status(plan_id, body["status"])
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    if parameter_service is not None:
-
-            @app.post(
-                "/api/v1/analysis/recommendation/submit",
-                status_code=status.HTTP_201_CREATED,
-            )
-            async def recommendation_submit_route(body: ParameterSetCreate) -> ParameterSet:
-                return await parameter_service.create_draft(body)
 
     if agent_graph is not None and session_manager is not None and knowledge_loader is not None:
         from process_opt.api.agent_routes import register_agent_routes

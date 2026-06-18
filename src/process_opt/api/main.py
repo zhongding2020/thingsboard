@@ -1,5 +1,3 @@
-import asyncio
-import logging
 from datetime import datetime
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -11,8 +9,6 @@ from fastapi import FastAPI
 
 from process_opt.analysis import AnalysisService
 from process_opt.analysis.dataset import DatasetBuilder
-from process_opt.analysis.dataset_repo import DatasetRepository
-from process_opt.analysis.excel import set_dataset_repo
 from process_opt.analysis.schemas import AnalysisDataset, AnalysisDatasetRequest, CorrelationRequest, CorrelationResult, ImportanceRequest, ImportanceResult, ProfilingResult, RecommendationRequest, RecommendationResult, RegressionRequest, RegressionResult, SpcRequest, SpcResult
 from process_opt.api.app import create_app
 from process_opt.common.db import apply_sql_file, create_pool
@@ -21,9 +17,15 @@ from process_opt.common.settings import Settings
 from process_opt.parameters.repository import ParameterRepository
 from process_opt.parameters.schemas import ParameterSet, ParameterSetCreate, ParameterSetWithItems
 from process_opt.parameters.service import ParameterService
+from process_opt.container_pool.manager import ContainerPoolManager
+from process_opt.container_pool.proxy import ContainerPoolProxy
+from process_opt.agent.tools.analysis_tools import create_analysis_tools
+from process_opt.agent.tools.system_tools import create_system_tools
+from process_opt.agent.tools.parameter_tools import create_parameter_tools
+from process_opt.agent.tools.experiment_tools import create_experiment_tools
+from process_opt.agent.graph import SessionManager, build_graph
+from process_opt.knowledge.loader import KnowledgeLoader
 from process_opt.experiment.repository import ExperimentRepository
-
-logger = logging.getLogger(__name__)
 
 
 class RepositoryProxy:
@@ -235,10 +237,9 @@ def create_api_app_from_settings() -> FastAPI:
     parameter_service_proxy = ParameterServiceProxy()
     analysis_service_proxy = AnalysisServiceProxy()
     line_device_repo_proxy = LineDeviceRepositoryProxy()
+    container_pool_proxy = ContainerPoolProxy()
     experiment_repo_proxy = ExperimentRepositoryProxy()
 
-    from process_opt.agent.graph import SessionManager
-    from process_opt.knowledge.loader import KnowledgeLoader
     from langchain_openai import ChatOpenAI
 
     knowledge_loader = KnowledgeLoader()
@@ -258,28 +259,9 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service = AnalysisService(dataset_builder)
         experiment_repo = ExperimentRepository(pool)
         experiment_repo_proxy._repo = experiment_repo
-        app.state.pool = pool
-
-        async def _expire_sessions():
-            while True:
-                await asyncio.sleep(300)
-                await session_manager.expire_stale()
-        expire_task = asyncio.create_task(_expire_sessions())
-
-        dataset_repo = DatasetRepository(pool)
-        set_dataset_repo(dataset_repo)
-
-        async def cleanup_expired_datasets():
-            while True:
-                await asyncio.sleep(300)
-                try:
-                    count = await dataset_repo.purge_expired()
-                    if count > 0:
-                        logger.info("Purged %d expired datasets", count)
-                except Exception:
-                    pass
-
-        cleanup_task = asyncio.create_task(cleanup_expired_datasets())
+        manager = ContainerPoolManager(settings)
+        container_pool_proxy.set_manager(manager)
+        await manager.start()
         app.state.pool = pool
         app.state.repository = repository
         repository_proxy.repository = repository
@@ -289,22 +271,23 @@ def create_api_app_from_settings() -> FastAPI:
         try:
             yield
         finally:
-            expire_task.cancel()
-            cleanup_task.cancel()
+            await manager.stop()
+            container_pool_proxy.reset()
             repository_proxy.repository = None
             line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None
             analysis_service_proxy._service = None
-            import gc
-            gc.collect()
+            experiment_repo_proxy._repo = None
             await pool.close()
 
-    from process_opt.agent.graph import build_graph
-    from process_opt.agent.tools.analysis_tools import create_analysis_tools
-
-    tools = create_analysis_tools(
-        repository_proxy, analysis_service_proxy, parameter_service_proxy, knowledge_loader,
-        experiment_repo_proxy,
+    tools = (
+        create_analysis_tools(
+            repository_proxy, analysis_service_proxy, parameter_service_proxy,
+            knowledge_loader, experiment_repo_proxy,
+        ) +
+        create_system_tools(line_device_repo_proxy, analysis_service_proxy) +
+        create_parameter_tools(parameter_service_proxy) +
+        create_experiment_tools(experiment_repo_proxy)
     )
     llm = ChatOpenAI(
         model=settings.agent_model,
@@ -321,6 +304,7 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_service=parameter_service_proxy,
         analysis_service=analysis_service_proxy,
         line_device_repo=line_device_repo_proxy,
+        container_pool=container_pool_proxy,
         agent_graph=agent_graph,
         session_manager=session_manager,
         knowledge_loader=knowledge_loader,

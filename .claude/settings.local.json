@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/zhongding/dev/thingsboard/.claude/worktrees/agent-system-api-tools/.venv/bin/python -c \"import langchain_core, fastapi, pydantic; print\\('core deps OK'\\)\")",
+      "Bash(/Users/zhongding/dev/thingsboard/.claude/worktrees/agent-system-api-tools/.venv/bin/pip install *)"
+    ]
+  }
+}

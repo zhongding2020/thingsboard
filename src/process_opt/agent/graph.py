@@ -9,9 +9,7 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from process_opt.agent.nodes.analyzer import create_analyzer_node
-from process_opt.agent.nodes.chat import create_chat_node
-from process_opt.agent.nodes.recommender import create_recommender_node
+from process_opt.agent.nodes.worker import create_worker_node
 from process_opt.agent.nodes.supervisor import create_supervisor_node
 from process_opt.agent.state import AgentState
 from process_opt.agent.tools.analysis_tools import create_analysis_tools
@@ -29,9 +27,9 @@ def build_graph(
     knowledge_loader: KnowledgeLoader,
 ):
     supervisor_node = create_supervisor_node(llm)
-    chat_node = create_chat_node(llm_with_tools, knowledge_loader)
-    analyzer_node = create_analyzer_node(llm_with_tools, knowledge_loader)
-    recommender_node = create_recommender_node(llm_with_tools, knowledge_loader)
+    chat_node = create_worker_node("chat", llm_with_tools, knowledge_loader)
+    analyzer_node = create_worker_node("analyzer", llm_with_tools, knowledge_loader)
+    recommender_node = create_worker_node("recommender", llm_with_tools, knowledge_loader)
 
     workflow = StateGraph(AgentState)
     workflow.add_node("supervisor", supervisor_node)

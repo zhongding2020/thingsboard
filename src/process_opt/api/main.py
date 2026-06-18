@@ -17,8 +17,14 @@ from process_opt.common.settings import Settings
 from process_opt.parameters.repository import ParameterRepository
 from process_opt.parameters.schemas import ParameterSet, ParameterSetCreate, ParameterSetWithItems
 from process_opt.parameters.service import ParameterService
-from process_opt.container_pool.manager import ContainerPoolManager
-from process_opt.container_pool.proxy import ContainerPoolProxy
+try:
+    from process_opt.container_pool.manager import ContainerPoolManager
+    from process_opt.container_pool.proxy import ContainerPoolProxy
+    _HAS_CONTAINER_POOL = True
+except ImportError:
+    ContainerPoolManager = None  # type: ignore
+    ContainerPoolProxy = None  # type: ignore
+    _HAS_CONTAINER_POOL = False
 from process_opt.agent.tools.analysis_tools import create_analysis_tools
 from process_opt.agent.tools.system_tools import create_system_tools
 from process_opt.agent.tools.parameter_tools import create_parameter_tools
@@ -237,7 +243,7 @@ def create_api_app_from_settings() -> FastAPI:
     parameter_service_proxy = ParameterServiceProxy()
     analysis_service_proxy = AnalysisServiceProxy()
     line_device_repo_proxy = LineDeviceRepositoryProxy()
-    container_pool_proxy = ContainerPoolProxy()
+    container_pool_proxy = ContainerPoolProxy() if _HAS_CONTAINER_POOL else None
     experiment_repo_proxy = ExperimentRepositoryProxy()
 
     from langchain_openai import ChatOpenAI
@@ -259,9 +265,10 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service = AnalysisService(dataset_builder)
         experiment_repo = ExperimentRepository(pool)
         experiment_repo_proxy._repo = experiment_repo
-        manager = ContainerPoolManager(settings)
-        container_pool_proxy.set_manager(manager)
-        await manager.start()
+        if _HAS_CONTAINER_POOL:
+            manager = ContainerPoolManager(settings)
+            container_pool_proxy.set_manager(manager)
+            await manager.start()
         app.state.pool = pool
         app.state.repository = repository
         repository_proxy.repository = repository
@@ -271,8 +278,9 @@ def create_api_app_from_settings() -> FastAPI:
         try:
             yield
         finally:
-            await manager.stop()
-            container_pool_proxy.reset()
+            if _HAS_CONTAINER_POOL:
+                await manager.stop()
+                container_pool_proxy.reset()
             repository_proxy.repository = None
             line_device_repo_proxy._repo = None
             parameter_service_proxy._service = None

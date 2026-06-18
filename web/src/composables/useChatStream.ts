@@ -20,10 +20,11 @@ export function useChatStream() {
     callbacks: {
       onDelta: (delta: string) => void
       onToolCall: (name: string, args: any) => void
-      onToolResult: (name: string, data: string) => void
+      onToolResult: (name: string, data: string, durationMs: number) => void
       onDone: () => void
       onError: (msg: string) => void
       onSuggestions: (questions: string[]) => void
+      onTrace?: (node: string, text: string) => void
     },
   ) {
     error.value = ''
@@ -39,6 +40,7 @@ export function useChatStream() {
         () => { loading.value = false; activeStream = null; callbacks.onDone() },
         (err: string) => { error.value = err; loading.value = false; activeStream = null; callbacks.onError(err) },
         callbacks.onSuggestions,
+        callbacks.onTrace,
       )
     } catch (e: any) {
       error.value = '请求失败: ' + (e.message || '')

@@ -8,12 +8,16 @@
           :type="part.type" :text="part.text" :isStreaming="isStreaming"
         />
         <ChatToolCall
+          v-else-if="part.type === 'trace'"
+          type="trace" :text="part.text" :node="part.node"
+        />
+        <ChatToolCall
           v-else-if="part.type === 'tool_call'"
           type="tool_call" :toolName="part.tool || part.name" :args="part.args"
         />
         <ChatToolCall
           v-else-if="part.type === 'tool_result'"
-          type="tool_result" :text="part.text"
+          type="tool_result" :text="part.text" :durationMs="part.durationMs || 0"
         />
         <div
           v-else-if="part.type === 'text' || !part.type || part.type === 'step-start' || part.type === 'step-finish'"

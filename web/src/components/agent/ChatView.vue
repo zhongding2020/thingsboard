@@ -28,7 +28,7 @@ import { useChatSession } from '@/composables/useChatSession'
 import { useFileUpload } from '@/composables/useFileUpload'
 
 const { sessionId, createNewSession } = useChatSession()
-const { messages, suggestions, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, copyMessage, regenerateMessage } = useChatMessages()
+const { messages, suggestions, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage } = useChatMessages()
 const { loading, error, sendAndStream } = useChatStream()
 const { upload } = useFileUpload()
 
@@ -36,6 +36,18 @@ const msgRef = ref<HTMLDivElement>()
 
 function scrollBottom() {
   nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight })
+}
+
+function makeCallbacks(assistantIdx: number) {
+  return {
+    onDelta: (delta: string) => { appendDelta(assistantIdx, delta); scrollBottom() },
+    onToolCall: (name: string, args: any) => { addToolCall(assistantIdx, name, args); scrollBottom() },
+    onToolResult: (name: string, data: string, durationMs: number) => { addToolResult(assistantIdx, name, data, durationMs); scrollBottom() },
+    onDone: () => { scrollBottom() },
+    onError: () => { scrollBottom() },
+    onSuggestions: (questions: string[]) => { suggestions.value = questions },
+    onTrace: (node: string, text: string) => { addTrace(assistantIdx, node, text); scrollBottom() },
+  }
 }
 
 async function onSend(text: string) {
@@ -51,14 +63,7 @@ async function onSend(text: string) {
   const assistantIdx = addAssistantPlaceholder()
   scrollBottom()
 
-  await sendAndStream(sessionId.value, text, {
-    onDelta: (delta: string) => { appendDelta(assistantIdx, delta); scrollBottom() },
-    onToolCall: (name: string, args: any) => { addToolCall(assistantIdx, name, args); scrollBottom() },
-    onToolResult: (name: string, data: string) => { addToolResult(assistantIdx, name, data); scrollBottom() },
-    onDone: () => { scrollBottom() },
-    onError: () => { scrollBottom() },
-    onSuggestions: (questions: string[]) => { suggestions.value = questions },
-  })
+  await sendAndStream(sessionId.value, text, makeCallbacks(assistantIdx))
 }
 
 async function onUpload(file: File) {
@@ -77,14 +82,7 @@ async function onUpload(file: File) {
       scrollBottom()
 
       const msg = `对数据集 ${datasetId} 做完整相关性分析，包含相关性热力图。特征字段: ${features.join(',')}，目标字段: ${targets.join(',')}`
-      sendAndStream(sessionId.value, msg, {
-        onDelta: (delta: string) => { appendDelta(assistantIdx, delta); scrollBottom() },
-        onToolCall: (name: string, args: any) => { addToolCall(assistantIdx, name, args); scrollBottom() },
-        onToolResult: (name: string, data: string) => { addToolResult(assistantIdx, name, data); scrollBottom() },
-        onDone: () => { scrollBottom() },
-        onError: () => { scrollBottom() },
-        onSuggestions: (questions: string[]) => { suggestions.value = questions },
-      })
+      sendAndStream(sessionId.value, msg, makeCallbacks(assistantIdx))
     },
     onError: (msg: string) => { error.value = msg },
   })

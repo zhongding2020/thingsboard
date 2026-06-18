@@ -29,9 +29,14 @@ export function useChatMessages() {
     if (parts) parts.push({ type: 'tool_call', text: '', tool: name, args: JSON.stringify(args) })
   }
 
-  function addToolResult(idx: number, name: string, data: string) {
+  function addToolResult(idx: number, name: string, data: string, durationMs: number = 0) {
     const parts = messages.value[idx]?.parts
-    if (parts) parts.push({ type: 'tool_result', text: data.slice(0, 500), tool: name })
+    if (parts) parts.push({ type: 'tool_result', text: data, tool: name, durationMs })
+  }
+
+  function addTrace(idx: number, node: string, text: string) {
+    const parts = messages.value[idx]?.parts
+    if (parts) parts.push({ type: 'trace', text, node })
   }
 
   function copyMessage(msg: ChatMessage) {
@@ -53,5 +58,5 @@ export function useChatMessages() {
 
   function clear() { messages.value = []; suggestions.value = [] }
 
-  return { messages, suggestions, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, copyMessage, regenerateMessage, clear }
+  return { messages, suggestions, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage, clear }
 }

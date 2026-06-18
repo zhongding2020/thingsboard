@@ -94,11 +94,12 @@ export function streamEvents(
   sessionId: string,
   onDelta: (delta: string) => void,
   onToolCall: (name: string, args: any) => void,
-  onToolResult: (name: string, data: string) => void,
+  onToolResult: (name: string, data: string, durationMs: number) => void,
   onNodeStart: (node: string) => void,
   onDone: () => void,
   onError: (err: string) => void,
   onSuggestions?: (questions: string[]) => void,
+  onTrace?: (node: string, text: string) => void,
 ): StreamEvents {
   const controller = new AbortController()
 
@@ -137,10 +138,15 @@ export function streamEvents(
                 onToolCall(event.name, event.args)
                 break
               case 'tool.result':
-                onToolResult(event.name, event.data)
+                onToolResult(event.name, event.data, event.duration_ms || 0)
                 break
               case 'node.start':
                 onNodeStart(event.node)
+                break
+              case 'agent.trace':
+                if (onTrace && event.node && event.text) {
+                  onTrace(event.node, event.text)
+                }
                 break
               case 'session.status':
                 if (event.status === 'idle') {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, status
@@ -9,6 +10,9 @@ from langchain_core.messages import AIMessageChunk
 from starlette.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
+
+_tool_start_times: dict[str, float] = {}
+_supervisor_text: str = ""
 
 
 def register_agent_routes(
@@ -116,43 +120,59 @@ def register_agent_routes(
 
 
 def _map_event(event: dict) -> bytes | None:
+    global _supervisor_text
+
     kind = event.get("event", "")
 
     if kind == "on_chat_model_stream":
         node_name = event.get("metadata", {}).get("langgraph_node", "")
-        if node_name == "supervisor":
-            return None
         chunk: Any = event.get("data", {}).get("chunk")
         if isinstance(chunk, AIMessageChunk) and chunk.content:
             text = chunk.content
             if isinstance(text, list):
                 text = "".join(str(t) for t in text)
+            if node_name == "supervisor":
+                global _supervisor_text
+                _supervisor_text += str(text)
+                return None
             data = json.dumps({"type": "message.delta", "text": str(text)})
             return f"data: {data}\n\n".encode()
 
+    if kind == "on_chain_end":
+        node_name = event.get("name", "")
+        if node_name == "supervisor":
+            if _supervisor_text.strip():
+                data = json.dumps({"type": "agent.trace", "node": "supervisor", "text": _supervisor_text.strip()})
+                _supervisor_text = ""
+                return f"data: {data}\n\n".encode()
+            return None
+        if node_name in ("chat", "analyzer", "recommender"):
+            data = json.dumps({"type": "node.end", "node": node_name})
+            return f"data: {data}\n\n".encode()
+
     if kind == "on_tool_start":
+        run_id = event.get("run_id", "")
         name = event.get("name", "")
         inp = event.get("data", {}).get("input", {})
         args = {k: v for k, v in inp.items() if not k.startswith("_")}
-        data = json.dumps({"type": "tool.call", "name": name, "args": args}, default=str)
+        _tool_start_times[run_id] = time.time()
+        data = json.dumps({"type": "tool.call", "name": name, "args": args, "run_id": run_id}, default=str)
         return f"data: {data}\n\n".encode()
 
     if kind == "on_tool_end":
+        run_id = event.get("run_id", "")
         name = event.get("name", "")
         output = event.get("data", {}).get("output", "")
-        data = json.dumps({"type": "tool.result", "name": name, "data": str(output)})
+        start_time = _tool_start_times.pop(run_id, None)
+        duration_ms = round((time.time() - start_time) * 1000) if start_time else 0
+        output_str = str(output)
+        data = json.dumps({"type": "tool.result", "name": name, "data": output_str, "run_id": run_id, "duration_ms": duration_ms})
         return f"data: {data}\n\n".encode()
 
     if kind == "on_chain_start":
         node_name = event.get("name", "")
         if node_name in ("chat", "analyzer", "recommender"):
             data = json.dumps({"type": "node.start", "node": node_name})
-            return f"data: {data}\n\n".encode()
-
-    if kind == "on_chain_end":
-        node_name = event.get("name", "")
-        if node_name in ("chat", "analyzer", "recommender"):
-            data = json.dumps({"type": "node.end", "node": node_name})
             return f"data: {data}\n\n".encode()
 
     return None
@@ -162,7 +182,7 @@ async def _generate_suggestions(llm: Any, messages: list) -> list[str]:
     from langchain_core.messages import SystemMessage
 
     context = ""
-    for msg in messages[-6:]:
+    for msg in messages:
         role = getattr(msg, "type", "unknown")
         content = msg.content if hasattr(msg, "content") else str(msg)
         if isinstance(content, list):

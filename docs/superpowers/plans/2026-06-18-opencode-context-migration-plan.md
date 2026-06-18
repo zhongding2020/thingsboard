@@ -4,7 +4,7 @@
 
 **Goal:** Extract recent 20 OpenCode sessions for the thingsboard project from SQLite into a structured Markdown document that Claude Code can `@`-reference.
 
-**Architecture:** Single Python script (`scripts/migrate-opencode-context.py`) reads OpenCode's SQLite database, extracts sessions/messages/parts/todos, classifies them into workflows, and renders a 6-section Markdown document. Zero external dependencies — only Python stdlib.
+**Architecture:** Single Python script (`scripts/migrate_opencode_context.py`) reads OpenCode's SQLite database, extracts sessions/messages/parts/todos, classifies them into workflows, and renders a 6-section Markdown document. Zero external dependencies — only Python stdlib.
 
 **Tech Stack:** Python 3.11+, sqlite3, json, datetime, pathlib, argparse
 
@@ -13,7 +13,7 @@
 - 仅使用 Python 标准库（`sqlite3`, `json`, `datetime`, `pathlib`, `argparse`）
 - 不对 OpenCode 数据库做任何写入（只读连接）
 - 输出 Markdown 文档到 `docs/superpowers/specs/2026-06-18-opencode-context-migration.md`
-- 脚本位置: `scripts/migrate-opencode-context.py`
+- 脚本位置: `scripts/migrate_opencode_context.py`
 - 所有输出使用中文
 
 ---
@@ -21,7 +21,7 @@
 ### Task 1: Database connection + session extraction
 
 **Files:**
-- Create: `scripts/migrate-opencode-context.py`
+- Create: `scripts/migrate_opencode_context.py`
 
 **Interfaces:**
 - Produces: `extract_sessions(db_path: str, project_id: str, limit: int) -> list[dict]`
@@ -135,7 +135,7 @@ Expected: Prints 3 sessions with message counts.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add scripts/migrate-opencode-context.py
+git add scripts/migrate_opencode_context.py
 git commit -m "feat: add session + message extraction from OpenCode DB"
 ```
 
@@ -144,7 +144,7 @@ git commit -m "feat: add session + message extraction from OpenCode DB"
 ### Task 2: Todo + part extraction
 
 **Files:**
-- Modify: `scripts/migrate-opencode-context.py`
+- Modify: `scripts/migrate_opencode_context.py`
 
 **Interfaces:**
 - Consumes: `get_db` from Task 1
@@ -229,7 +229,7 @@ Expected: Shows todo count and text parts per session.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/migrate-opencode-context.py
+git add scripts/migrate_opencode_context.py
 git commit -m "feat: add todo + part extraction from OpenCode DB"
 ```
 
@@ -238,7 +238,7 @@ git commit -m "feat: add todo + part extraction from OpenCode DB"
 ### Task 3: Workflow classification + file aggregation
 
 **Files:**
-- Modify: `scripts/migrate-opencode-context.py`
+- Modify: `scripts/migrate_opencode_context.py`
 
 **Interfaces:**
 - Consumes: `extract_sessions`, `extract_messages` from Tasks 1-2
@@ -378,7 +378,7 @@ Expected: Grouped workflows with sessions, matching the known Phase structure.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/migrate-opencode-context.py
+git add scripts/migrate_opencode_context.py
 git commit -m "feat: add workflow classification + file aggregation"
 ```
 
@@ -387,7 +387,7 @@ git commit -m "feat: add workflow classification + file aggregation"
 ### Task 4: Markdown section builders (part 1)
 
 **Files:**
-- Modify: `scripts/migrate-opencode-context.py`
+- Modify: `scripts/migrate_opencode_context.py`
 
 **Interfaces:**
 - Consumes: `classify_workflows`, `aggregate_files` output shapes from Task 3
@@ -519,7 +519,7 @@ Expected: Structured overview in Markdown format.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/migrate-opencode-context.py
+git add scripts/migrate_opencode_context.py
 git commit -m "feat: add Markdown builders for overview + session details"
 ```
 
@@ -528,7 +528,7 @@ git commit -m "feat: add Markdown builders for overview + session details"
 ### Task 5: Markdown section builders (part 2) + render
 
 **Files:**
-- Modify: `scripts/migrate-opencode-context.py`
+- Modify: `scripts/migrate_opencode_context.py`
 
 **Interfaces:**
 - Consumes: `aggregate_files` from Task 3
@@ -684,7 +684,7 @@ Expected: Complete Markdown with all 6 sections, >2000 chars.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add scripts/migrate-opencode-context.py
+git add scripts/migrate_opencode_context.py
 git commit -m "feat: add remaining Markdown sections + render pipeline"
 ```
 
@@ -693,7 +693,7 @@ git commit -m "feat: add remaining Markdown sections + render pipeline"
 ### Task 6: CLI main + error handling + output
 
 **Files:**
-- Modify: `scripts/migrate-opencode-context.py`
+- Modify: `scripts/migrate_opencode_context.py`
 
 **Interfaces:**
 - Produces: `main()` — argparse CLI entry point
@@ -794,7 +794,7 @@ if __name__ == "__main__":
 
 Run:
 ```bash
-python3 scripts/migrate-opencode-context.py \
+python3 scripts/migrate_opencode_context.py \
   --limit 20 \
   --output docs/superpowers/specs/2026-06-18-opencode-context-migration.md
 ```
@@ -818,7 +818,7 @@ Expected: Reasonable line count (>100 lines).
 
 Run:
 ```bash
-python3 scripts/migrate-opencode-context.py --db /nonexistent/path.db
+python3 scripts/migrate_opencode_context.py --db /nonexistent/path.db
 ```
 Expected: Exit code 1 with "错误: 数据库文件不存在" message.
 
@@ -826,14 +826,14 @@ Expected: Exit code 1 with "错误: 数据库文件不存在" message.
 
 Run:
 ```bash
-python3 scripts/migrate-opencode-context.py --project-id nonexistent --limit 3
+python3 scripts/migrate_opencode_context.py --project-id nonexistent --limit 3
 ```
 Expected: Prints warning "未找到匹配的会话", outputs empty report.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/migrate-opencode-context.py docs/superpowers/specs/2026-06-18-opencode-context-migration.md
+git add scripts/migrate_opencode_context.py docs/superpowers/specs/2026-06-18-opencode-context-migration.md
 git commit -m "feat: add CLI main + error handling + generate migration doc"
 ```
 

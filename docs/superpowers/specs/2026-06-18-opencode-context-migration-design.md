@@ -151,7 +151,7 @@ ORDER BY p.time_created
 
 ### 文件位置
 
-`scripts/migrate-opencode-context.py`
+`scripts/migrate_opencode_context.py`
 
 ### 依赖
 
@@ -160,7 +160,7 @@ ORDER BY p.time_created
 ### CLI 接口
 
 ```
-python scripts/migrate-opencode-context.py \
+python scripts/migrate_opencode_context.py \
   --project-id b52e71c68c3d6152862f3ff4892683dce00d6eb1 \
   --limit 20 \
   --output docs/superpowers/specs/2026-06-18-opencode-context-migration.md

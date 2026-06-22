@@ -32,6 +32,13 @@ export interface ChatMessage {
   trace?: string
 }
 
+export interface DebugEvent {
+  type: string
+  name?: string
+  timestamp: number
+  payload?: unknown
+}
+
 export function useAgentStream(sessionId: string) {
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
@@ -39,6 +46,7 @@ export function useAgentStream(sessionId: string) {
   const suggestions = ref<string[]>([])
   const todos = ref<TodoItem[]>([])
   const currentPhase = ref('')
+  const debugEvents = ref<DebugEvent[]>([])
 
   let abortController: AbortController | null = null
 
@@ -93,6 +101,13 @@ export function useAgentStream(sessionId: string) {
 
           try {
             const event = JSON.parse(trimmed.slice(6))
+            // Record debug event
+            debugEvents.value.push({
+              type: event.type,
+              name: event.name || event.phase || undefined,
+              timestamp: Date.now(),
+              payload: event,
+            })
             switch (event.type) {
               case 'message.delta':
                 assistantMsg.content += event.text || ''
@@ -202,5 +217,5 @@ export function useAgentStream(sessionId: string) {
     error.value = ''
   }
 
-  return { messages, loading, error, suggestions, todos, currentPhase, lastAssistantMsg, send, cancel, clear }
+  return { messages, loading, error, suggestions, todos, currentPhase, debugEvents, lastAssistantMsg, send, cancel, clear }
 }

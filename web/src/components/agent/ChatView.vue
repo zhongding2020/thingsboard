@@ -29,6 +29,14 @@
               : 'bg-gray-100 dark:bg-gray-800'"
           >{{ doneTodoCount }}/{{ allTodos.length }}</span>
         </button>
+        <!-- Debug toggle -->
+        <button
+          class="flex items-center gap-1 px-2 py-1 text-[11px] rounded border-none cursor-pointer transition-colors"
+          :class="showDebug
+            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
+            : 'bg-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+          @click="showDebug = !showDebug"
+        >🐛 调试</button>
       </div>
     </div>
 
@@ -91,6 +99,12 @@
           📍 当前阶段: {{ currentPhase }}
         </div>
 
+        <!-- Debug panel -->
+        <DebugPanel
+          v-if="showDebug"
+          :events="debugEvents"
+        />
+
         <!-- Input -->
         <ChatInput
           :disabled="loading"
@@ -130,6 +144,7 @@ import MessageCard from './MessageCard.vue'
 import ChatInput from './ChatInput.vue'
 import FilesystemDrawer from './panels/FilesystemDrawer.vue'
 import TodoDrawer from './panels/TodoDrawer.vue'
+import DebugPanel from './panels/DebugPanel.vue'
 import { useAgentStream } from '@/composables/useAgentStream'
 import { useChatSession } from '@/composables/useChatSession'
 import { useFileUpload } from '@/composables/useFileUpload'
@@ -166,11 +181,13 @@ const suggestions = computed(() => streamRef.value?.suggestions.value ?? [])
 const currentPhase = computed(() => streamRef.value?.currentPhase.value ?? '')
 const allTodos = computed(() => streamRef.value?.todos.value ?? [])
 const doneTodoCount = computed(() => allTodos.value.filter((t) => t.done).length)
+const debugEvents = computed(() => streamRef.value?.debugEvents.value ?? [])
 
 // ---------------------------------------------------------------------------
 // Right panel state
 // ---------------------------------------------------------------------------
 const activePanel = ref<'files' | 'todos' | null>(null)
+const showDebug = ref(false)
 
 // ---------------------------------------------------------------------------
 // Welcome message

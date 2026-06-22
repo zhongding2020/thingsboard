@@ -25,6 +25,13 @@
         <TextBlock :text="msg.content" :isStreaming="isStreaming" />
       </div>
 
+      <!-- Interactive actions -->
+      <InteractiveActions
+        v-if="msg.actions?.length"
+        :actions="msg.actions"
+        @resolve="(actionId: string, value: unknown) => $emit('resolveAction', msg, actionId, value)"
+      />
+
       <!-- Tool calls -->
       <ToolCallCard
         v-for="(tc, j) in msg.toolCalls"
@@ -71,8 +78,13 @@ import TextBlock from './TextBlock.vue'
 import ThinkingBlock from './ThinkingBlock.vue'
 import ToolCallCard from './ToolCallCard.vue'
 import SubagentCard from './SubagentCard.vue'
+import InteractiveActions from './InteractiveActions.vue'
 import type { ChatMessage } from '@/composables/useAgentStream'
 
 defineProps<{ msg: ChatMessage; isStreaming: boolean }>()
-defineEmits<{ copy: []; regenerate: [] }>()
+defineEmits<{
+  copy: []
+  regenerate: []
+  resolveAction: [msg: ChatMessage, actionId: string, value: unknown]
+}>()
 </script>

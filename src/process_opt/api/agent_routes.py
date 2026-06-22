@@ -129,15 +129,36 @@ def register_agent_routes(
         ]
 
         async def generate():
+            subagent_run_ids: set[str] = set()
+            stream_config = {"configurable": {"thread_id": session["thread_id"]}}
             try:
                 async for event in session["agent"].astream_events(
                     {"messages": messages},
-                    config={"configurable": {"thread_id": session["thread_id"]}},
+                    config=stream_config,
                     version="v2",
                 ):
-                    sse = _map_event(event)
+                    sse = _map_event(event, subagent_run_ids)
                     if sse:
                         yield sse
+
+                    # Emit todo.update after tool_end events
+                    if event.get("event") == "on_tool_end":
+                        try:
+                            state = await session["agent"].aget_state(stream_config)
+                            todos = state.values.get("todos", [])
+                            todo_data = json.dumps({"type": "todo.update", "todos": todos})
+                            yield f"data: {todo_data}\n\n".encode()
+                        except Exception:
+                            pass
+
+                # Emit final todo.update at stream end
+                try:
+                    state = await session["agent"].aget_state(stream_config)
+                    todos = state.values.get("todos", [])
+                    todo_data = json.dumps({"type": "todo.update", "todos": todos})
+                    yield f"data: {todo_data}\n\n".encode()
+                except Exception:
+                    pass
 
                 # Emit suggestions
                 if llm is not None and session.get("messages"):
@@ -204,13 +225,21 @@ def register_agent_routes(
     app.include_router(router)
 
 
-def _map_event(event: dict) -> bytes | None:
+def _map_event(event: dict, subagent_run_ids: set[str] | None = None) -> bytes | None:
     """Map DeepAgents astream_events event to SSE bytes.
 
     Keeps the same SSE event type names as the old LangGraph layer
     so the frontend needs zero changes.
+
+    New in v2: differentiates subagent events (subagent.start, subagent.delta,
+    subagent.end) from root agent events (node.start, message.delta, node.end)
+    by tracking subagent chain run IDs.
     """
     kind = event.get("event", "")
+
+    # Determine if this event is inside a subagent context
+    parent_id = event.get("parent_run_id", "")
+    inside_subagent = bool(subagent_run_ids and parent_id in subagent_run_ids)
 
     # AI text streaming
     if kind == "on_chat_model_stream":
@@ -219,7 +248,8 @@ def _map_event(event: dict) -> bytes | None:
             text = chunk.content
             if isinstance(text, list):
                 text = "".join(str(t) for t in text)
-            data = json.dumps({"type": "message.delta", "text": str(text)})
+            event_type = "subagent.delta" if inside_subagent else "message.delta"
+            data = json.dumps({"type": event_type, "text": str(text)})
             return f"data: {data}\n\n".encode()
 
     # Tool start
@@ -241,19 +271,50 @@ def _map_event(event: dict) -> bytes | None:
                            "data": output_str})
         return f"data: {data}\n\n".encode()
 
-    # Subagent start (maps to old node.start)
+    # Chain start — differentiate subagent vs node
     if kind == "on_chain_start":
         name = event.get("name", "")
-        data = json.dumps({"type": "node.start", "node": name})
+        tags = event.get("tags", [])
+        run_id = event.get("run_id", "")
+
+        is_subagent = _is_subagent_event(name, tags)
+        if is_subagent and subagent_run_ids is not None:
+            subagent_run_ids.add(run_id)
+
+        event_type = "subagent.start" if is_subagent else "node.start"
+        data = json.dumps({"type": event_type, "node": name})
         return f"data: {data}\n\n".encode()
 
-    # Subagent end (maps to old node.end)
+    # Chain end — differentiate subagent vs node
     if kind == "on_chain_end":
         name = event.get("name", "")
-        data = json.dumps({"type": "node.end", "node": name})
+        run_id = event.get("run_id", "")
+
+        is_subagent_end = bool(subagent_run_ids and run_id in subagent_run_ids)
+        if is_subagent_end and subagent_run_ids is not None:
+            subagent_run_ids.discard(run_id)
+
+        event_type = "subagent.end" if is_subagent_end else "node.end"
+        data = json.dumps({"type": event_type, "node": name})
         return f"data: {data}\n\n".encode()
 
     return None
+
+
+def _is_subagent_event(name: str, tags: list) -> bool:
+    """Detect if a chain event belongs to a subagent.
+
+    Checks the chain name and tags for subagent indicators.
+    DeepAgents subagent spawns create nested chains whose names
+    contain ``subagent`` or tags include ``subagent``.
+    """
+    name_lower = name.lower()
+    if "subagent" in name_lower or "sub_agent" in name_lower:
+        return True
+    for tag in tags:
+        if "subagent" in str(tag).lower():
+            return True
+    return False
 
 
 async def _generate_suggestions(llm: Any, messages: list[dict]) -> list[str]:

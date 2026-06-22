@@ -14,11 +14,12 @@
         @close="visible = false"
       />
       <div class="agent-messages">
-        <SessionList
+        <ThreadPicker
           v-if="showSessions"
           :sessions="session.sessions.value" :activeId="session.sessionId.value"
           @select="(id: string) => { onSwitchSession(id); showSessions = false }"
           @delete="onDeleteSession"
+          @new="() => { onNewSession(); showSessions = false }"
         />
         <ChatView v-else />
       </div>
@@ -31,7 +32,7 @@ import { ref, onMounted } from 'vue'
 import FloatingButton from './agent/FloatingButton.vue'
 import AgentSidebar from './agent/AgentSidebar.vue'
 import AgentHeader from './agent/AgentHeader.vue'
-import SessionList from './agent/SessionList.vue'
+import ThreadPicker from './agent/ThreadPicker.vue'
 import ChatView from './agent/ChatView.vue'
 import { useChatSession } from '@/composables/useChatSession'
 import { listProcesses } from '@/api/agent'

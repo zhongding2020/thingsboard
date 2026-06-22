@@ -214,6 +214,7 @@ export function useAgentStream(sessionId: string) {
     messages.value = []
     suggestions.value = []
     todos.value = []
+    debugEvents.value = []
     error.value = ''
   }
 

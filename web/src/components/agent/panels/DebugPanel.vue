@@ -90,6 +90,8 @@ const props = defineProps<{
   events: DebugEvent[]
 }>()
 
+const emit = defineEmits<{ clear: [] }>()
+
 // ---------------------------------------------------------------------------
 // Collapse state
 // ---------------------------------------------------------------------------
@@ -187,8 +189,7 @@ function formatTime(ts: number): string {
 // Clear
 // ---------------------------------------------------------------------------
 function clearEvents() {
-  // Replace the array in-place via splice
-  props.events.splice(0, props.events.length)
+  emit('clear')
 }
 
 // ---------------------------------------------------------------------------

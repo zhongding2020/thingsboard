@@ -103,6 +103,7 @@
         <DebugPanel
           v-if="showDebug"
           :events="debugEvents"
+          @clear="debugEvents.length = 0"
         />
 
         <!-- Input -->

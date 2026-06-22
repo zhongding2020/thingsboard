@@ -259,8 +259,19 @@ def create_analysis_tools(
     @with_retry()
     async def run_spc(device_id: str, field: str = "") -> str:
         """对设备的工艺参数进行 SPC 监控分析。field 可选指定字段。"""
-        req = SpcRequest(device_id=device_id, field=field or None)
-        result = await analysis_service.spc(req)
+        try:
+            req = SpcRequest(device_id=device_id, field=field or None)
+            result = await analysis_service.spc(req)
+        except Exception as e:
+            msg = str(e)
+            if "No samples" in msg or "INSUFFICIENT" in msg:
+                return (
+                    f"## SPC 监控: {field or '全部字段'}\n\n"
+                    f"设备 `{device_id}` 暂无生产数据，无法执行 SPC 分析。\n\n"
+                    f"建议：先通过数据接入网关上报工艺参数，或使用 `process-opt-mock` 生成模拟数据。"
+                )
+            return f"SPC 分析失败: {msg}"
+
         lines = [f"## SPC 监控: {field or '全部字段'}", ""]
         if result.overview:
             lines.append("| 字段 | 均值 | 标准差 | USL | LSL | Cpk | 异常值 | 状态 |")

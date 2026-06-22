@@ -72,6 +72,11 @@ def register_agent_routes(
                         yield f"data: {err}\n\n".encode()
                         yield b'data: {"type":"session.status","status":"idle"}\n\n'
                         break
+                    # Thinking events: pass through directly (bypass _map_event)
+                    if event.get("type") in ("thinking.start", "thinking.delta", "thinking.done"):
+                        data = json.dumps({"type": event["type"], "text": event.get("text", "")})
+                        yield f"data: {data}\n\n".encode()
+                        continue
                     sse = _map_event(event)
                     if sse:
                         yield sse

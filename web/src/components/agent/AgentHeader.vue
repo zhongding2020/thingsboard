@@ -12,17 +12,6 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <el-dropdown trigger="click" @command="$emit('switchProcess', $event)">
-        <el-button text size="small" class="model-btn">
-          {{ processTypeLabel }}
-          <el-icon><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item v-for="p in processTypes" :key="p.process_type" :command="p.process_type">{{ p.display_name }}</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
     </div>
     <div class="agent-header-title">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 9.5l-4 4 .5 5.5L12 16l-4.5 3 .5-5.5-4-4L9.5 8.5z"/></svg>
@@ -70,7 +59,6 @@ defineEmits<{
 }>()
 
 const currentModelLabel = computed(() => props.models.find(m => m.value === props.currentModel)?.label || '')
-const processTypeLabel = computed(() => props.processTypes.find(p => p.process_type === props.currentProcessType)?.display_name || '胶固')
 </script>
 
 <style scoped>

@@ -56,6 +56,7 @@ class TestCreateProcessAgent:
                     create_deep_agent=DEFAULT,
                     FilesystemMiddleware=DEFAULT,
                     SummarizationMiddleware=DEFAULT,
+                    StateBackend=DEFAULT,
                 ) as mocks:
                     mock_get_cap.return_value = [
                         s for s in mock_registry.values() if s.get("type") == "capability"
@@ -80,6 +81,7 @@ class TestCreateProcessAgent:
                     create_deep_agent=DEFAULT,
                     FilesystemMiddleware=DEFAULT,
                     SummarizationMiddleware=DEFAULT,
+                    StateBackend=DEFAULT,
                 ) as mocks:
                     mock_get_cap.return_value = []
 

@@ -19,6 +19,7 @@ SKILL_REGISTRY: dict[str, dict] = discover_skills()
 create_deep_agent: Any = None  # set on first call
 FilesystemMiddleware: Any = None
 SummarizationMiddleware: Any = None
+StateBackend: Any = None
 
 
 async def create_process_agent(
@@ -62,24 +63,28 @@ async def create_process_agent(
         logger.warning("Skill tools not in pool: %s", missing)
 
     # 4. Lazy-load deepagents (deferred import for testability)
-    global create_deep_agent, FilesystemMiddleware, SummarizationMiddleware
+    global create_deep_agent, FilesystemMiddleware, SummarizationMiddleware, StateBackend
     if create_deep_agent is None:
         from deepagents import create_deep_agent as _create_deep_agent  # type: ignore[no-redef]
         from deepagents.middleware import (  # type: ignore[import-untyped]
             FilesystemMiddleware as _FilesystemMiddleware,
             SummarizationMiddleware as _SummarizationMiddleware,
         )
+        from deepagents.backends import StateBackend as _StateBackend  # type: ignore[import-untyped]
         create_deep_agent = _create_deep_agent
         FilesystemMiddleware = _FilesystemMiddleware
         SummarizationMiddleware = _SummarizationMiddleware
+        StateBackend = _StateBackend
 
     # 5. Assemble middleware stack
     # DeepAgents 0.6+ has built-in todo management and subagent spawning.
     # FilesystemMiddleware provides file operations for large result eviction.
     # SummarizationMiddleware auto-compresses long conversations.
+    # StateBackend stores files in LangGraph agent state (ephemeral, per-session).
+    backend = StateBackend()
     middleware: list[Any] = [
-        FilesystemMiddleware(),
-        SummarizationMiddleware(model=llm),
+        FilesystemMiddleware(backend=backend),
+        SummarizationMiddleware(model=llm, backend=backend),
     ]
 
     # 6. Create DeepAgent

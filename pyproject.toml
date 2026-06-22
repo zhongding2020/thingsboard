@@ -49,6 +49,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "process_opt.knowledge" = ["templates/*.json"]
+"process_opt.agent.skills" = ["*.md", "**/*.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

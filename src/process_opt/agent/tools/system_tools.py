@@ -101,6 +101,64 @@ def create_system_tools(
         return "\n".join(result)
 
     @tool
+    async def ask_user(
+        type: str,
+        title: str,
+        description: str = "",
+        options: str = "[]",
+        cascader_levels: str = "[]",
+        confirm_text: str = "",
+        cancel_text: str = "",
+        placeholder: str = "",
+        default_value: str = "",
+    ) -> str:
+        """Ask the user for structured input via an interactive UI widget.
+
+        Use this when you need the user to select, confirm, or input something
+        before proceeding. The frontend will render the appropriate widget
+        (dropdown, checkbox group, confirm buttons, etc.).
+
+        IMPORTANT: After calling this tool, STOP your current response and
+        tell the user to use the interactive widget above. Do NOT proceed
+        with analysis until the user responds in the next turn.
+
+        Args:
+            type: Widget type — one of "select", "multi_select", "confirm",
+                  "input", "cascader"
+            title: Prompt text shown to the user
+            description: Optional longer explanation
+            options: JSON array of {label, value, description?, disabled?}
+                     for select/multi_select types
+            cascader_levels: JSON array of {key, label, options} for cascader
+            confirm_text: Text for the confirm button (confirm type)
+            cancel_text: Text for the cancel button (confirm type)
+            placeholder: Placeholder text for input type
+            default_value: Pre-selected value if any
+        """
+        import json as _json
+        action: dict = {
+            "type": type,
+            "title": title,
+        }
+        if description:
+            action["description"] = description
+        if options and options != "[]":
+            action["options"] = _json.loads(options)
+        if cascader_levels and cascader_levels != "[]":
+            action["cascaderLevels"] = _json.loads(cascader_levels)
+        if confirm_text:
+            action["confirmText"] = confirm_text
+        if cancel_text:
+            action["cancelText"] = cancel_text
+        if placeholder:
+            action["placeholder"] = placeholder
+        if default_value:
+            action["defaultValue"] = _json.loads(default_value)
+
+        # action_id is assigned by SSE layer; tool just returns the payload
+        return _json.dumps({"action": action, "message": "等待用户通过前端交互组件选择..."})
+
+    @tool
     async def monitor_production_line(line_id: str) -> str:
         """对整条产线进行 SPC 监控总览。line_id: 产线ID。返回各设备的过程能力状态和产线整体评级。"""
         if analysis_service is None:
@@ -205,4 +263,5 @@ def create_system_tools(
         list_registered_devices,
         get_registered_device,
         monitor_production_line,
+        ask_user,
     ]

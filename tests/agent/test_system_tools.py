@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from process_opt.agent.tools.system_tools import create_system_tools
@@ -111,3 +113,68 @@ async def test_monitor_no_analysis_service(tools: list) -> None:
     tool = _find_tool(tools, "monitor_production_line")
     result = await tool.ainvoke({"line_id": "L1"})
     assert "不可用" in result
+
+
+@pytest.mark.asyncio
+async def test_ask_user_select_type(tools: list) -> None:
+    tool = _find_tool(tools, "ask_user")
+    result = await tool.ainvoke({
+        "type": "select",
+        "title": "请选择产线",
+        "options": json.dumps([
+            {"label": "注塑A线", "value": "L1"},
+            {"label": "注塑B线", "value": "L2"},
+        ]),
+    })
+    data = json.loads(result)
+    assert data["action"]["type"] == "select"
+    assert data["action"]["title"] == "请选择产线"
+    assert len(data["action"]["options"]) == 2
+    assert data["action"]["options"][0]["label"] == "注塑A线"
+
+
+@pytest.mark.asyncio
+async def test_ask_user_confirm_type(tools: list) -> None:
+    tool = _find_tool(tools, "ask_user")
+    result = await tool.ainvoke({
+        "type": "confirm",
+        "title": "确认批准？",
+        "confirm_text": "批准",
+        "cancel_text": "驳回",
+    })
+    data = json.loads(result)
+    assert data["action"]["type"] == "confirm"
+    assert data["action"]["confirmText"] == "批准"
+    assert data["action"]["cancelText"] == "驳回"
+
+
+@pytest.mark.asyncio
+async def test_ask_user_cascader_type(tools: list) -> None:
+    tool = _find_tool(tools, "ask_user")
+    result = await tool.ainvoke({
+        "type": "cascader",
+        "title": "请选择产线和设备",
+        "cascader_levels": json.dumps([
+            {"key": "line_id", "label": "产线", "options": [
+                {"label": "A线", "value": "L1"},
+                {"label": "B线", "value": "L2"},
+            ]},
+            {"key": "device_id", "label": "设备", "options": [
+                {"label": "设备1", "value": "D1"},
+                {"label": "设备2", "value": "D2"},
+            ]},
+        ]),
+    })
+    data = json.loads(result)
+    assert data["action"]["type"] == "cascader"
+    assert len(data["action"]["cascaderLevels"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_ask_user_minimal_args(tools: list) -> None:
+    tool = _find_tool(tools, "ask_user")
+    result = await tool.ainvoke({"type": "input", "title": "请输入目标值"})
+    data = json.loads(result)
+    assert data["action"]["type"] == "input"
+    assert data["action"]["title"] == "请输入目标值"
+    assert "options" not in data["action"]

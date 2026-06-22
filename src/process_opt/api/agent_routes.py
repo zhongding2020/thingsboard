@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -74,6 +75,13 @@ def register_agent_routes(
                     sse = _map_event(event)
                     if sse:
                         yield sse
+            except GeneratorExit:
+                # Client disconnected — cancel the backend task
+                logger.info("SSE client disconnected for session %s", session_id)
+                session.cancel()
+            except asyncio.CancelledError:
+                logger.info("SSE stream cancelled for session %s", session_id)
+                session.cancel()
             except Exception as e:
                 logger.error("SSE stream error: %s", e)
 

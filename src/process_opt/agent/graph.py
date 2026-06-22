@@ -105,18 +105,36 @@ class AgentSession:
         }
         self.event_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._running = False
+        self._task: asyncio.Task | None = None
         self.last_active = time.monotonic()
+
+    def cancel(self) -> None:
+        """Cancel the running agent task and drain the event queue."""
+        logger.info("Cancelling session %s", self.session_id)
+        if self._task and not self._task.done():
+            self._task.cancel()
+            self._task = None
+        self._running = False
+        # Drain stale events
+        while not self.event_queue.empty():
+            try:
+                self.event_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
 
     async def send_message(self, text: str) -> None:
         from langchain_core.messages import HumanMessage
 
         if self._running:
-            return
+            # Cancel previous run if user sent a new message while running
+            self.cancel()
+            # Brief yield to allow cancellation to propagate
+            await asyncio.sleep(0.05)
 
         self.state["messages"].append(HumanMessage(content=text))
         self.state["next"] = "supervisor"
         self._running = True
-        asyncio.create_task(self._run_with_thinking(text))
+        self._task = asyncio.create_task(self._run_with_thinking(text))
 
     async def _run_with_thinking(self, text: str) -> None:
         """Generate thinking plan before executing graph."""

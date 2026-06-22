@@ -11,7 +11,7 @@
   </div>
 
   <!-- Done result — dispatch to renderer -->
-  <div v-else class="my-1 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs bg-white dark:bg-gray-900 max-w-[95%]">
+  <div v-else-if="tc.status === 'done'" class="my-1 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs bg-white dark:bg-gray-900 max-w-[95%]">
     <div class="flex items-center gap-2 mb-2">
       <span class="text-green-500">✓</span>
       <span class="font-medium text-gray-500 dark:text-gray-400">

@@ -165,7 +165,11 @@ def _map_event(event: dict) -> bytes | None:
         output = event.get("data", {}).get("output", "")
         start_time = _tool_start_times.pop(run_id, None)
         duration_ms = round((time.time() - start_time) * 1000) if start_time else 0
-        output_str = str(output)
+        # Extract content: ToolMessage object → .content, else str
+        if hasattr(output, 'content'):
+            output_str = str(output.content)
+        else:
+            output_str = str(output)
         data = json.dumps({"type": "tool.result", "name": name, "data": output_str, "run_id": run_id, "duration_ms": duration_ms})
         return f"data: {data}\n\n".encode()
 

@@ -32,6 +32,16 @@
         :tc="tc"
       />
 
+      <!-- Subagent cards -->
+      <SubagentCard
+        v-for="(sa, k) in msg.subagents"
+        :key="k"
+        :name="sa.name"
+        :content="sa.content"
+        :status="sa.status"
+        :open="sa.open"
+      />
+
       <!-- Action buttons (only when not streaming) -->
       <div
         v-if="!isStreaming"
@@ -60,6 +70,7 @@
 import TextBlock from './TextBlock.vue'
 import ThinkingBlock from './ThinkingBlock.vue'
 import ToolCallCard from './ToolCallCard.vue'
+import SubagentCard from './SubagentCard.vue'
 import type { ChatMessage } from '@/composables/useAgentStream'
 
 defineProps<{ msg: ChatMessage; isStreaming: boolean }>()

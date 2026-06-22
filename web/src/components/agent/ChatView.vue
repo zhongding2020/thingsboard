@@ -1,103 +1,176 @@
 <template>
-  <div class="agent-messages" ref="msgRef">
-    <div v-if="!messages.length && !loading" class="agent-welcome">
-      <div class="welcome-content" v-html="welcomeHtml" />
+  <div class="flex flex-col h-full bg-white dark:bg-gray-950">
+    <!-- Messages area -->
+    <div ref="msgRef" class="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+      <!-- Welcome -->
+      <div
+        v-if="!msgs.length && !loading"
+        class="p-5 text-gray-500 dark:text-gray-400"
+      >
+        <div v-html="welcomeHtml" />
+      </div>
+
+      <!-- Message cards -->
+      <MessageCard
+        v-for="(msg, i) in msgs"
+        :key="i"
+        :msg="msg"
+        :isStreaming="loading && i === msgs.length - 1 && msg.role === 'assistant'"
+        @copy="copyMsg(msg)"
+        @regenerate="onRegenerate(i)"
+      />
+
+      <!-- Loading dots (thinking phase with no content yet) -->
+      <div
+        v-if="loading && lastMsg?.role === 'assistant' && !lastMsg?.content && !lastMsg?.toolCalls?.length"
+        class="flex items-center gap-1.5 px-4 py-2"
+      >
+        <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0ms" />
+        <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 150ms" />
+        <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 300ms" />
+      </div>
+
+      <!-- Suggestions -->
+      <div v-if="suggestions.length && !loading" class="flex flex-wrap gap-2">
+        <button
+          v-for="(q, i) in suggestions"
+          :key="i"
+          class="px-3 py-1.5 text-xs rounded-full border border-gray-200 dark:border-gray-700 bg-transparent text-gray-500 dark:text-gray-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors"
+          @click="onSend(q)"
+        >{{ q }}</button>
+      </div>
     </div>
-    <ChatBubble
-      v-for="(msg, i) in messages" :key="i"
-      :msg="msg" :msgIndex="i" :isStreaming="loading && i === messages.length - 1"
-      @copy="copyMsg" @regenerate="onRegenerate"
+
+    <!-- Error bar -->
+    <div
+      v-if="error"
+      class="px-4 py-1.5 text-xs text-red-500 border-t border-red-100 dark:border-red-900"
+    >{{ error }}</div>
+
+    <!-- Phase indicator -->
+    <div
+      v-if="currentPhase"
+      class="px-4 py-1.5 text-xs text-indigo-500 border-t border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950"
+    >
+      📍 当前阶段: {{ currentPhase }}
+    </div>
+
+    <!-- Input -->
+    <ChatInput
+      :disabled="loading"
+      @send="onSend"
+      @upload="onUpload"
+      @startWorkflow="onStartWorkflow"
+      @stop="cancel"
     />
-    <ChatLoading v-if="loading" />
-    <ChatSuggestions v-if="suggestions.length && !loading" :questions="suggestions" @select="onSuggestion" />
-  </div>
-  <div v-if="error" class="agent-error">{{ error }}</div>
-  <div ref="inputArea">
-    <PhaseIndicator v-if="workflowPhase" :phase="workflowPhase" />
-    <ChatInput :disabled="loading" @send="onSend" @upload="onUpload" @startWorkflow="onStartWorkflow" @stop="cancel()" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, shallowRef, nextTick } from 'vue'
 import { marked } from 'marked'
-import ChatBubble from './ChatBubble.vue'
-import ChatLoading from './ChatLoading.vue'
-import ChatSuggestions from './ChatSuggestions.vue'
+import MessageCard from './MessageCard.vue'
 import ChatInput from './ChatInput.vue'
-import PhaseIndicator from './PhaseIndicator.vue'
-import { useChatMessages } from '@/composables/useChatMessages'
-import { useChatStream } from '@/composables/useChatStream'
+import { useAgentStream } from '@/composables/useAgentStream'
 import { useChatSession } from '@/composables/useChatSession'
 import { useFileUpload } from '@/composables/useFileUpload'
+import type { ChatMessage } from '@/composables/useAgentStream'
 
 const { sessionId, createNewSession } = useChatSession()
-const { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, addThinking, copyMessage, regenerateMessage } = useChatMessages()
-const { loading, error, sendAndStream, cancel } = useChatStream()
 const { upload } = useFileUpload()
 
 const msgRef = ref<HTMLDivElement>()
 
+// ---------------------------------------------------------------------------
+// Lazy stream initialization — avoids the sessionId reactivity bug.
+// useAgentStream captures sessionId by VALUE in its closure. If called with
+// an empty string, send() will early-return.  We defer creation until the
+// session is real, and wrap the return value in a shallowRef so computed
+// accessors always read from the *current* stream's reactive refs.
+// ---------------------------------------------------------------------------
+const streamRef = shallowRef<ReturnType<typeof useAgentStream> | null>(null)
+
+/** Ensure a stream exists for the current session, creating one if needed. */
+function ensureStream(): ReturnType<typeof useAgentStream> {
+  if (!streamRef.value) {
+    streamRef.value = useAgentStream(sessionId.value)
+  }
+  return streamRef.value
+}
+
+// Computed accessors — proxy through to the current stream's reactive refs.
+// When streamRef is reassigned, these automatically re-wire to the new stream.
+const msgs = computed(() => streamRef.value?.messages.value ?? [])
+const loading = computed(() => streamRef.value?.loading.value ?? false)
+const error = computed(() => streamRef.value?.error.value ?? '')
+const suggestions = computed(() => streamRef.value?.suggestions.value ?? [])
+const currentPhase = computed(() => streamRef.value?.currentPhase.value ?? '')
+
+// ---------------------------------------------------------------------------
+// Welcome message
+// ---------------------------------------------------------------------------
 const welcomeMd = `## 🤖 工艺参数分析助手
 
-输入 \`?\` 随时查看此帮助。支持 **8 种** 制造工艺的智能化分析。
+输入 \`?\` 查看帮助。支持 **8 种** 制造工艺的智能化分析。
 
-| 功能 | 功能说明 | 示例 |
-|------|----------|------|
-| 📊 数据画像 | 自动统计均值/标准差/极值/异常值 | 「分析D1设备的数据画像」 |
-| 🔗 相关性分析 | Pearson/Spearman 系数 + 热力图 | 「分析温度与剪切强度的相关性」 |
-| 📈 回归建模 | Linear/PLS 回归，R²/RMSE/系数 | 「建立固化温度、时间对强度的回归」 |
-| ⭐ 特征重要性 | 随机森林排序关键影响因子 | 「哪些参数对气泡率影响最大」 |
-| 📉 SPC 监控 | I-MR 控制图、Cp/Cpk 过程能力 | 「查看 wave-solder-004 的 SPC」 |
-| 🧪 DOE 实验 | 全因子/Box-Behnken/田口 + ANOVA | 「为固化工艺设计 Box-Behnken 实验」 |
-| 🎯 参数推荐 | 网格/LHS 搜索 + 工艺规则校验 | 「推荐提高剪切强度的参数」 |
-| 🏭 系统查询 | 产线/设备/参数集/平台统计 | 「系统有哪些产线」 |
-| 🔍 产品追溯 | 按条码追溯完整生产链路 | 「追溯条码 B001」 |
-| 🔄 工艺调优 | Define→Explore→Analyze→Optimize→Verify | 输入「优化剪切强度」启动 |
+| 功能 | 示例 |
+|------|------|
+| 📊 数据画像 | 「分析D1设备的数据画像」 |
+| 🔗 相关性分析 | 「分析温度与剪切强度的相关性」 |
+| 📈 回归建模 | 「建立固化温度、时间对强度的回归」 |
+| ⭐ 特征重要性 | 「哪些参数对气泡率影响最大」 |
+| 📉 SPC 监控 | 「查看 wave-solder-004 的 SPC」 |
+| 🧪 DOE 实验 | 「为固化工艺设计 Box-Behnken 实验」 |
+| 🎯 参数推荐 | 「推荐提高剪切强度的参数」 |
+| 🏭 系统查询 | 「系统有哪些产线」 |
+| 🔍 产品追溯 | 「追溯条码 B001」 |
+| 🔄 工艺调优 | 输入「优化剪切强度」启动 |
 
 点击下方 ⭐ **工艺调优** 开始引导式参数优化。`
 
 const welcomeHtml = computed(() => marked.parse(welcomeMd, { breaks: true, gfm: true }) as string)
 
-function scrollBottom() {
-  nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight })
-}
-
-function makeCallbacks(assistantIdx: number) {
-  return {
-    onDelta: (delta: string) => { appendDelta(assistantIdx, delta); scrollBottom() },
-    onToolCall: (name: string, args: any) => { addToolCall(assistantIdx, name, args); scrollBottom() },
-    onToolResult: (name: string, data: string, durationMs: number) => { addToolResult(assistantIdx, name, data, durationMs); scrollBottom() },
-    onDone: () => { scrollBottom() },
-    onError: () => { scrollBottom() },
-    onSuggestions: (questions: string[]) => { suggestions.value = questions },
-    onTrace: (node: string, text: string) => { addTrace(assistantIdx, node, text); scrollBottom() },
-    onPhase: (phase: string) => { workflowPhase.value = phase },
-    onThinking: (() => {
-      let buf = ''
-      return (type: string, text?: string) => {
-        if (type === 'thinking.start') { buf = '' }
-        else if (type === 'thinking.delta') { buf += (text || ''); scrollBottom() }
-        else if (type === 'thinking.done' && buf) { addThinking(assistantIdx, buf); scrollBottom() }
-      }
-    })(),
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const lastMsg = computed(() => {
+  const arr = msgs.value
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].role === 'assistant') return arr[i]
   }
+  return null
+})
+
+function scrollBottom() {
+  nextTick(() => {
+    if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight
+  })
 }
 
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
 async function onSend(text: string) {
-  addUserMessage(text)
-  scrollBottom()
-  suggestions.value = []
-
+  // Ensure session exists
   if (!sessionId.value) {
     await createNewSession()
     sessionStorage.setItem('opencode-session', sessionId.value)
   }
 
-  const assistantIdx = addAssistantPlaceholder()
+  // Lazily create stream now that we have a real sessionId.
+  // If streamRef.value already exists (created by a previous send), reuse it;
+  // the send() closure captured the sessionId at creation time, which is already valid.
+  const stream = ensureStream()
+  await stream.send(text)
   scrollBottom()
+}
 
-  await sendAndStream(sessionId.value, text, makeCallbacks(assistantIdx))
+function cancel() {
+  streamRef.value?.cancel()
+}
+
+function onStartWorkflow() {
+  onSend('__start_workflow__')
 }
 
 async function onUpload(file: File) {
@@ -106,50 +179,32 @@ async function onUpload(file: File) {
     sessionStorage.setItem('opencode-session', sessionId.value)
   }
   await upload(file, {
-    onSuccess: (datasetId: string, features: string[], targets: string[]) => {
-      addUserMessage('上传文件: ' + file.name)
-      loading.value = true
-      scrollBottom()
-      suggestions.value = []
-
-      const assistantIdx = addAssistantPlaceholder()
-      scrollBottom()
-
-      const msg = `对数据集 ${datasetId} 做完整相关性分析，包含相关性热力图。特征字段: ${features.join(',')}，目标字段: ${targets.join(',')}`
-      sendAndStream(sessionId.value, msg, makeCallbacks(assistantIdx))
+    onSuccess: (datasetId, features, targets) => {
+      onSend(
+        `对数据集 ${datasetId} 做完整相关性分析，包含相关性热力图。特征字段: ${features.join(',')}，目标字段: ${targets.join(',')}`,
+      )
     },
-    onError: (msg: string) => { error.value = msg },
+    onError: (msg) => {
+      const stream = ensureStream()
+      stream.error.value = msg
+    },
   })
 }
 
 function onRegenerate(idx: number) {
   if (loading.value) return
-  const text = regenerateMessage(idx)
-  if (text) onSend(text)
+  const stream = streamRef.value
+  if (!stream) return
+  const arr = stream.messages.value
+  const userMsg = arr[idx - 1]
+  if (!userMsg || userMsg.role !== 'user') return
+  // Remove the user message and the assistant response that followed it
+  arr.splice(idx - 1, 2)
+  onSend(userMsg.content)
 }
 
-function onSuggestion(q: string) {
-  onSend(q)
-}
-
-function copyMsg(msg: any) {
-  copyMessage(msg)
-}
-
-function onStartWorkflow() {
-  onSend('__start_workflow__')
+function copyMsg(msg: ChatMessage) {
+  const text = msg.content || ''
+  navigator.clipboard.writeText(text).catch(() => {})
 }
 </script>
-
-<style scoped>
-.agent-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.agent-error { padding: 6px 14px; font-size: 12px; color: var(--el-color-danger); border-top: 1px solid var(--el-border-color-light); }
-.agent-welcome { padding: 20px 18px; color: var(--el-text-color-secondary); }
-.agent-welcome :deep(h2) { font-size: 16px; color: #6366f1; margin: 0 0 8px; }
-.agent-welcome :deep(p) { margin: 4px 0; font-size: 13px; }
-.agent-welcome :deep(table) { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
-.agent-welcome :deep(th), .agent-welcome :deep(td) { border: 1px solid var(--el-border-color-light); padding: 4px 8px; text-align: left; }
-.agent-welcome :deep(th) { background: var(--el-fill-color); }
-.agent-welcome :deep(code) { background: var(--el-fill-color-dark); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
-
-</style>

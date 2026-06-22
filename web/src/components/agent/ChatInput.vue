@@ -1,38 +1,59 @@
 <template>
-  <div class="agent-input">
-    <div class="input-card" :class="{ focused }">
+  <div class="px-4 pb-4 pt-2">
+    <div
+      class="border border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-900 overflow-hidden transition-colors focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-400/20"
+    >
       <textarea
         v-model="text"
-        class="input-textarea"
+        class="w-full border-none outline-none bg-transparent text-sm leading-relaxed resize-none font-sans text-gray-800 dark:text-gray-200 placeholder-gray-400 px-4 pt-3 pb-1 box-border"
         placeholder="输入分析需求..."
         :disabled="disabled"
         rows="3"
-        @focus="focused = true"
-        @blur="focused = false"
         @keydown.enter.exact.prevent="emitSend"
         @keydown.shift.enter.prevent="text += '\n'"
       />
-      <div class="toolbar">
-        <div class="toolbar-left">
-          <button class="tool-btn workflow-btn" title="工艺参数调优向导" @click="$emit('startWorkflow')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2L22 9.5l-5.7 4.8L17.8 22 12 18l-5.8 4 1.3-7.7L2 9.5l7.6-.3z"/></svg>
-            <span class="tool-label">工艺调优</span>
+      <div class="flex items-center justify-between px-3 pb-3">
+        <div class="flex items-center gap-1">
+          <button
+            class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-transparent text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950 border-none cursor-pointer transition-colors"
+            @click="$emit('startWorkflow')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2L22 9.5l-5.7 4.8L17.8 22 12 18l-5.8 4 1.3-7.7L2 9.5l7.6-.3z"/></svg>
+            工艺调优
           </button>
-          <input type="file" ref="fileInputRef" accept=".xlsx,.xls,.csv" @change="onFileChange" style="display:none" />
-          <button class="tool-btn" title="上传数据文件 (.xlsx/.xls/.csv)" @click="(fileInputRef as HTMLInputElement).click()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span class="tool-label">上传文件</span>
+          <input
+            ref="fileRef"
+            type="file"
+            class="hidden"
+            accept=".xlsx,.xls,.csv"
+            @change="onFileChange"
+          />
+          <button
+            class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-transparent text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border-none cursor-pointer transition-colors"
+            @click="(fileRef as HTMLInputElement)?.click()"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            上传
           </button>
         </div>
-        <div class="toolbar-right">
-          <span v-if="text.trim()" class="char-hint">{{ text.length }}</span>
-          <button v-if="disabled" class="send-btn stop-btn" @click="$emit('stop')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
-            <span class="send-label">停止</span>
+        <div class="flex items-center gap-2">
+          <span v-if="text.trim()" class="text-[11px] tabular-nums text-gray-300">{{ text.length }}</span>
+          <button
+            v-if="disabled"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-red-500 hover:bg-red-600 text-white border-none cursor-pointer transition-colors"
+            @click="$emit('stop')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+            停止
           </button>
-          <button v-else class="send-btn" :disabled="!text.trim()" @click="emitSend">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
-            <span class="send-label">发送</span>
+          <button
+            v-else
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white border-none cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!text.trim()"
+            @click="emitSend"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+            发送
           </button>
         </div>
       </div>
@@ -44,11 +65,15 @@
 import { ref } from 'vue'
 
 defineProps<{ disabled: boolean }>()
-const emit = defineEmits<{ send: [text: string]; upload: [file: File]; startWorkflow: []; stop: [] }>()
+const emit = defineEmits<{
+  send: [text: string]
+  upload: [file: File]
+  startWorkflow: []
+  stop: []
+}>()
 
 const text = ref('')
-const fileInputRef = ref<HTMLInputElement>()
-const focused = ref(false)
+const fileRef = ref<HTMLInputElement>()
 
 function emitSend() {
   const val = text.value.trim()
@@ -64,103 +89,3 @@ function onFileChange(e: Event) {
   target.value = ''
 }
 </script>
-
-<style scoped>
-.agent-input {
-  padding: 12px 14px 14px;
-  background: transparent;
-}
-.input-card {
-  border: 1.5px solid var(--el-border-color);
-  border-radius: 14px;
-  background: var(--el-fill-color);
-  overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.input-card.focused {
-  border-color: var(--el-color-primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-.input-textarea {
-  width: 100%;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 14px;
-  line-height: 1.6;
-  resize: none;
-  font-family: inherit;
-  color: var(--el-text-color-primary);
-  padding: 12px 14px 4px;
-  box-sizing: border-box;
-}
-.input-textarea::placeholder {
-  color: var(--el-text-color-placeholder);
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 10px 8px;
-}
-.toolbar-left,
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--el-text-color-regular);
-  cursor: pointer;
-  font-size: 12px;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-.tool-btn:hover {
-  background: var(--el-fill-color-light);
-}
-.tool-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.send-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 14px;
-  border: none;
-  border-radius: 6px;
-  background: var(--el-color-primary);
-  color: #fff;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: inherit;
-  transition: opacity 0.15s, background 0.15s;
-}
-.send-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-.send-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.send-label {
-  font-size: 12px;
-}
-.char-hint {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--el-text-color-placeholder);
-}
-.workflow-btn { color: var(--el-color-warning); }
-.workflow-btn:hover { background: var(--el-color-warning-light-9); }
-.stop-btn { background: var(--el-color-danger) !important; }
-.stop-btn:hover { opacity: 0.85; }
-</style>

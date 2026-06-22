@@ -14,6 +14,10 @@
       />
       <div class="toolbar">
         <div class="toolbar-left">
+          <button class="tool-btn workflow-btn" title="工艺参数调优向导" @click="$emit('startWorkflow')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2L22 9.5l-5.7 4.8L17.8 22 12 18l-5.8 4 1.3-7.7L2 9.5l7.6-.3z"/></svg>
+            <span class="tool-label">工艺调优</span>
+          </button>
           <input type="file" ref="fileInputRef" accept=".xlsx,.xls,.csv" @change="onFileChange" style="display:none" />
           <button class="tool-btn" title="上传数据文件 (.xlsx/.xls/.csv)" @click="(fileInputRef as HTMLInputElement).click()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -37,7 +41,7 @@
 import { ref } from 'vue'
 
 defineProps<{ disabled: boolean }>()
-const emit = defineEmits<{ send: [text: string]; upload: [file: File] }>()
+const emit = defineEmits<{ send: [text: string]; upload: [file: File]; startWorkflow: [] }>()
 
 const text = ref('')
 const fileInputRef = ref<HTMLInputElement>()
@@ -152,4 +156,6 @@ function onFileChange(e: Event) {
   font-variant-numeric: tabular-nums;
   color: var(--el-text-color-placeholder);
 }
+.workflow-btn { color: var(--el-color-warning); }
+.workflow-btn:hover { background: var(--el-color-warning-light-9); }
 </style>

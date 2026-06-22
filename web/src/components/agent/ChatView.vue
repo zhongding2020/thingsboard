@@ -13,7 +13,10 @@
     <ChatSuggestions v-if="suggestions.length && !loading" :questions="suggestions" @select="onSuggestion" />
   </div>
   <div v-if="error" class="agent-error">{{ error }}</div>
-  <ChatInput :disabled="loading" @send="onSend" @upload="onUpload" />
+  <div ref="inputArea">
+    <PhaseIndicator v-if="workflowPhase" :phase="workflowPhase" />
+    <ChatInput :disabled="loading" @send="onSend" @upload="onUpload" @startWorkflow="onStartWorkflow" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -22,13 +25,14 @@ import ChatBubble from './ChatBubble.vue'
 import ChatLoading from './ChatLoading.vue'
 import ChatSuggestions from './ChatSuggestions.vue'
 import ChatInput from './ChatInput.vue'
+import PhaseIndicator from './PhaseIndicator.vue'
 import { useChatMessages } from '@/composables/useChatMessages'
 import { useChatStream } from '@/composables/useChatStream'
 import { useChatSession } from '@/composables/useChatSession'
 import { useFileUpload } from '@/composables/useFileUpload'
 
 const { sessionId, createNewSession } = useChatSession()
-const { messages, suggestions, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage } = useChatMessages()
+const { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage } = useChatMessages()
 const { loading, error, sendAndStream } = useChatStream()
 const { upload } = useFileUpload()
 
@@ -47,6 +51,7 @@ function makeCallbacks(assistantIdx: number) {
     onError: () => { scrollBottom() },
     onSuggestions: (questions: string[]) => { suggestions.value = questions },
     onTrace: (node: string, text: string) => { addTrace(assistantIdx, node, text); scrollBottom() },
+    onPhase: (phase: string) => { workflowPhase.value = phase },
   }
 }
 
@@ -100,6 +105,10 @@ function onSuggestion(q: string) {
 
 function copyMsg(msg: any) {
   copyMessage(msg)
+}
+
+function onStartWorkflow() {
+  onSend('__start_workflow__')
 }
 </script>
 

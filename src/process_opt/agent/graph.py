@@ -83,6 +83,13 @@ class AgentSession:
             "process_type": process_type,
             "intent": "",
             "next": "supervisor",
+            "mode": "chat",
+            "phase": "",
+            "goal": None,
+            "baseline": None,
+            "recommendation": None,
+            "dataset_id": "",
+            "experiment_plan_id": 0,
         }
         self.event_queue: asyncio.Queue[dict] = asyncio.Queue()
         self._running = False

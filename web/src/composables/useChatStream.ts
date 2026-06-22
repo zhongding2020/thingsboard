@@ -25,6 +25,7 @@ export function useChatStream() {
       onError: (msg: string) => void
       onSuggestions: (questions: string[]) => void
       onTrace?: (node: string, text: string) => void
+      onPhase?: (phase: string, prevPhase: string, action: string) => void
     },
   ) {
     error.value = ''
@@ -41,6 +42,7 @@ export function useChatStream() {
         (err: string) => { error.value = err; loading.value = false; activeStream = null; callbacks.onError(err) },
         callbacks.onSuggestions,
         callbacks.onTrace,
+        callbacks.onPhase,
       )
     } catch (e: any) {
       error.value = '请求失败: ' + (e.message || '')

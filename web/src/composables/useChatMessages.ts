@@ -4,6 +4,7 @@ interface ChatMessage { role: 'user' | 'assistant'; text: string; parts?: any[] 
 
 const messages = ref<ChatMessage[]>([])
 const suggestions = ref<string[]>([])
+const workflowPhase = ref('')
 
 export function useChatMessages() {
   function addUserMessage(text: string) {
@@ -58,5 +59,5 @@ export function useChatMessages() {
 
   function clear() { messages.value = []; suggestions.value = [] }
 
-  return { messages, suggestions, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage, clear }
+  return { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage, clear }
 }

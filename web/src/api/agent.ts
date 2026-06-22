@@ -100,6 +100,7 @@ export function streamEvents(
   onError: (err: string) => void,
   onSuggestions?: (questions: string[]) => void,
   onTrace?: (node: string, text: string) => void,
+  onPhase?: (phase: string, prevPhase: string, action: string) => void,
 ): StreamEvents {
   const controller = new AbortController()
 
@@ -153,6 +154,9 @@ export function streamEvents(
                   onDone()
                   return
                 }
+                break
+              case 'phase.change':
+                if (onPhase) onPhase(event.phase, event.prev_phase || '', event.action || '')
                 break
               case 'suggestions':
                 if (onSuggestions && event.questions) {

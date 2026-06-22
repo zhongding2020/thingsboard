@@ -204,3 +204,65 @@ async def test_health_returns_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
+import json as _json_mod
+
+
+@pytest.mark.asyncio
+async def test_ask_user_emits_interactive_prompt_not_tool_call() -> None:
+    """Verify ask_user tool start emits interactive.prompt, not tool.call."""
+    from process_opt.api.agent_routes import _map_event
+
+    event = {
+        "event": "on_tool_start",
+        "name": "ask_user",
+        "run_id": "run-123",
+        "data": {
+            "input": {
+                "type": "select",
+                "title": "请选择产线",
+                "options": '[{"label":"A线","value":"L1"}]',
+            }
+        },
+    }
+    result = _map_event(event, set())
+    assert result is not None
+    decoded = _json_mod.loads(result.decode().lstrip("data: "))
+    assert decoded["type"] == "interactive.prompt"
+    assert decoded["action"]["type"] == "select"
+    assert decoded["action"]["title"] == "请选择产线"
+    assert "id" in decoded["action"]
+
+
+@pytest.mark.asyncio
+async def test_ask_user_tool_end_is_skipped() -> None:
+    """Verify ask_user tool_end produces no SSE output."""
+    from process_opt.api.agent_routes import _map_event
+
+    event = {
+        "event": "on_tool_end",
+        "name": "ask_user",
+        "run_id": "run-123",
+        "data": {"output": "..."},
+    }
+    result = _map_event(event, set())
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_normal_tool_call_still_works() -> None:
+    """Verify non-ask_user tools still emit tool.call."""
+    from process_opt.api.agent_routes import _map_event
+
+    event = {
+        "event": "on_tool_start",
+        "name": "list_production_lines",
+        "run_id": "run-456",
+        "data": {"input": {}},
+    }
+    result = _map_event(event, set())
+    assert result is not None
+    decoded = _json_mod.loads(result.decode().lstrip("data: "))
+    assert decoded["type"] == "tool.call"
+    assert decoded["name"] == "list_production_lines"
+
+

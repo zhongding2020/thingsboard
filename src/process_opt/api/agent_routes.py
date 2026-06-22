@@ -100,14 +100,29 @@ def register_agent_routes(
         body = await request.json()
         session_id = body.get("session_id", "")
         text = body.get("text", "")
-        if not session_id or not text:
-            raise HTTPException(status_code=400, detail="session_id and text required")
+        action_responses = body.get("action_responses") or []
+
+        if not session_id:
+            raise HTTPException(status_code=400, detail="session_id required")
+        if not text and not action_responses:
+            raise HTTPException(status_code=400, detail="text or action_responses required")
 
         session = _sessions.get(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="会话已过期，请重新开始")
 
-        session["messages"].append({"role": "user", "content": text})
+        # Build user message content
+        content_parts: list[str] = []
+        if text:
+            content_parts.append(text)
+        if action_responses:
+            for ar in action_responses:
+                action_id = ar.get("action_id", "")
+                value = ar.get("value", {})
+                content_parts.append(f"[交互响应 action_id={action_id}]: {json.dumps(value, ensure_ascii=False)}")
+        content = "\n".join(content_parts)
+
+        session["messages"].append({"role": "user", "content": content})
         session["pending"] = True
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -256,12 +271,45 @@ def _map_event(event: dict, subagent_run_ids: set[str] | None = None) -> bytes |
     if kind == "on_tool_start":
         name = event.get("name", "")
         inp = event.get("data", {}).get("input", {})
+
+        # ask_user is intercepted — emit interactive.prompt instead of tool.call
+        if name == "ask_user":
+            action_id = f"act_{uuid.uuid4().hex[:8]}"
+            action_data: dict[str, Any] = {"id": action_id}
+            # Copy scalar fields with camelCase key mapping
+            for src, dst in (("type", "type"), ("title", "title"),
+                             ("description", "description"), ("placeholder", "placeholder")):
+                if inp.get(src):
+                    action_data[dst] = inp[src]
+            if inp.get("confirm_text"):
+                action_data["confirmText"] = inp["confirm_text"]
+            if inp.get("cancel_text"):
+                action_data["cancelText"] = inp["cancel_text"]
+            # Parse JSON string fields to objects
+            for src, dst in (("options", "options"), ("cascader_levels", "cascaderLevels")):
+                raw = inp.get(src, "")
+                if raw and raw != "[]":
+                    try:
+                        action_data[dst] = json.loads(raw) if isinstance(raw, str) else raw
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+            if inp.get("default_value") and inp["default_value"]:
+                try:
+                    action_data["defaultValue"] = json.loads(inp["default_value"]) if isinstance(inp["default_value"], str) else inp["default_value"]
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            data = json.dumps({"type": "interactive.prompt", "action": action_data}, default=str)
+            return f"data: {data}\n\n".encode()
+
         args = {k: v for k, v in inp.items() if not k.startswith("_")}
         data = json.dumps({"type": "tool.call", "name": name, "args": args}, default=str)
         return f"data: {data}\n\n".encode()
 
     # Tool end
     if kind == "on_tool_end":
+        # Skip tool.result for ask_user — already handled as interactive.prompt
+        if event.get("name", "") == "ask_user":
+            return None
         output = event.get("data", {}).get("output", "")
         if hasattr(output, "content"):
             output_str = str(output.content)

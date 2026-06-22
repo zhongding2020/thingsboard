@@ -113,73 +113,48 @@ def create_supervisor_node(llm: BaseChatModel):
         ctx = _build_context(state)
 
         if mode == "workflow" and phase:
-            # Deterministic phase routing:
-            # STAY only when: (a) pending tool calls, or (b) last response was a tool result
-            # ADVANCE when: worker gave a text response with no pending tool calls
-            # BACK when: user clearly rejects/asks to redo
-            # FINISH when: last phase completed and no more phases
-
+            # Workflow routing: one user message → one worker response → FINISH
+            # Phase advancement happens when a NEW user message arrives (checked here)
             last_msg = state["messages"][-1] if state["messages"] else None
             is_tool_result = isinstance(last_msg, ToolMessage)
             has_tool_calls = _has_pending_tool_calls(state)
             is_ai_msg = isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None)
+            is_human = isinstance(last_msg, HumanMessage)
 
-            # Check for user back-request
-            user_wants_back = False
-            user_confirms = False
-            for msg in reversed(state["messages"]):
-                if isinstance(msg, HumanMessage):
-                    content = str(msg.content)
-                    back_keywords = ["不满意", "重做", "回退", "换一个", "重新"]
-                    user_wants_back = any(k in content for k in back_keywords)
-                    confirm_keywords = ["ok", "可以", "确认", "下一步", "继续", "好的", "行", "对", "是", "正确", "没错", "没问题", "就这样", "开始"]
-                    user_confirms = any(k in content.lower() for k in confirm_keywords)
-                    break
-
-            # Count how many times we've stayed in this phase
-            stay_count = sum(
-                1 for m in state["messages"]
-                if isinstance(m, AIMessage) and not getattr(m, "tool_calls", None)
-            )
-
-            if phase == "define" and user_confirms:
-                # User explicitly confirmed the goal → advance to Explore
-                return {"next": "analyzer", "phase": "explore", "phase_action": "ADVANCE", "prev_phase": "define"}
-
-            if user_wants_back and phase != "define":
-                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else 0
-                prev_phase = PHASE_ORDER[idx - 1] if idx > 0 else "define"
-                return {"next": "analyzer", "phase": prev_phase, "phase_action": "BACK", "prev_phase": phase}
-
-            if has_tool_calls or is_tool_result:
-                # Need tools to execute, or worker to interpret tool results
+            # Tool execution loop: need to execute tools or interpret results
+            if has_tool_calls:
+                return {"next": "tools"}
+            if is_tool_result:
                 return {"next": "analyzer", "phase": phase}
-            elif is_ai_msg and phase == "define":
-                # Define phase: do NOT auto-advance. Wait for user confirmation.
-                # User must explicitly confirm the goal before moving to Explore.
+
+            # Worker finished responding → FINISH this turn
+            if is_ai_msg:
+                return {"next": "FINISH", "phase": phase}
+
+            # New user message: check for phase transition signals
+            if is_human:
+                content = str(last_msg.content)
+                confirm_kw = ["ok", "可以", "确认", "下一步", "继续", "好的", "行", "对", "是", "正确", "没错", "没问题", "就这样", "开始"]
+                back_kw = ["不满意", "重做", "回退", "换一个", "重新"]
+
+                if any(k in content.lower() for k in confirm_kw):
+                    idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else -1
+                    next_phase = PHASE_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(PHASE_ORDER) else ""
+                    if next_phase:
+                        return {"next": "analyzer", "phase": next_phase, "phase_action": "ADVANCE", "prev_phase": phase}
+                    else:
+                        return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
+
+                if any(k in content for k in back_kw) and phase != "define":
+                    idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else 0
+                    prev_phase = PHASE_ORDER[idx - 1] if idx > 0 else "define"
+                    return {"next": "analyzer", "phase": prev_phase, "phase_action": "BACK", "prev_phase": phase}
+
+                # Regular user message in current phase → route to analyzer
                 return {"next": "analyzer", "phase": phase}
-            elif is_ai_msg and phase == "verify":
-                # Verify phase: worker responded → FINISH
-                return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
-            elif is_ai_msg:
-                # Worker gave a text response → advance to next phase
-                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else -1
-                next_phase = PHASE_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(PHASE_ORDER) else ""
-                if next_phase:
-                    return {"next": "analyzer", "phase": next_phase, "phase_action": "ADVANCE", "prev_phase": phase}
-                else:
-                    return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
-            elif stay_count > MAX_STAY_PER_PHASE:
-                # Safety: force advance if stuck
-                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else -1
-                next_phase = PHASE_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(PHASE_ORDER) else ""
-                if next_phase:
-                    logger.warning("Force advancing from %s after %d stays", phase, stay_count)
-                    return {"next": "analyzer", "phase": next_phase, "phase_action": "ADVANCE", "prev_phase": phase}
-                else:
-                    return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
-            else:
-                return {"next": "analyzer", "phase": phase}
+
+            # Fallback
+            return {"next": "FINISH"}
 
         # Chat mode routing
         prompt = (

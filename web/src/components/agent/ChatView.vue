@@ -242,7 +242,7 @@ import DebugPanel from './panels/DebugPanel.vue'
 import { useAgentStream } from '@/composables/useAgentStream'
 import { useChatSession } from '@/composables/useChatSession'
 import { useFileUpload } from '@/composables/useFileUpload'
-import type { ChatMessage, ActionResponse } from '@/composables/useAgentStream'
+import type { ChatMessage, ActionResponse, ToolCall, SubagentState, InteractiveAction } from '@/composables/useAgentStream'
 
 const { sessionId, createNewSession } = useChatSession()
 const { upload } = useFileUpload()
@@ -516,6 +516,7 @@ async function resolveAction(msg: ChatMessage, actionId: string, value: unknown)
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let thinkingBuf = ''
 
     while (true) {
       const { done, value } = await reader.read()
@@ -528,19 +529,114 @@ async function resolveAction(msg: ChatMessage, actionId: string, value: unknown)
         if (!trimmed.startsWith('data: ')) continue
         try {
           const event = JSON.parse(trimmed.slice(6))
-          if (event.type === 'message.delta') {
-            assistantMsg.content += event.text || ''
-          } else if (event.type === 'session.status' && event.status === 'idle') {
-            stream.loading.value = false
+          stream.debugEvents.value.push({
+            type: event.type,
+            name: event.node || event.name || event.phase || undefined,
+            timestamp: Date.now(),
+            payload: event,
+          })
+          switch (event.type) {
+            case 'message.delta':
+              assistantMsg.content += event.text || ''
+              break
+
+            case 'tool.call': {
+              const tc: ToolCall = {
+                name: event.node || event.name,
+                args: event.args || {},
+                status: 'pending',
+              }
+              assistantMsg.toolCalls = [...(assistantMsg.toolCalls || []), tc]
+              break
+            }
+
+            case 'tool.result': {
+              const tcs = assistantMsg.toolCalls || []
+              const last = [...tcs].reverse().find(t => t.name === (event.node || event.name) && t.status === 'pending')
+              if (last) {
+                last.result = event.data || ''
+                last.durationMs = event.duration_ms || 0
+                last.status = 'done'
+              }
+              break
+            }
+
+            case 'interactive.prompt': {
+              const action: InteractiveAction = {
+                ...event.action,
+                status: 'pending',
+              }
+              assistantMsg.actions = [...(assistantMsg.actions || []), action]
+              break
+            }
+
+            case 'subagent.start': {
+              const sa: SubagentState = {
+                name: event.node || event.name,
+                content: '',
+                status: 'running',
+                open: true,
+              }
+              assistantMsg.subagents = [...(assistantMsg.subagents || []), sa]
+              break
+            }
+
+            case 'subagent.delta': {
+              const sa = (assistantMsg.subagents || []).find(s => s.name === (event.node || event.name) && s.status === 'running')
+              if (sa) sa.content += event.text || ''
+              break
+            }
+
+            case 'subagent.end': {
+              const sa = (assistantMsg.subagents || []).find(s => s.name === (event.node || event.name) && s.status === 'running')
+              if (sa) sa.status = 'done'
+              break
+            }
+
+            case 'todo.update':
+              stream.todos.value = event.todos || []
+              break
+
+            case 'thinking.start':
+              thinkingBuf = ''
+              break
+            case 'thinking.delta':
+              thinkingBuf += event.text || ''
+              break
+            case 'thinking.done':
+              if (thinkingBuf) assistantMsg.thinking = thinkingBuf
+              break
+
+            case 'phase.change':
+              stream.currentPhase.value = event.phase
+              break
+
+            case 'suggestions':
+              stream.suggestions.value = event.questions || []
+              break
+
+            case 'session.status':
+              if (event.status === 'idle') {
+                stream.loading.value = false
+              }
+              break
+
+            case 'error':
+              stream.error.value = event.message || ''
+              stream.loading.value = false
+              break
           }
-        } catch { /* skip */ }
+        } catch { /* skip malformed */ }
       }
     }
     stream.loading.value = false
+    scrollBottom()
   } catch (e: unknown) {
     action.status = 'rejected'
     if ((e as Error).name !== 'AbortError') {
-      streamRef.value!.error.value = (e as Error).message || '操作失败'
+      if (streamRef.value) {
+        streamRef.value.error.value = (e as Error).message || '操作失败'
+      }
     }
   }
 }

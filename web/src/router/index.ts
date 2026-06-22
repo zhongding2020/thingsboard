@@ -9,6 +9,11 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
     },
     {
+      path: '/chat',
+      name: 'ChatPage',
+      component: () => import('@/views/ChatPageView.vue'),
+    },
+    {
       path: '/',
       component: AppLayout,
       redirect: '/dashboard',

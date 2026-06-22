@@ -126,10 +126,14 @@ def create_supervisor_node(llm: BaseChatModel):
 
             # Check for user back-request
             user_wants_back = False
+            user_confirms = False
             for msg in reversed(state["messages"]):
                 if isinstance(msg, HumanMessage):
+                    content = str(msg.content)
                     back_keywords = ["不满意", "重做", "回退", "换一个", "重新"]
-                    user_wants_back = any(k in str(msg.content) for k in back_keywords)
+                    user_wants_back = any(k in content for k in back_keywords)
+                    confirm_keywords = ["ok", "可以", "确认", "下一步", "继续", "好的", "行", "对", "是", "正确", "没错", "没问题", "就这样", "开始"]
+                    user_confirms = any(k in content.lower() for k in confirm_keywords)
                     break
 
             # Count how many times we've stayed in this phase
@@ -138,6 +142,10 @@ def create_supervisor_node(llm: BaseChatModel):
                 if isinstance(m, AIMessage) and not getattr(m, "tool_calls", None)
             )
 
+            if phase == "define" and user_confirms:
+                # User explicitly confirmed the goal → advance to Explore
+                return {"next": "analyzer", "phase": "explore", "phase_action": "ADVANCE", "prev_phase": "define"}
+
             if user_wants_back and phase != "define":
                 idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else 0
                 prev_phase = PHASE_ORDER[idx - 1] if idx > 0 else "define"
@@ -145,6 +153,10 @@ def create_supervisor_node(llm: BaseChatModel):
 
             if has_tool_calls or is_tool_result:
                 # Need tools to execute, or worker to interpret tool results
+                return {"next": "analyzer", "phase": phase}
+            elif is_ai_msg and phase == "define":
+                # Define phase: do NOT auto-advance. Wait for user confirmation.
+                # User must explicitly confirm the goal before moving to Explore.
                 return {"next": "analyzer", "phase": phase}
             elif is_ai_msg and phase == "verify":
                 # Verify phase: worker responded → FINISH

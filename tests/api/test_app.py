@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from typing import Any
 
+import json
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -204,9 +206,6 @@ async def test_health_returns_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
-import json as _json_mod
-
-
 @pytest.mark.asyncio
 async def test_ask_user_emits_interactive_prompt_not_tool_call() -> None:
     """Verify ask_user tool start emits interactive.prompt, not tool.call."""
@@ -226,7 +225,7 @@ async def test_ask_user_emits_interactive_prompt_not_tool_call() -> None:
     }
     result = _map_event(event, set())
     assert result is not None
-    decoded = _json_mod.loads(result.decode().lstrip("data: "))
+    decoded = json.loads(result.decode().lstrip("data: "))
     assert decoded["type"] == "interactive.prompt"
     assert decoded["action"]["type"] == "select"
     assert decoded["action"]["title"] == "请选择产线"
@@ -261,7 +260,7 @@ async def test_normal_tool_call_still_works() -> None:
     }
     result = _map_event(event, set())
     assert result is not None
-    decoded = _json_mod.loads(result.decode().lstrip("data: "))
+    decoded = json.loads(result.decode().lstrip("data: "))
     assert decoded["type"] == "tool.call"
     assert decoded["name"] == "list_production_lines"
 

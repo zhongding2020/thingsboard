@@ -70,6 +70,9 @@ export interface InteractiveAction {
   placeholder?: string
   defaultValue?: unknown
   status: 'pending' | 'submitting' | 'resolved' | 'rejected'
+  // Runtime-only fields set by resolveAction handler (not in SSE payload)
+  _resolvedLabel?: string
+  _resolvedValue?: unknown
 }
 
 export interface ActionResponse {

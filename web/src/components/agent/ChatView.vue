@@ -8,10 +8,6 @@
       :msg="msg" :msgIndex="i" :isStreaming="loading && i === messages.length - 1"
       @copy="copyMsg" @regenerate="onRegenerate"
     />
-    <details v-if="thinkingText" class="thinking-box" :open="loading">
-      <summary>{{ loading ? '思考中...' : '思考过程' }}</summary>
-      <div class="thinking-content">{{ thinkingText }}</div>
-    </details>
     <ChatLoading v-if="loading" />
     <ChatSuggestions v-if="suggestions.length && !loading" :questions="suggestions" @select="onSuggestion" />
   </div>
@@ -36,12 +32,11 @@ import { useChatSession } from '@/composables/useChatSession'
 import { useFileUpload } from '@/composables/useFileUpload'
 
 const { sessionId, createNewSession } = useChatSession()
-const { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage } = useChatMessages()
+const { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, addThinking, copyMessage, regenerateMessage } = useChatMessages()
 const { loading, error, sendAndStream, cancel } = useChatStream()
 const { upload } = useFileUpload()
 
 const msgRef = ref<HTMLDivElement>()
-const thinkingText = ref('')
 
 const welcomeMd = `## 🤖 工艺参数分析助手
 
@@ -78,11 +73,14 @@ function makeCallbacks(assistantIdx: number) {
     onSuggestions: (questions: string[]) => { suggestions.value = questions },
     onTrace: (node: string, text: string) => { addTrace(assistantIdx, node, text); scrollBottom() },
     onPhase: (phase: string) => { workflowPhase.value = phase },
-    onThinking: (type: string, text?: string) => {
-      if (type === 'thinking.start') { thinkingText.value = '' }
-      else if (type === 'thinking.delta') { thinkingText.value += (text || ''); scrollBottom() }
-      else if (type === 'thinking.done') { /* keep visible */ }
-    },
+    onThinking: (() => {
+      let buf = ''
+      return (type: string, text?: string) => {
+        if (type === 'thinking.start') { buf = '' }
+        else if (type === 'thinking.delta') { buf += (text || ''); scrollBottom() }
+        else if (type === 'thinking.done' && buf) { addThinking(assistantIdx, buf); scrollBottom() }
+      }
+    })(),
   }
 }
 
@@ -153,8 +151,5 @@ function onStartWorkflow() {
 .agent-welcome :deep(th), .agent-welcome :deep(td) { border: 1px solid var(--el-border-color-light); padding: 4px 8px; text-align: left; }
 .agent-welcome :deep(th) { background: var(--el-fill-color); }
 .agent-welcome :deep(code) { background: var(--el-fill-color-dark); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
-.thinking-box { margin: 4px 14px; border: 1px solid var(--el-color-info-light-5); border-radius: 8px; padding: 6px 10px; font-size: 12px; background: var(--el-color-info-light-9); }
-.thinking-box summary { cursor: pointer; color: var(--el-color-info); font-weight: 500; }
-.thinking-box[open] summary { margin-bottom: 4px; }
-.thinking-content { color: var(--el-text-color-secondary); line-height: 1.5; white-space: pre-wrap; }
+
 </style>

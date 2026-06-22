@@ -40,6 +40,11 @@ export function useChatMessages() {
     if (parts) parts.push({ type: 'trace', text, node })
   }
 
+  function addThinking(idx: number, text: string) {
+    const parts = messages.value[idx]?.parts
+    if (parts) parts.push({ type: 'thinking', text })
+  }
+
   function copyMessage(msg: ChatMessage) {
     const text = msg.parts
       ?.filter(p => p.type === 'text' || p.type === 'step-start' || p.type === 'step-finish')
@@ -59,5 +64,5 @@ export function useChatMessages() {
 
   function clear() { messages.value = []; suggestions.value = [] }
 
-  return { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage, clear }
+  return { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, addThinking, copyMessage, regenerateMessage, clear }
 }

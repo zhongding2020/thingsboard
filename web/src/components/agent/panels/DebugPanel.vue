@@ -59,7 +59,7 @@
             <!-- Name -->
             <span
               v-if="evt.name"
-              class="flex-shrink-0 text-indigo-500 dark:text-indigo-400 truncate max-w-[140px]"
+              class="flex-shrink-0 text-blue-500 dark:text-blue-400 truncate max-w-[140px]"
             >{{ evt.name }}</span>
             <!-- Time -->
             <span class="flex-shrink-0 text-gray-400 dark:text-gray-600 ml-auto tabular-nums">{{ formatTime(evt.timestamp) }}</span>
@@ -111,7 +111,7 @@ const filter = ref<Record<string, boolean>>({
 
 const categories = [
   { key: 'message', label: '消息', activeClass: 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400' },
-  { key: 'tool', label: '工具', activeClass: 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400' },
+  { key: 'tool', label: '工具', activeClass: 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400' },
   { key: 'subagent', label: '子代理', activeClass: 'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700 text-green-600 dark:text-green-400' },
   { key: 'thinking', label: '思考', activeClass: 'bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400' },
   { key: 'system', label: '系统', activeClass: 'bg-gray-200 dark:bg-gray-700 border-gray-400 dark:border-gray-600 text-gray-600 dark:text-gray-300' },
@@ -147,7 +147,7 @@ function categoryBadge(type: string): string {
   const cat = eventCategory(type)
   const map: Record<string, string> = {
     message: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
-    tool: 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300',
+    tool: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
     subagent: 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300',
     thinking: 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300',
     system: 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300',

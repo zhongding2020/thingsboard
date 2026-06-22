@@ -8,7 +8,7 @@
         <button
           class="flex items-center gap-1 px-2 py-1 text-[11px] rounded border-none cursor-pointer transition-colors"
           :class="activePanel === 'files'
-            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
+            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
             : 'bg-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
           @click="activePanel = activePanel === 'files' ? null : 'files'"
         >📁 文件</button>
@@ -16,7 +16,7 @@
         <button
           class="flex items-center gap-1 px-2 py-1 text-[11px] rounded border-none cursor-pointer transition-colors"
           :class="activePanel === 'todos'
-            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
+            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
             : 'bg-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
           @click="activePanel = activePanel === 'todos' ? null : 'todos'"
         >
@@ -25,7 +25,7 @@
             v-if="allTodos.length > 0"
             class="text-[10px] px-1 rounded-full"
             :class="activePanel === 'todos'
-              ? 'bg-indigo-200 dark:bg-indigo-800'
+              ? 'bg-blue-200 dark:bg-blue-800'
               : 'bg-gray-100 dark:bg-gray-800'"
           >{{ doneTodoCount }}/{{ allTodos.length }}</span>
         </button>
@@ -33,7 +33,7 @@
         <button
           class="flex items-center gap-1 px-2 py-1 text-[11px] rounded border-none cursor-pointer transition-colors"
           :class="showDebug
-            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
+            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
             : 'bg-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
           @click="showDebug = !showDebug"
         >🐛 调试</button>
@@ -46,12 +46,29 @@
       <div class="flex-1 flex flex-col min-w-0">
         <!-- Messages area -->
         <div ref="msgRef" class="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-          <!-- Welcome -->
+          <!-- Welcome screen — process type cards -->
           <div
             v-if="!msgs.length && !loading"
-            class="p-5 text-gray-500 dark:text-gray-400"
+            class="flex-1 flex items-center justify-center px-6"
           >
-            <div v-html="welcomeHtml" />
+            <div class="max-w-xl w-full">
+              <h1 class="text-base font-semibold text-slate-700 dark:text-slate-200 text-center mb-1">工艺参数分析助手</h1>
+              <p class="text-xs text-slate-400 dark:text-slate-500 text-center mb-5">选择一个工艺类型开始分析，或直接输入问题</p>
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  v-for="pt in processTypes" :key="pt.type"
+                  class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-blue-600 dark:hover:border-blue-400 hover:shadow-sm transition-all text-left group"
+                  @click="onSend('分析' + pt.name + '工艺')"
+                >
+                  <span class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                    :class="pt.bg">{{ pt.icon }}</span>
+                  <div class="min-w-0">
+                    <div class="text-xs font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">{{ pt.name }}</div>
+                    <div class="text-[10px] text-slate-400 dark:text-slate-500 truncate">{{ pt.en }}</div>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Message cards -->
@@ -69,9 +86,9 @@
             v-if="loading && lastMsg?.role === 'assistant' && !lastMsg?.content && !lastMsg?.toolCalls?.length"
             class="flex items-center gap-1.5 px-4 py-2"
           >
-            <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0ms" />
-            <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 150ms" />
-            <span class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 300ms" />
+            <span class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0ms" />
+            <span class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 150ms" />
+            <span class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 300ms" />
           </div>
 
           <!-- Suggestions -->
@@ -79,7 +96,7 @@
             <button
               v-for="(q, i) in suggestions"
               :key="i"
-              class="px-3 py-1.5 text-xs rounded-full border border-gray-200 dark:border-gray-700 bg-transparent text-gray-500 dark:text-gray-400 hover:border-indigo-300 hover:text-indigo-500 cursor-pointer transition-colors"
+              class="px-3 py-1.5 text-xs rounded-full border border-gray-200 dark:border-gray-700 bg-transparent text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 cursor-pointer transition-colors"
               @click="onSend(q)"
             >{{ q }}</button>
           </div>
@@ -94,7 +111,7 @@
         <!-- Phase indicator -->
         <div
           v-if="currentPhase"
-          class="px-4 py-1.5 text-xs text-indigo-500 border-t border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950"
+          class="px-4 py-1.5 text-xs text-blue-500 border-t border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-950"
         >
           📍 当前阶段: {{ currentPhase }}
         </div>
@@ -140,7 +157,6 @@
 
 <script setup lang="ts">
 import { ref, computed, shallowRef, nextTick } from 'vue'
-import { marked } from 'marked'
 import MessageCard from './MessageCard.vue'
 import ChatInput from './ChatInput.vue'
 import FilesystemDrawer from './panels/FilesystemDrawer.vue'
@@ -191,28 +207,18 @@ const activePanel = ref<'files' | 'todos' | null>(null)
 const showDebug = ref(false)
 
 // ---------------------------------------------------------------------------
-// Welcome message
+// Process types for welcome cards
 // ---------------------------------------------------------------------------
-const welcomeMd = `## 🤖 工艺参数分析助手
-
-输入 \`?\` 查看帮助。支持 **8 种** 制造工艺的智能化分析。
-
-| 功能 | 示例 |
-|------|------|
-| 📊 数据画像 | 「分析D1设备的数据画像」 |
-| 🔗 相关性分析 | 「分析温度与剪切强度的相关性」 |
-| 📈 回归建模 | 「建立固化温度、时间对强度的回归」 |
-| ⭐ 特征重要性 | 「哪些参数对气泡率影响最大」 |
-| 📉 SPC 监控 | 「查看 wave-solder-004 的 SPC」 |
-| 🧪 DOE 实验 | 「为固化工艺设计 Box-Behnken 实验」 |
-| 🎯 参数推荐 | 「推荐提高剪切强度的参数」 |
-| 🏭 系统查询 | 「系统有哪些产线」 |
-| 🔍 产品追溯 | 「追溯条码 B001」 |
-| 🔄 工艺调优 | 输入「优化剪切强度」启动 |
-
-点击下方 ⭐ **工艺调优** 开始引导式参数优化。`
-
-const welcomeHtml = computed(() => marked.parse(welcomeMd, { breaks: true, gfm: true }) as string)
+const processTypes = [
+  { type: 'adhesive_curing', name: '点胶固化', en: 'Adhesive Curing', icon: '🔬', bg: 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300' },
+  { type: 'injection_molding', name: '注塑成型', en: 'Injection Molding', icon: '⚙️', bg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' },
+  { type: 'die_casting', name: '压铸', en: 'Die Casting', icon: '🔥', bg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
+  { type: 'cnc_machining', name: 'CNC加工', en: 'CNC Machining', icon: '🪚', bg: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
+  { type: 'reflow_soldering', name: '回流焊', en: 'Reflow Soldering', icon: '🌊', bg: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' },
+  { type: 'heat_treatment', name: '热处理', en: 'Heat Treatment', icon: '🌡️', bg: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300' },
+  { type: 'welding', name: '焊接', en: 'Welding', icon: '⚡', bg: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300' },
+  { type: 'powder_coating', name: '粉末涂装', en: 'Powder Coating', icon: '🎨', bg: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300' },
+] as const
 
 // ---------------------------------------------------------------------------
 // Helpers

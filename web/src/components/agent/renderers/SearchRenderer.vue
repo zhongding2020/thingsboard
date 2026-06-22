@@ -101,13 +101,13 @@ const searchResults = computed<SearchResult[]>(() => {
 function highlightTitle(text: string): string {
   // Basic markdown → HTML for bold/italic in titles
   return text
-    .replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-indigo-600 dark:text-indigo-400">$1</span>')
+    .replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-blue-600 dark:text-blue-400">$1</span>')
     .replace(/\*(.+?)\*/g, '<span class="italic">$1</span>')
 }
 
 function highlightSnippet(text: string): string {
   return text
-    .replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-indigo-600 dark:text-indigo-400">$1</span>')
+    .replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-blue-600 dark:text-blue-400">$1</span>')
     .replace(/\*(.+?)\*/g, '<span class="italic">$1</span>')
 }
 

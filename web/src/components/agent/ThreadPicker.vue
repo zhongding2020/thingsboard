@@ -14,7 +14,7 @@
           v-model="searchQuery"
           type="text"
           placeholder="搜索会话..."
-          class="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-colors"
+          class="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors"
         />
       </div>
     </div>
@@ -22,7 +22,7 @@
     <!-- New session button -->
     <div class="px-3 pb-2">
       <button
-        class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+        class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
         @click="$emit('new')"
       >
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -39,14 +39,14 @@
         :key="s.id"
         class="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-colors"
         :class="s.id === activeId
-          ? 'bg-indigo-50 dark:bg-indigo-900/25 text-indigo-700 dark:text-indigo-300'
+          ? 'bg-blue-50 dark:bg-blue-900/25 text-blue-700 dark:text-blue-300'
           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'"
         @click="$emit('select', s.id)"
       >
         <!-- Chat icon -->
         <svg
           class="w-4 h-4 flex-shrink-0"
-          :class="s.id === activeId ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'"
+          :class="s.id === activeId ? 'text-blue-500 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
         >
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />

@@ -1,13 +1,13 @@
 <template>
   <!-- Pending call -->
-  <div v-if="tc.status === 'pending'" class="my-1 border border-indigo-200 dark:border-indigo-800 rounded-lg px-3 py-2 text-xs bg-indigo-50 dark:bg-indigo-900/30 max-w-[95%]">
+  <div v-if="tc.status === 'pending'" class="my-1 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/30 max-w-[95%]">
     <div class="flex items-center gap-2 mb-1">
-      <span class="w-4 h-4 text-indigo-500 animate-spin">
+      <span class="w-4 h-4 text-blue-500 animate-spin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
       </span>
-      <span class="font-medium text-indigo-600 dark:text-indigo-400">调用: {{ tc.name }}</span>
+      <span class="font-medium text-blue-600 dark:text-blue-400">调用: {{ tc.name }}</span>
     </div>
-    <pre v-if="tc.args && Object.keys(tc.args).length" class="m-0 text-[11px] whitespace-pre-wrap break-all text-indigo-400 font-mono">{{ JSON.stringify(tc.args, null, 2) }}</pre>
+    <pre v-if="tc.args && Object.keys(tc.args).length" class="m-0 text-[11px] whitespace-pre-wrap break-all text-blue-400 font-mono">{{ JSON.stringify(tc.args, null, 2) }}</pre>
   </div>
 
   <!-- Done result — dispatch to renderer -->

@@ -17,15 +17,15 @@
         <button
           v-for="m in models"
           :key="m.value"
-          class="block w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-950"
-          :class="{ 'text-indigo-600 dark:text-indigo-400 font-medium': m.value === currentModel }"
+          class="block w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950"
+          :class="{ 'text-blue-600 dark:text-blue-400 font-medium': m.value === currentModel }"
           @mousedown.prevent="$emit('switchModel', m.value)"
         >{{ m.label }}</button>
       </div>
     </div>
 
     <!-- Center: AI title -->
-    <div class="flex items-center gap-1.5 text-sm font-semibold text-indigo-500">
+    <div class="flex items-center gap-1.5 text-sm font-semibold text-blue-500">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <path d="M12 3l2.5 5.5L20 9.5l-4 4 .5 5.5L12 16l-4.5 3 .5-5.5-4-4L9.5 8.5z"/>
       </svg>

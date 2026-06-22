@@ -3,7 +3,7 @@
     <!-- User message -->
     <div
       v-if="msg.role === 'user'"
-      class="self-end bg-indigo-500 text-white px-4 py-2.5 rounded-2xl rounded-br-sm max-w-[85%] text-sm leading-relaxed break-words"
+      class="self-end bg-blue-600 text-white px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] text-xs leading-relaxed break-words"
     >
       {{ msg.content }}
     </div>

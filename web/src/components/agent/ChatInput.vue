@@ -1,7 +1,7 @@
 <template>
   <div class="px-4 pb-4 pt-2">
     <div
-      class="border border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-900 overflow-hidden transition-colors focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-400/20"
+      class="border border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-900 overflow-hidden transition-colors focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20"
     >
       <textarea
         v-model="text"
@@ -48,7 +48,7 @@
           </button>
           <button
             v-else
-            class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white border-none cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-none cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             :disabled="!text.trim()"
             @click="emitSend"
           >

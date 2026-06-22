@@ -141,10 +141,30 @@ def _map_event(event: dict) -> bytes | None:
     if kind == "on_chain_end":
         node_name = event.get("name", "")
         if node_name == "supervisor":
+            result_parts: list[bytes] = []
+
+            # Phase change event
+            output = event.get("data", {}).get("output", {})
+            if isinstance(output, dict):
+                phase = output.get("phase", "")
+                phase_action = output.get("phase_action", "")
+                prev_phase = output.get("prev_phase", "")
+                if phase_action in ("ADVANCE", "BACK") and phase:
+                    data = json.dumps({
+                        "type": "phase.change",
+                        "phase": phase,
+                        "prev_phase": prev_phase,
+                        "action": phase_action,
+                    })
+                    result_parts.append(f"data: {data}\n\n".encode())
+
             if _supervisor_text.strip():
                 data = json.dumps({"type": "agent.trace", "node": "supervisor", "text": _supervisor_text.strip()})
                 _supervisor_text = ""
-                return f"data: {data}\n\n".encode()
+                result_parts.append(f"data: {data}\n\n".encode())
+
+            if result_parts:
+                return b"".join(result_parts)
             return None
         if node_name in ("chat", "analyzer", "recommender"):
             data = json.dumps({"type": "node.end", "node": node_name})

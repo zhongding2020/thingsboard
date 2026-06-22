@@ -5,6 +5,92 @@ from process_opt.agent.state import AgentState
 from process_opt.knowledge.loader import KnowledgeLoader
 
 
+PHASE_PROMPTS = {
+    "define": (
+        "## 当前阶段：明确目标与基准（Define）\n\n"
+        "### 任务\n"
+        "1. 引导用户明确：优化哪个质量指标？方向（最大化/最小化/达标）？\n"
+        "2. 调用 get_process_knowledge 获取工艺规范（USL/LSL）\n"
+        "3. 调用 get_latest_active_parameters 获取当前参数作为基准\n"
+        "4. 调用 run_spc 获取当前 Cpk 基线\n"
+        "5. 汇总为「优化目标卡」表格\n\n"
+        "### 输出格式\n"
+        "| 项目 | 内容 |\n"
+        "|------|------|\n"
+        "| 优化目标 | [指标名] [方向] |\n"
+        "| USL / LSL | [规格] |\n"
+        "| 当前 Cpk | [数值] |\n"
+        "| 当前参数 | [参数列表] |\n\n"
+        "### 规则\n"
+        "- 不要跳过工具调用，必须先获取真实数据\n"
+        "- 完成后自然结束，由 Supervisor 推进到下一阶段"
+    ),
+    "explore": (
+        "## 当前阶段：设计试验与探索（Explore）\n\n"
+        "### 任务\n"
+        "1. 若历史数据充足：build_dataset → profile_data → analyze_pareto\n"
+        "2. 若数据不足：引导用户设计 DOE（design_experiment），建议 Box-Behnken 或 Central Composite\n"
+        "3. 若设计了实验：提示用户按实验矩阵执行并记录结果\n"
+        "4. 将 dataset_id 或 experiment_plan_id 告知用户\n\n"
+        "### 规则\n"
+        "- 数据量判断：先调用 get_stats 查看记录数\n"
+        "- DOE 因素建议基于 Define 阶段的 goal 和 get_process_knowledge 结果\n"
+        "- 完成后自然结束"
+    ),
+    "analyze": (
+        "## 当前阶段：数据分析与建模（Analyze）\n\n"
+        "### 任务\n"
+        "1. 基于 Explore 阶段的 dataset_id，执行：\n"
+        "   - analyze_correlation（相关性矩阵）\n"
+        "   - analyze_importance（特征重要性排序）\n"
+        "   - run_regression（回归建模，输出 R² 和系数）\n"
+        "2. 若有 DOE 数据：analyze_experiment（ANOVA 方差分析）\n"
+        "3. 识别关键因子，评估模型质量\n\n"
+        "### 输出格式\n"
+        "- 关键因子排名表\n"
+        "- 回归模型摘要（R², RMSE, 显著因子）\n\n"
+        "### 规则\n"
+        "- 使用 Explore 阶段产出的 dataset_id\n"
+        "- 分析结果用表格呈现\n"
+        "- 完成后自然结束"
+    ),
+    "optimize": (
+        "## 当前阶段：训优与参数推荐（Optimize）\n\n"
+        "### 任务\n"
+        "1. 调用 recommend_params 或 optimize_parameters（多目标时）\n"
+        "2. 自动传入 Define 阶段的 goal 约束（USL/LSL/target_value）\n"
+        "3. 调用 get_process_knowledge 校验工艺规则\n"
+        "4. 对比推荐参数 vs 当前基准\n\n"
+        "### 输出格式\n"
+        "| 参数 | 当前值 | 推荐值 | 调整 |\n"
+        "|------|--------|--------|------|\n"
+        "| ... | ... | ... | ... |\n\n"
+        "- 预测 Cpk: [前] → [后]\n"
+        "- 风险提示（如有规则违规）\n\n"
+        "### 规则\n"
+        "- 必须基于 Analyze 阶段的分析结果选择优化参数\n"
+        "- 自动校验工艺规则，违规项标注 ❌ 或 ⚠\n"
+        "- 完成后自然结束"
+    ),
+    "verify": (
+        "## 当前阶段：验证与闭环（Verify）\n\n"
+        "### 任务\n"
+        "1. 汇总整个调优过程的产出\n"
+        "2. 调优前后对比表\n"
+        "3. 建议用户下一步操作：\n"
+        "   - 提交审批（submit_parameter_set）→ 试验验证 → SPC 持续监控\n"
+        "4. 若用户不满意推荐结果：可建议回退到上一阶段\n\n"
+        "### 输出格式\n"
+        "- 全流程产出汇总\n"
+        "- 调优前后对比表\n"
+        "- 下一步操作建议\n\n"
+        "### 规则\n"
+        "- 汇总 Define → Explore → Analyze → Optimize 的全流程产出\n"
+        "- 给出清晰可操作的下一步建议\n"
+        "- 完成后自然结束"
+    ),
+}
+
 ROLE_PROMPTS = {
     "chat": {
         "title": "工艺参数分析与优化助手",
@@ -74,7 +160,6 @@ def create_worker_node(role: str, llm: BaseChatModel, knowledge_loader: Knowledg
         raise ValueError(f"Unknown role: {role}. Valid: {list(ROLE_PROMPTS.keys())}")
 
     role_cfg = ROLE_PROMPTS[role]
-    # Pre-compute the list of all processes for multi-process context
     _all_processes = knowledge_loader.list_processes()
 
     async def worker_node(state: AgentState) -> dict:
@@ -85,11 +170,20 @@ def create_worker_node(role: str, llm: BaseChatModel, knowledge_loader: Knowledg
             if template
             else ""
         )
+
+        # Inject phase-specific prompt when in workflow mode
+        mode = state.get("mode", "chat")
+        phase = state.get("phase", "")
+        phase_prompt = ""
+        if mode == "workflow" and phase and phase in PHASE_PROMPTS:
+            phase_prompt = "\n\n" + PHASE_PROMPTS[phase]
+
         system = SystemMessage(
             content=(
                 f"你是{template.display_name if template else process_type}"
                 f"{role_cfg['title']}。\n\n"
-                f"{role_cfg['instructions']}\n\n"
+                f"{role_cfg['instructions']}"
+                f"{phase_prompt}\n\n"
                 f"{knowledge_prompt}"
             )
         )

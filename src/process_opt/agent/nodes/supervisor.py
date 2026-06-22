@@ -10,42 +10,69 @@ from process_opt.agent.state import AgentState
 
 class SupervisorDecision(BaseModel):
     intent: Literal["CHAT", "ANALYZER", "RECOMMENDER", "TOOLS", "FINISH"]
+    phase_action: Literal["STAY", "ADVANCE", "BACK", "FINISH"] | None = None
+
+
+class PhaseDecision(BaseModel):
+    action: Literal["STAY", "ADVANCE", "BACK", "FINISH"]
+    reason: str
+
+
+PHASE_ORDER = ["define", "explore", "analyze", "optimize", "verify"]
+
+PHASE_HINTS = {
+    "define": "用户正在「明确目标与基准」阶段。需引导用户设定优化目标、查看当前基准。完成后推进到 explore。",
+    "explore": "用户正在「设计试验与探索」阶段。需构建数据集或设计DOE实验。产出 dataset_id 后推进到 analyze。",
+    "analyze": "用户正在「数据分析与建模」阶段。需执行相关性、回归、重要性分析。产出分析结论后推进到 optimize。",
+    "optimize": "用户正在「训优与参数推荐」阶段。需调用推荐工具并校验规则。产出推荐参数后推进到 verify。",
+    "verify": "用户正在「验证与闭环」阶段。汇总优化结果、对比基准、建议提交审批。用户确认后 FINISH。",
+}
+
+WORKFLOW_TRIGGERS = [
+    "优化", "调优", "改善", "提高", "降低", "提升", "改进",
+    "参数推荐", "工艺优化", "质量改善", "doe", "实验设计",
+]
+
+
+def _detect_workflow_intent(text: str) -> bool:
+    lower = text.lower()
+    return any(t in lower for t in WORKFLOW_TRIGGERS) or "__start_workflow__" in text
 
 
 def _has_pending_tool_calls(state: AgentState) -> bool:
-    """Check if the most recent AI message has unexecuted tool calls.
-
-    Scans messages in reverse — if we find a ToolMessage first, the tools
-    have already been executed and we return False.
-    """
     for msg in reversed(state["messages"]):
         if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
             return True
         if isinstance(msg, ToolMessage):
-            return False  # tool already executed
+            return False
         if isinstance(msg, AIMessage):
-            return False  # AI response without tool calls
+            return False
     return False
 
 
 def _build_context(state: AgentState) -> str:
-    """Build decision context for the supervisor including message history."""
     parts: list[str] = []
+    mode = state.get("mode", "chat")
+    phase = state.get("phase", "")
 
-    # Count AI turns to detect excessive looping
-    ai_turns = sum(
-        1 for msg in state["messages"]
-        if isinstance(msg, AIMessage)
-    )
-    parts.append(f"当前对话轮次: {ai_turns} (超过 3 轮应优先考虑 FINISH)")
+    if mode == "workflow" and phase:
+        parts.append(f"当前模式: 工艺调优工作流")
+        parts.append(f"当前阶段: {phase} ({PHASE_HINTS.get(phase, '')})")
+        parts.append(f"阶段顺序: {' → '.join(PHASE_ORDER)}")
+        parts.append(f"阶段目标: {state.get('goal')}")
+        parts.append(f"阶段基准: {state.get('baseline')}")
+        parts.append(f"数据集ID: {state.get('dataset_id', '')}")
+        parts.append(f"实验方案ID: {state.get('experiment_plan_id', 0)}")
+        parts.append(f"推荐结果: {state.get('recommendation')}")
+    else:
+        ai_turns = sum(1 for msg in state["messages"] if isinstance(msg, AIMessage))
+        parts.append(f"当前对话轮次: {ai_turns} (超过 3 轮应优先考虑 FINISH)")
 
-    # Show the user's original question
     for msg in state["messages"]:
         if isinstance(msg, HumanMessage):
             parts.append(f"用户问题: {str(msg.content)[:300]}")
             break
 
-    # Show recent activity (last 4 non-system messages)
     recent = [m for m in state["messages"] if not isinstance(m, SystemMessage)][-4:]
     for msg in recent:
         if isinstance(msg, HumanMessage):
@@ -68,14 +95,55 @@ def _build_context(state: AgentState) -> str:
 
 def create_supervisor_node(llm: BaseChatModel):
     structured_llm = llm.with_structured_output(SupervisorDecision, method="function_calling")
+    phase_llm = llm.with_structured_output(PhaseDecision, method="function_calling")
 
     async def supervisor_node(state: AgentState) -> dict:
-        # Automatic: if last AI message has pending tool calls, must route to tools
         if _has_pending_tool_calls(state):
             return {"next": "tools"}
 
+        mode = state.get("mode", "chat")
+        phase = state.get("phase", "")
+
+        # Detect workflow mode entry
+        if mode != "workflow":
+            for msg in reversed(state["messages"]):
+                if isinstance(msg, HumanMessage):
+                    if _detect_workflow_intent(str(msg.content)):
+                        return {"next": "analyzer", "mode": "workflow", "phase": "define"}
+                    break
+
         ctx = _build_context(state)
 
+        if mode == "workflow" and phase:
+            phase_prompt = (
+                f"当前处于工艺调优工作流「{phase}」阶段。\n"
+                f"阶段说明: {PHASE_HINTS.get(phase, '')}\n\n"
+                f"根据对话上下文，判断当前阶段是否已完成、应推进到下一阶段、回退还是完成：\n"
+                f"- STAY: 当前阶段任务未完成，需继续\n"
+                f"- ADVANCE: 当前阶段已完成，推进到下一阶段\n"
+                f"- BACK: 用户对结果不满意，回退到上一阶段\n"
+                f"- FINISH: 整个调优流程已完成\n\n"
+                f"{ctx}"
+            )
+            decision: PhaseDecision = await phase_llm.ainvoke([SystemMessage(content=phase_prompt)])
+
+            if decision.action == "ADVANCE":
+                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else -1
+                next_phase = PHASE_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(PHASE_ORDER) else ""
+                if next_phase:
+                    return {"next": "analyzer", "phase": next_phase, "phase_action": "ADVANCE", "prev_phase": phase}
+                else:
+                    return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
+            elif decision.action == "BACK":
+                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else 0
+                prev_phase = PHASE_ORDER[idx - 1] if idx > 0 else "define"
+                return {"next": "analyzer", "phase": prev_phase, "phase_action": "BACK", "prev_phase": phase}
+            elif decision.action == "FINISH":
+                return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
+            else:
+                return {"next": "analyzer", "phase": phase}
+
+        # Chat mode routing
         prompt = (
             "你是对话路由器。根据上下文决定下一步路由。\n\n"
             "## 路由选项\n"

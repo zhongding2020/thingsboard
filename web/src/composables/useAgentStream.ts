@@ -30,6 +30,7 @@ export interface ChatMessage {
   thinking?: string
   subagents?: SubagentState[]
   trace?: string
+  actions?: InteractiveAction[]
 }
 
 export interface DebugEvent {
@@ -37,6 +38,44 @@ export interface DebugEvent {
   name?: string
   timestamp: number
   payload?: unknown
+}
+
+// --- Interactive Prompt types ---
+
+export type InteractionType = 'select' | 'multi_select' | 'confirm' | 'input' | 'cascader'
+
+export interface ActionOption {
+  label: string
+  value: string
+  description?: string
+  disabled?: boolean
+}
+
+export interface CascaderLevel {
+  key: string
+  label: string
+  options: ActionOption[]
+}
+
+export interface InteractiveAction {
+  id: string
+  type: InteractionType
+  title: string
+  description?: string
+  required?: boolean
+  options?: ActionOption[]
+  cascaderLevels?: CascaderLevel[]
+  confirmText?: string
+  cancelText?: string
+  placeholder?: string
+  defaultValue?: unknown
+  status: 'pending' | 'submitting' | 'resolved' | 'rejected'
+}
+
+export interface ActionResponse {
+  action_id: string
+  type: InteractionType
+  value: unknown
 }
 
 export function useAgentStream(sessionId: string) {
@@ -132,6 +171,15 @@ export function useAgentStream(sessionId: string) {
                   last.durationMs = event.duration_ms || 0
                   last.status = 'done'
                 }
+                break
+              }
+
+              case 'interactive.prompt': {
+                const action: InteractiveAction = {
+                  ...event.action,
+                  status: 'pending',
+                }
+                assistantMsg.actions = [...(assistantMsg.actions || []), action]
                 break
               }
 

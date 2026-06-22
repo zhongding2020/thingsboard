@@ -1,41 +1,86 @@
 <template>
-  <div class="agent-header">
-    <div class="agent-header-left">
-      <el-dropdown trigger="click" @command="$emit('switchModel', $event)">
-        <el-button text size="small" class="model-btn">
-          {{ currentModelLabel }}
-          <el-icon><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item v-for="m in models" :key="m.value" :command="m.value" :class="{ 'is-active': m.value === currentModel }">{{ m.label }}</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+  <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-200 dark:border-gray-700 shrink-0 gap-2">
+    <!-- Left: model dropdown -->
+    <div class="relative">
+      <button
+        class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
+        @click="showModelMenu = !showModelMenu"
+        @blur="onBlurModelMenu"
+      >
+        {{ currentModelLabel }}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div
+        v-if="showModelMenu"
+        class="absolute top-full left-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 py-1 min-w-[140px]"
+      >
+        <button
+          v-for="m in models"
+          :key="m.value"
+          class="block w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+          :class="{ 'text-indigo-600 dark:text-indigo-400 font-medium': m.value === currentModel }"
+          @mousedown.prevent="$emit('switchModel', m.value)"
+        >{{ m.label }}</button>
+      </div>
     </div>
-    <div class="agent-header-title">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 9.5l-4 4 .5 5.5L12 16l-4.5 3 .5-5.5-4-4L9.5 8.5z"/></svg>
+
+    <!-- Center: AI title -->
+    <div class="flex items-center gap-1.5 text-sm font-semibold text-indigo-500">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M12 3l2.5 5.5L20 9.5l-4 4 .5 5.5L12 16l-4.5 3 .5-5.5-4-4L9.5 8.5z"/>
+      </svg>
       AI
     </div>
-    <div class="agent-header-right">
-      <el-button text size="small" @click="$emit('toggleSessions')" :title="showSessions ? '返回' : '历史'">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      </el-button>
-      <el-button text size="small" @click="$emit('newSession')" title="新建">+</el-button>
-      <el-button text size="small" @click="$emit('toggleMaximize')" :title="maximized ? '还原' : '最大化'">
-        <svg v-if="!maximized" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="12" rx="2"/><rect x="4" y="4" width="12" height="12" rx="2"/></svg>
-      </el-button>
-      <el-button text size="small" @click="$emit('close')" title="关闭">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </el-button>
+
+    <!-- Right: action buttons -->
+    <div class="flex items-center gap-0.5">
+      <button
+        class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
+        @click="$emit('toggleSessions')"
+        :title="showSessions ? '返回' : '历史'"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+      </button>
+      <button
+        class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
+        @click="$emit('newSession')"
+        title="新建"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      </button>
+      <button
+        class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
+        @click="$emit('toggleMaximize')"
+        :title="maximized ? '还原' : '最大化'"
+      >
+        <svg v-if="!maximized" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="4" width="16" height="16" rx="2"/>
+        </svg>
+        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="8" y="8" width="12" height="12" rx="2"/>
+          <rect x="4" y="4" width="12" height="12" rx="2"/>
+        </svg>
+      </button>
+      <button
+        class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
+        @click="$emit('close')"
+        title="关闭"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ref, computed } from 'vue'
 
 interface Model { label: string; value: string }
 interface ProcessType { process_type: string; display_name: string }
@@ -58,12 +103,10 @@ defineEmits<{
   close: []
 }>()
 
+const showModelMenu = ref(false)
 const currentModelLabel = computed(() => props.models.find(m => m.value === props.currentModel)?.label || '')
-</script>
 
-<style scoped>
-.agent-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--el-border-color-light); flex-shrink: 0; gap: 8px; }
-.agent-header-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #6366f1; }
-.agent-header-right { display: flex; align-items: center; gap: 2px; }
-.model-btn { font-size: 12px; color: var(--el-text-color-secondary); }
-</style>
+function onBlurModelMenu() {
+  setTimeout(() => { showModelMenu.value = false }, 150)
+}
+</script>

@@ -104,7 +104,7 @@ export function useAgentStream(sessionId: string) {
             // Record debug event
             debugEvents.value.push({
               type: event.type,
-              name: event.name || event.phase || undefined,
+              name: event.node || event.name || event.phase || undefined,
               timestamp: Date.now(),
               payload: event,
             })
@@ -115,7 +115,7 @@ export function useAgentStream(sessionId: string) {
 
               case 'tool.call': {
                 const tc: ToolCall = {
-                  name: event.name,
+                  name: event.node || event.name,
                   args: event.args || {},
                   status: 'pending',
                 }
@@ -126,7 +126,7 @@ export function useAgentStream(sessionId: string) {
               case 'tool.result': {
                 const tcs = assistantMsg.toolCalls || []
                 // ES2020 compatible: reverse-copy instead of findLast (ES2023)
-                const last = [...tcs].reverse().find(t => t.name === event.name && t.status === 'pending')
+                const last = [...tcs].reverse().find(t => t.name === (event.node || event.name) && t.status === 'pending')
                 if (last) {
                   last.result = event.data || ''
                   last.durationMs = event.duration_ms || 0
@@ -137,7 +137,7 @@ export function useAgentStream(sessionId: string) {
 
               case 'subagent.start': {
                 const sa: SubagentState = {
-                  name: event.name,
+                  name: event.node || event.name,
                   content: '',
                   status: 'running',
                   open: true,
@@ -147,13 +147,13 @@ export function useAgentStream(sessionId: string) {
               }
 
               case 'subagent.delta': {
-                const sa = (assistantMsg.subagents || []).find(s => s.name === event.name && s.status === 'running')
+                const sa = (assistantMsg.subagents || []).find(s => s.name === (event.node || event.name) && s.status === 'running')
                 if (sa) sa.content += event.text || ''
                 break
               }
 
               case 'subagent.end': {
-                const sa = (assistantMsg.subagents || []).find(s => s.name === event.name && s.status === 'running')
+                const sa = (assistantMsg.subagents || []).find(s => s.name === (event.node || event.name) && s.status === 'running')
                 if (sa) sa.status = 'done'
                 break
               }

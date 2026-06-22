@@ -28,7 +28,9 @@ const isDark = ref(true)
 function applyTheme(dark: boolean) {
   isDark.value = dark
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  document.documentElement.classList.toggle('dark', dark)
   localStorage.setItem(STORAGE_KEY, dark ? 'dark' : 'light')
+  localStorage.setItem('theme', dark ? 'dark' : 'light')
 }
 
 function toggle() {

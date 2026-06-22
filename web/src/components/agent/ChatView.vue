@@ -9,6 +9,10 @@
       :msg="msg" :msgIndex="i" :isStreaming="loading && i === messages.length - 1"
       @copy="copyMsg" @regenerate="onRegenerate"
     />
+    <details v-if="thinkingText" class="thinking-box" :open="loading">
+      <summary>{{ loading ? '思考中...' : '思考过程' }}</summary>
+      <div class="thinking-content">{{ thinkingText }}</div>
+    </details>
     <ChatLoading v-if="loading" />
     <ChatSuggestions v-if="suggestions.length && !loading" :questions="suggestions" @select="onSuggestion" />
   </div>
@@ -37,6 +41,7 @@ const { loading, error, sendAndStream, cancel } = useChatStream()
 const { upload } = useFileUpload()
 
 const msgRef = ref<HTMLDivElement>()
+const thinkingText = ref('')
 
 function scrollBottom() {
   nextTick(() => { if (msgRef.value) msgRef.value.scrollTop = msgRef.value.scrollHeight })
@@ -52,6 +57,11 @@ function makeCallbacks(assistantIdx: number) {
     onSuggestions: (questions: string[]) => { suggestions.value = questions },
     onTrace: (node: string, text: string) => { addTrace(assistantIdx, node, text); scrollBottom() },
     onPhase: (phase: string) => { workflowPhase.value = phase },
+    onThinking: (type: string, text?: string) => {
+      if (type === 'thinking.start') { thinkingText.value = '' }
+      else if (type === 'thinking.delta') { thinkingText.value += (text || ''); scrollBottom() }
+      else if (type === 'thinking.done') { /* keep visible */ }
+    },
   }
 }
 
@@ -117,4 +127,8 @@ function onStartWorkflow() {
 .agent-error { padding: 6px 14px; font-size: 12px; color: var(--el-color-danger); border-top: 1px solid var(--el-border-color-light); }
 .agent-welcome { text-align: center; padding: 60px 24px; color: var(--el-text-color-secondary); }
 .agent-welcome p { margin: 4px 0; font-size: 14px; }
+.thinking-box { margin: 4px 14px; border: 1px solid var(--el-color-info-light-5); border-radius: 8px; padding: 6px 10px; font-size: 12px; background: var(--el-color-info-light-9); }
+.thinking-box summary { cursor: pointer; color: var(--el-color-info); font-weight: 500; }
+.thinking-box[open] summary { margin-bottom: 4px; }
+.thinking-content { color: var(--el-text-color-secondary); line-height: 1.5; white-space: pre-wrap; }
 </style>

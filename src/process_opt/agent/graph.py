@@ -67,12 +67,24 @@ def build_graph(
     return workflow.compile()
 
 
+THINKING_PROMPT = """你是一个工艺参数分析助手的思考过程。请用中文，简洁地分析用户的意图，并规划执行步骤。
+
+要求：
+1. 识别用户的核心需求（数据分析？参数推荐？工艺咨询？）
+2. 判断是否需要进入工艺调优工作流（5阶段：Define→Explore→Analyze→Optimize→Verify）
+3. 列出可能需要调用的工具（最多3-5个）
+4. 用2-4句话完成，不要展开细节
+
+用户消息："""
+
+
 class AgentSession:
-    def __init__(self, session_id: str, user_id: str, process_type: str, graph: Any) -> None:
+    def __init__(self, session_id: str, user_id: str, process_type: str, graph: Any, llm: Any = None) -> None:
         self.session_id = session_id
         self.user_id = user_id
         self.process_type = process_type
         self.graph = graph
+        self.llm = llm
         self.config = {
             "configurable": {"thread_id": session_id},
             "recursion_limit": RECURSION_LIMIT,
@@ -104,7 +116,25 @@ class AgentSession:
         self.state["messages"].append(HumanMessage(content=text))
         self.state["next"] = "supervisor"
         self._running = True
-        asyncio.create_task(self._run_graph())
+        asyncio.create_task(self._run_with_thinking(text))
+
+    async def _run_with_thinking(self, text: str) -> None:
+        """Generate thinking plan before executing graph."""
+        try:
+            if self.llm is not None:
+                await self.event_queue.put({"type": "thinking.start"})
+                full = ""
+                async for chunk in self.llm.astream(THINKING_PROMPT + text):
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    if content:
+                        full += content
+                        await self.event_queue.put({"type": "thinking.delta", "text": content})
+                await self.event_queue.put({"type": "thinking.done", "text": full})
+        except Exception as e:
+            logger.warning("Thinking generation failed: %s", e)
+            await self.event_queue.put({"type": "thinking.done", "text": ""})
+
+        await self._run_graph()
 
     async def _run_graph(self) -> None:
         try:
@@ -136,9 +166,9 @@ class SessionManager:
         self._ttl = ttl_seconds
         self._lock = asyncio.Lock()
 
-    async def create(self, user_id: str, process_type: str, graph: Any) -> AgentSession:
+    async def create(self, user_id: str, process_type: str, graph: Any, llm: Any = None) -> AgentSession:
         sid = f"ses_{uuid.uuid4().hex[:20]}"
-        session = AgentSession(sid, user_id, process_type, graph)
+        session = AgentSession(sid, user_id, process_type, graph, llm=llm)
         async with self._lock:
             self._sessions[sid] = session
         return session

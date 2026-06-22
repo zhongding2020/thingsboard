@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from pydantic import BaseModel
@@ -7,18 +8,16 @@ from typing import Literal
 
 from process_opt.agent.state import AgentState
 
+logger = logging.getLogger(__name__)
+
 
 class SupervisorDecision(BaseModel):
     intent: Literal["CHAT", "ANALYZER", "RECOMMENDER", "TOOLS", "FINISH"]
     phase_action: Literal["STAY", "ADVANCE", "BACK", "FINISH"] | None = None
 
 
-class PhaseDecision(BaseModel):
-    action: Literal["STAY", "ADVANCE", "BACK", "FINISH"]
-    reason: str
-
-
 PHASE_ORDER = ["define", "explore", "analyze", "optimize", "verify"]
+MAX_STAY_PER_PHASE = 3  # safety limit to prevent infinite loops
 
 PHASE_HINTS = {
     "define": "用户正在「明确目标与基准」阶段。需引导用户设定优化目标、查看当前基准。完成后推进到 explore。",
@@ -95,7 +94,6 @@ def _build_context(state: AgentState) -> str:
 
 def create_supervisor_node(llm: BaseChatModel):
     structured_llm = llm.with_structured_output(SupervisorDecision, method="function_calling")
-    phase_llm = llm.with_structured_output(PhaseDecision, method="function_calling")
 
     async def supervisor_node(state: AgentState) -> dict:
         if _has_pending_tool_calls(state):
@@ -115,31 +113,59 @@ def create_supervisor_node(llm: BaseChatModel):
         ctx = _build_context(state)
 
         if mode == "workflow" and phase:
-            phase_prompt = (
-                f"当前处于工艺调优工作流「{phase}」阶段。\n"
-                f"阶段说明: {PHASE_HINTS.get(phase, '')}\n\n"
-                f"根据对话上下文，判断当前阶段是否已完成、应推进到下一阶段、回退还是完成：\n"
-                f"- STAY: 当前阶段任务未完成，需继续\n"
-                f"- ADVANCE: 当前阶段已完成，推进到下一阶段\n"
-                f"- BACK: 用户对结果不满意，回退到上一阶段\n"
-                f"- FINISH: 整个调优流程已完成\n\n"
-                f"{ctx}"
-            )
-            decision: PhaseDecision = await phase_llm.ainvoke([SystemMessage(content=phase_prompt)])
+            # Deterministic phase routing:
+            # STAY only when: (a) pending tool calls, or (b) last response was a tool result
+            # ADVANCE when: worker gave a text response with no pending tool calls
+            # BACK when: user clearly rejects/asks to redo
+            # FINISH when: last phase completed and no more phases
 
-            if decision.action == "ADVANCE":
+            last_msg = state["messages"][-1] if state["messages"] else None
+            is_tool_result = isinstance(last_msg, ToolMessage)
+            has_tool_calls = _has_pending_tool_calls(state)
+            is_ai_msg = isinstance(last_msg, AIMessage) and not getattr(last_msg, "tool_calls", None)
+
+            # Check for user back-request
+            user_wants_back = False
+            for msg in reversed(state["messages"]):
+                if isinstance(msg, HumanMessage):
+                    back_keywords = ["不满意", "重做", "回退", "换一个", "重新"]
+                    user_wants_back = any(k in str(msg.content) for k in back_keywords)
+                    break
+
+            # Count how many times we've stayed in this phase
+            stay_count = sum(
+                1 for m in state["messages"]
+                if isinstance(m, AIMessage) and not getattr(m, "tool_calls", None)
+            )
+
+            if user_wants_back and phase != "define":
+                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else 0
+                prev_phase = PHASE_ORDER[idx - 1] if idx > 0 else "define"
+                return {"next": "analyzer", "phase": prev_phase, "phase_action": "BACK", "prev_phase": phase}
+
+            if has_tool_calls or is_tool_result:
+                # Need tools to execute, or worker to interpret tool results
+                return {"next": "analyzer", "phase": phase}
+            elif is_ai_msg and phase == "verify":
+                # Verify phase: worker responded → FINISH
+                return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
+            elif is_ai_msg:
+                # Worker gave a text response → advance to next phase
                 idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else -1
                 next_phase = PHASE_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(PHASE_ORDER) else ""
                 if next_phase:
                     return {"next": "analyzer", "phase": next_phase, "phase_action": "ADVANCE", "prev_phase": phase}
                 else:
                     return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
-            elif decision.action == "BACK":
-                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else 0
-                prev_phase = PHASE_ORDER[idx - 1] if idx > 0 else "define"
-                return {"next": "analyzer", "phase": prev_phase, "phase_action": "BACK", "prev_phase": phase}
-            elif decision.action == "FINISH":
-                return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
+            elif stay_count > MAX_STAY_PER_PHASE:
+                # Safety: force advance if stuck
+                idx = PHASE_ORDER.index(phase) if phase in PHASE_ORDER else -1
+                next_phase = PHASE_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(PHASE_ORDER) else ""
+                if next_phase:
+                    logger.warning("Force advancing from %s after %d stays", phase, stay_count)
+                    return {"next": "analyzer", "phase": next_phase, "phase_action": "ADVANCE", "prev_phase": phase}
+                else:
+                    return {"next": "FINISH", "phase": "", "phase_action": "FINISH", "prev_phase": phase}
             else:
                 return {"next": "analyzer", "phase": phase}
 

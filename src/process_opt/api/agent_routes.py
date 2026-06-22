@@ -29,7 +29,7 @@ def register_agent_routes(
         user = request.headers.get("X-User", "anonymous")
         body = await request.json()
         process_type = body.get("process_type", "adhesive_curing")
-        session = await session_manager.create(user, process_type, graph)
+        session = await session_manager.create(user, process_type, graph, llm=llm)
         return {"session_id": session.session_id, "process_type": process_type}
 
     @router.get("/session")

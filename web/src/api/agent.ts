@@ -101,6 +101,7 @@ export function streamEvents(
   onSuggestions?: (questions: string[]) => void,
   onTrace?: (node: string, text: string) => void,
   onPhase?: (phase: string, prevPhase: string, action: string) => void,
+  onThinking?: (type: string, text?: string) => void,
 ): StreamEvents {
   const controller = new AbortController()
 
@@ -154,6 +155,11 @@ export function streamEvents(
                   onDone()
                   return
                 }
+                break
+              case 'thinking.start':
+              case 'thinking.delta':
+              case 'thinking.done':
+                if (onThinking) onThinking(event.type, event.text)
                 break
               case 'phase.change':
                 if (onPhase) onPhase(event.phase, event.prev_phase || '', event.action || '')

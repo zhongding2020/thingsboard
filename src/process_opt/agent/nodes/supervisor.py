@@ -32,6 +32,59 @@ WORKFLOW_TRIGGERS = [
     "参数推荐", "工艺优化", "质量改善", "doe", "实验设计",
 ]
 
+HELP_MESSAGE = """## 🤖 工艺参数分析助手 — 功能清单
+
+### 📊 数据分析
+| 功能 | 说明 | 示例 |
+|------|------|------|
+| 数据画像 | 统计数据分布、异常值 | 「分析D1设备的数据画像」 |
+| 相关性分析 | Pearson/Spearman，热力图 | 「分析温度与剪切强度的相关性」 |
+| 回归建模 | Linear/PLS 回归 | 「建立固化温度、时间对强度的回归模型」 |
+| 特征重要性 | 随机森林排序关键因子 | 「哪些参数对气泡率影响最大」 |
+| SPC 监控 | I-MR 控制图、Cp/Cpk | 「查看 wave-solder-004 的 SPC」 |
+| 帕累托分析 | 因子影响力排序 | 「对数据集做帕累托分析」 |
+
+### 🧪 实验设计 (DOE)
+| 功能 | 说明 | 示例 |
+|------|------|------|
+| 设计实验 | 全因子/Box-Behnken/CCD/田口 | 「为固化工艺设计 Box-Behnken 实验」 |
+| 方差分析 | ANOVA 效应/系数/p值 | 「分析实验方案的 ANOVA」 |
+
+### 🎯 参数推荐
+| 功能 | 说明 | 示例 |
+|------|------|------|
+| 参数推荐 | 网格/LHS 搜索最优参数 | 「推荐提高剪切强度的参数」 |
+| 多目标优化 | 约束条件下多目标寻优 | 「同时优化强度和气泡率」 |
+
+### 🏭 系统查询
+| 功能 | 说明 | 示例 |
+|------|------|------|
+| 产线管理 | 查看产线和设备 | 「系统有哪些产线」 |
+| 产线监控 | 产线级 SPC 总览 | 「监控 DIP-A 线」 |
+| 参数管理 | 查看/审批参数集 | 「查看当前激活的参数」 |
+| 产品追溯 | 查询产品生产链路 | 「追溯条码 B001」 |
+| 平台统计 | 今日数据量/设备数 | 「系统当前状态如何」 |
+
+### 📁 其他
+| 功能 | 说明 | 示例 |
+|------|------|------|
+| 文件上传 | 上传 xlsx/csv 自动分析 | 点击下方「上传文件」按钮 |
+| 工艺知识 | 查看工艺参数规范 | 「点胶固化的工艺规范是什么」 |
+| 报告生成 | 生成 Markdown 分析报告 | 「生成一份工艺分析报告」 |
+
+### 🔄 工艺调优工作流
+点击输入框下方 **⭐ 工艺调优** 按钮，或输入「优化剪切强度」，启动 5 阶段引导流程：
+**Define → Explore → Analyze → Optimize → Verify**
+
+---
+
+输入 `?` 或 `help` 可随时查看本帮助。"""
+
+
+def _is_help_request(text: str) -> bool:
+    t = text.strip()
+    return t == "?" or t == "help" or t == "？" or t.lower() == "help"
+
 
 def _detect_workflow_intent(text: str) -> bool:
     lower = text.lower()
@@ -96,6 +149,18 @@ def create_supervisor_node(llm: BaseChatModel):
     structured_llm = llm.with_structured_output(SupervisorDecision, method="function_calling")
 
     async def supervisor_node(state: AgentState) -> dict:
+        # Help command: inject help text directly and finish
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                if _is_help_request(str(msg.content)):
+                    return {
+                        "next": "FINISH",
+                        "messages": [AIMessage(content=HELP_MESSAGE)],
+                        "mode": state.get("mode", "chat"),
+                        "phase": state.get("phase", ""),
+                    }
+                break
+
         if _has_pending_tool_calls(state):
             return {"next": "tools"}
 

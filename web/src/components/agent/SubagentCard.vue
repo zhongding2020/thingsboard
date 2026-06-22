@@ -33,8 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import TextBlock from './TextBlock.vue'
 
 const props = defineProps<{
@@ -45,6 +44,7 @@ const props = defineProps<{
 }>()
 
 const isOpen = ref(props.open)
+watch(() => props.open, (v) => { isOpen.value = v })
 
 const borderClass = computed(() => {
   switch (props.status) {

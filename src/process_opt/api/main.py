@@ -157,6 +157,15 @@ class AnalysisServiceProxy:
             raise RuntimeError("AnalysisService not initialized")
         return await self._service.spc(request)
 
+    async def build_dataset_id(
+        self,
+        device_id: str,
+        since: datetime | None = None,
+    ) -> str:
+        if self._service is None:
+            raise RuntimeError("AnalysisService not initialized")
+        return await self._service._builder.build_to_dataset_id(device_id, since=since)
+
 
 class LineDeviceRepositoryProxy:
     def __init__(self) -> None:

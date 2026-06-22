@@ -337,7 +337,7 @@ def create_analysis_tools(
         since_dt: datetime | None = None
         if since:
             since_dt = datetime.fromisoformat(since)
-        ds_id = await analysis_service._builder.build_to_dataset_id(device_id, since=since_dt)
+        ds_id = await analysis_service.build_dataset_id(device_id, since=since_dt)
         ds = get_dataset(ds_id)
         feature_fields = sorted({k for f in ds.features for k in f}) if ds else []
         target_fields = sorted({k for t in ds.targets for k in t}) if ds else []

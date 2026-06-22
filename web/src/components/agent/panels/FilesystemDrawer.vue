@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-full flex flex-col bg-white dark:bg-gray-950 border-l border-gray-200 dark:border-gray-800"
+    class="h-full flex flex-col bg-white dark:bg-gray-950"
   >
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-2.5 border-b border-gray-200 dark:border-gray-800">

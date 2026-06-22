@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, DEFAULT
+from unittest.mock import MagicMock, patch
 from process_opt.agent.deep_agent import create_process_agent
 
 
@@ -51,13 +51,7 @@ class TestCreateProcessAgent:
     def test_merges_process_and_capability_tools(self, mock_llm, mock_tool_pool, mock_registry):
         with patch("process_opt.agent.deep_agent.SKILL_REGISTRY", mock_registry):
             with patch("process_opt.agent.deep_agent.get_capability_skills") as mock_get_cap:
-                with patch.multiple(
-                    "process_opt.agent.deep_agent",
-                    create_deep_agent=DEFAULT,
-                    FilesystemMiddleware=DEFAULT,
-                    SummarizationMiddleware=DEFAULT,
-                    StateBackend=DEFAULT,
-                ) as mocks:
+                with patch("process_opt.agent.deep_agent.create_deep_agent") as mock_create:
                     mock_get_cap.return_value = [
                         s for s in mock_registry.values() if s.get("type") == "capability"
                     ]
@@ -67,7 +61,7 @@ class TestCreateProcessAgent:
                         mock_llm, "adhesive_curing", mock_tool_pool,
                     ))
 
-                    call_kwargs = mocks["create_deep_agent"].call_args.kwargs
+                    call_kwargs = mock_create.call_args.kwargs
                     # Should include tools from both process + capability
                     tool_names = {t.__name__ for t in call_kwargs["tools"]}
                     assert "query_records" in tool_names
@@ -76,13 +70,7 @@ class TestCreateProcessAgent:
     def test_system_prompt_from_skill_body(self, mock_llm, mock_tool_pool, mock_registry):
         with patch("process_opt.agent.deep_agent.SKILL_REGISTRY", mock_registry):
             with patch("process_opt.agent.deep_agent.get_capability_skills") as mock_get_cap:
-                with patch.multiple(
-                    "process_opt.agent.deep_agent",
-                    create_deep_agent=DEFAULT,
-                    FilesystemMiddleware=DEFAULT,
-                    SummarizationMiddleware=DEFAULT,
-                    StateBackend=DEFAULT,
-                ) as mocks:
+                with patch("process_opt.agent.deep_agent.create_deep_agent") as mock_create:
                     mock_get_cap.return_value = []
 
                     import asyncio
@@ -90,5 +78,5 @@ class TestCreateProcessAgent:
                         mock_llm, "adhesive_curing", mock_tool_pool,
                     ))
 
-                    call_kwargs = mocks["create_deep_agent"].call_args.kwargs
+                    call_kwargs = mock_create.call_args.kwargs
                     assert call_kwargs["system_prompt"] == "## 工艺参数\n\n测试正文"

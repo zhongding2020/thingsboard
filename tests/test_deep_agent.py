@@ -54,9 +54,6 @@ class TestCreateProcessAgent:
                 with patch.multiple(
                     "process_opt.agent.deep_agent",
                     create_deep_agent=DEFAULT,
-                    TodoListMiddleware=DEFAULT,
-                    SkillsMiddleware=DEFAULT,
-                    SubAgentMiddleware=DEFAULT,
                     FilesystemMiddleware=DEFAULT,
                     SummarizationMiddleware=DEFAULT,
                 ) as mocks:
@@ -81,9 +78,6 @@ class TestCreateProcessAgent:
                 with patch.multiple(
                     "process_opt.agent.deep_agent",
                     create_deep_agent=DEFAULT,
-                    TodoListMiddleware=DEFAULT,
-                    SkillsMiddleware=DEFAULT,
-                    SubAgentMiddleware=DEFAULT,
                     FilesystemMiddleware=DEFAULT,
                     SummarizationMiddleware=DEFAULT,
                 ) as mocks:

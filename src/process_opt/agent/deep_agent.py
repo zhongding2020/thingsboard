@@ -17,9 +17,6 @@ SKILL_REGISTRY: dict[str, dict] = discover_skills()
 
 # Lazy imports — deepagents is imported at call time so tests can mock without it installed
 create_deep_agent: Any = None  # set on first call
-TodoListMiddleware: Any = None
-SkillsMiddleware: Any = None
-SubAgentMiddleware: Any = None
 FilesystemMiddleware: Any = None
 SummarizationMiddleware: Any = None
 
@@ -64,38 +61,26 @@ async def create_process_agent(
     if missing:
         logger.warning("Skill tools not in pool: %s", missing)
 
-    # 4. Lazy-load deepagents (deferred import so tests can mock without package installed)
-    global create_deep_agent, TodoListMiddleware, SkillsMiddleware
-    global SubAgentMiddleware, FilesystemMiddleware, SummarizationMiddleware
+    # 4. Lazy-load deepagents (deferred import for testability)
+    global create_deep_agent, FilesystemMiddleware, SummarizationMiddleware
     if create_deep_agent is None:
         from deepagents import create_deep_agent as _create_deep_agent  # type: ignore[no-redef]
         from deepagents.middleware import (  # type: ignore[import-untyped]
-            TodoListMiddleware as _TodoListMiddleware,
-            SubAgentMiddleware as _SubAgentMiddleware,
             FilesystemMiddleware as _FilesystemMiddleware,
             SummarizationMiddleware as _SummarizationMiddleware,
         )
         create_deep_agent = _create_deep_agent
-        TodoListMiddleware = _TodoListMiddleware
-        SubAgentMiddleware = _SubAgentMiddleware
         FilesystemMiddleware = _FilesystemMiddleware
         SummarizationMiddleware = _SummarizationMiddleware
-        # SkillsMiddleware may not exist in all deepagents versions
-        try:
-            from deepagents.middleware import SkillsMiddleware as _SkillsMiddleware  # type: ignore[import-untyped]
-            SkillsMiddleware = _SkillsMiddleware
-        except ImportError:
-            logger.debug("SkillsMiddleware not available in this deepagents version")
 
-    # 5. Assemble middleware stack (skip SkillsMiddleware if not available)
-    middleware: list[Any] = [TodoListMiddleware()]
-    if SkillsMiddleware is not None:
-        middleware.append(SkillsMiddleware(skills=capability_skills))
-    middleware.extend([
-        SubAgentMiddleware(default_model=llm),
-        FilesystemMiddleware(backend="state"),
-        SummarizationMiddleware(trigger_tokens=0.85),
-    ])
+    # 5. Assemble middleware stack
+    # DeepAgents 0.6+ has built-in todo management and subagent spawning.
+    # FilesystemMiddleware provides file operations for large result eviction.
+    # SummarizationMiddleware auto-compresses long conversations.
+    middleware: list[Any] = [
+        FilesystemMiddleware(),
+        SummarizationMiddleware(model=llm),
+    ]
 
     # 6. Create DeepAgent
     agent = create_deep_agent(

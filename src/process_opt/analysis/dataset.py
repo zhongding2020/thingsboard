@@ -67,23 +67,32 @@ class DatasetBuilder:
                 elif isinstance(row["results"], dict):
                     all_result_keys.update(row["results"].keys())
 
+        # Auto-correct: if a "feature" is actually a result key, move it to targets
+        corrected_features: list[str] = []
+        corrected_targets: list[str] = list(request.target_fields)
         for field in request.feature_fields:
+            if field not in all_param_keys and field in all_result_keys:
+                corrected_targets.append(field)
+            else:
+                corrected_features.append(field)
+
+        for field in corrected_features:
             if field not in all_param_keys:
                 return AnalysisError(
                     code="FIELD_NOT_FOUND",
                     message=f"Feature field '{field}' not found in params data",
-                    suggestion=f"Available param keys: {sorted(all_param_keys)}",
+                    suggestion=f"Available param keys: {sorted(all_param_keys)}. Available result keys (use as target): {sorted(all_result_keys)}",
                 )
-        for field in request.target_fields:
+        for field in corrected_targets:
             if field not in all_result_keys:
                 return AnalysisError(
                     code="FIELD_NOT_FOUND",
                     message=f"Target field '{field}' not found in results data",
-                    suggestion=f"Available result keys: {sorted(all_result_keys)}",
+                    suggestion=f"Available result keys: {sorted(all_result_keys)}. Available param keys (use as feature): {sorted(all_param_keys)}",
                 )
 
-        use_feature_fields = request.feature_fields or list(all_param_keys)
-        use_target_fields = request.target_fields or list(all_result_keys)
+        use_feature_fields = corrected_features or list(all_param_keys)
+        use_target_fields = corrected_targets or list(all_result_keys)
         all_fields = use_feature_fields + use_target_fields
         features: list[dict[str, Any]] = []
         targets: list[dict[str, Any]] = []

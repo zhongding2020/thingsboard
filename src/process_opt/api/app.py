@@ -126,9 +126,7 @@ def create_app(
     analysis_service: AnalysisService | None = None,
     line_device_repo: LineDeviceRepositoryProtocol | None = None,
     container_pool: "ContainerPoolProxy | None" = None,
-    agent_graph: Any = None,
-    session_manager: Any = None,
-    knowledge_loader: Any = None,
+    agent_factory: Any = None,
     experiment_repo: Any = None,
     suggestion_llm: Any = None,
 ) -> FastAPI:
@@ -623,9 +621,9 @@ def create_app(
             await experiment_repo.update_plan_status(plan_id, body["status"])
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    if agent_graph is not None and session_manager is not None and knowledge_loader is not None:
+    if agent_factory is not None:
         from process_opt.api.agent_routes import register_agent_routes
-        register_agent_routes(app, session_manager, knowledge_loader, agent_graph, llm=suggestion_llm)
+        register_agent_routes(app, agent_factory, llm=suggestion_llm)
 
     _web_dist = (
         candidate

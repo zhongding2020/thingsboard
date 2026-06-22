@@ -29,8 +29,7 @@ from process_opt.agent.tools.analysis_tools import create_analysis_tools
 from process_opt.agent.tools.system_tools import create_system_tools
 from process_opt.agent.tools.parameter_tools import create_parameter_tools
 from process_opt.agent.tools.experiment_tools import create_experiment_tools
-from process_opt.agent.graph import SessionManager, build_graph
-from process_opt.knowledge.loader import KnowledgeLoader
+from process_opt.agent.deep_agent import create_process_agent
 from process_opt.experiment.repository import ExperimentRepository
 
 
@@ -248,8 +247,10 @@ def create_api_app_from_settings() -> FastAPI:
 
     from langchain_openai import ChatOpenAI
 
+    # knowledge_loader kept for analysis tools (parameter tables, rule validation)
+    # Agent system prompts now come from Markdown skills, not from KnowledgeLoader
+    from process_opt.knowledge.loader import KnowledgeLoader
     knowledge_loader = KnowledgeLoader()
-    session_manager = SessionManager(ttl_seconds=settings.agent_session_ttl)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -288,7 +289,9 @@ def create_api_app_from_settings() -> FastAPI:
             experiment_repo_proxy._repo = None
             await pool.close()
 
-    tools = (
+    # Build tool pool as flat dict keyed by tool name
+    tool_pool: dict[str, object] = {}
+    all_tools = (
         create_analysis_tools(
             repository_proxy, analysis_service_proxy, parameter_service_proxy,
             knowledge_loader, experiment_repo_proxy,
@@ -297,6 +300,9 @@ def create_api_app_from_settings() -> FastAPI:
         create_parameter_tools(parameter_service_proxy) +
         create_experiment_tools(experiment_repo_proxy)
     )
+    for t in all_tools:
+        tool_pool[t.name] = t
+
     llm = ChatOpenAI(
         model=settings.agent_model,
         base_url=settings.agent_api_base,
@@ -304,8 +310,9 @@ def create_api_app_from_settings() -> FastAPI:
         temperature=settings.agent_temperature,
         streaming=True,
     )
-    llm_with_tools = llm.bind_tools(tools)
-    agent_graph = build_graph(llm, llm_with_tools, tools, knowledge_loader)
+
+    async def agent_factory(llm_instance, process_type: str):
+        return await create_process_agent(llm_instance, process_type, tool_pool)
 
     app = create_app(
         repository=repository_proxy,
@@ -313,11 +320,9 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service=analysis_service_proxy,
         line_device_repo=line_device_repo_proxy,
         container_pool=container_pool_proxy,
-        agent_graph=agent_graph,
-        session_manager=session_manager,
-        knowledge_loader=knowledge_loader,
-        experiment_repo=experiment_repo_proxy,
+        agent_factory=agent_factory,
         suggestion_llm=llm,
+        experiment_repo=experiment_repo_proxy,
     )
     app.router.lifespan_context = lifespan
     return app

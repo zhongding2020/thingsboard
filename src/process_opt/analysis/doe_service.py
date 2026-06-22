@@ -58,10 +58,20 @@ def generate_design(config: DOEConfig) -> DOEDesign:
 
     for i in range(n_runs):
         coded = matrix_2d[i].tolist()
+        # Normalize coded values: map min→low, max→high, midpoint→center
+        col_min = matrix_2d.min(axis=0)
+        col_max = matrix_2d.max(axis=0)
         factor_vals: dict[str, float] = {}
         real_vals: list[float] = []
         for j, f in enumerate(config.factors):
-            val = f.low if coded[j] <= 0 else f.high
+            lo, hi = col_min[j], col_max[j]
+            rng = hi - lo
+            if rng > 0:
+                t = (coded[j] - lo) / rng
+                val = f.low + t * (f.high - f.low)
+            else:
+                val = f.low if coded[j] <= 0 else f.high
+            val = round(val, 2)
             factor_vals[f.name] = val
             real_vals.append(val)
         runs.append(

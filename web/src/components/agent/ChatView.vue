@@ -15,7 +15,7 @@
   <div v-if="error" class="agent-error">{{ error }}</div>
   <div ref="inputArea">
     <PhaseIndicator v-if="workflowPhase" :phase="workflowPhase" />
-    <ChatInput :disabled="loading" @send="onSend" @upload="onUpload" @startWorkflow="onStartWorkflow" />
+    <ChatInput :disabled="loading" @send="onSend" @upload="onUpload" @startWorkflow="onStartWorkflow" @stop="cancel()" />
   </div>
 </template>
 
@@ -33,7 +33,7 @@ import { useFileUpload } from '@/composables/useFileUpload'
 
 const { sessionId, createNewSession } = useChatSession()
 const { messages, suggestions, workflowPhase, addUserMessage, addAssistantPlaceholder, appendDelta, addToolCall, addToolResult, addTrace, copyMessage, regenerateMessage } = useChatMessages()
-const { loading, error, sendAndStream } = useChatStream()
+const { loading, error, sendAndStream, cancel } = useChatStream()
 const { upload } = useFileUpload()
 
 const msgRef = ref<HTMLDivElement>()

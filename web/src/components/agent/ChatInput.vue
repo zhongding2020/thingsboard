@@ -26,9 +26,12 @@
         </div>
         <div class="toolbar-right">
           <span v-if="text.trim()" class="char-hint">{{ text.length }}</span>
-          <button class="send-btn" :disabled="!text.trim() || disabled" @click="emitSend">
-            <svg v-if="disabled" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="4"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+          <button v-if="disabled" class="send-btn stop-btn" @click="$emit('stop')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+            <span class="send-label">停止</span>
+          </button>
+          <button v-else class="send-btn" :disabled="!text.trim()" @click="emitSend">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
             <span class="send-label">发送</span>
           </button>
         </div>
@@ -41,7 +44,7 @@
 import { ref } from 'vue'
 
 defineProps<{ disabled: boolean }>()
-const emit = defineEmits<{ send: [text: string]; upload: [file: File]; startWorkflow: [] }>()
+const emit = defineEmits<{ send: [text: string]; upload: [file: File]; startWorkflow: []; stop: [] }>()
 
 const text = ref('')
 const fileInputRef = ref<HTMLInputElement>()
@@ -158,4 +161,6 @@ function onFileChange(e: Event) {
 }
 .workflow-btn { color: var(--el-color-warning); }
 .workflow-btn:hover { background: var(--el-color-warning-light-9); }
+.stop-btn { background: var(--el-color-danger) !important; }
+.stop-btn:hover { opacity: 0.85; }
 </style>

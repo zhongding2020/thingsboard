@@ -53,6 +53,8 @@ async def create_process_agent(
     all_tool_names: set[str] = set(process_skill.get("tools", []))
     for cap in capability_skills:
         all_tool_names.update(cap.get("tools", []))
+    # Always include ask_user for interactive prompts
+    all_tool_names.add("ask_user")
 
     tools = [tool_pool[name] for name in all_tool_names if name in tool_pool]
     missing = all_tool_names - set(tool_pool.keys())
@@ -68,9 +70,44 @@ async def create_process_agent(
     # 5. Create DeepAgent with defaults
     # DeepAgents 0.6+ includes built-in middleware (Filesystem, Summarization,
     # Todo management, Subagent spawning) — no need to add duplicates.
+    #
+    # Augment system prompt with interactive prompt usage instructions
+    interactive_instructions = """
+## 与用户交互的方式
+
+当需要用户提供信息（选择产线、设备、参数、确认操作等）时，**必须使用 `ask_user` 工具**，不要直接在文本中提问。`ask_user` 会在前端渲染为下拉框、多选、确认按钮等交互组件。
+
+### 何时使用 ask_user
+
+- 需要用户选择产线或设备 → type="cascader" 或 type="select"
+- 需要用户勾选要分析的参数 → type="multi_select"
+- 需要用户确认操作（如提交参数集）→ type="confirm"
+- 需要用户输入具体数值 → type="input"
+
+### 使用示例
+
+选择产线：
+```
+ask_user(type="select", title="请选择要分析的产线", options='[{"label":"注塑A线","value":"L1"},{"label":"注塑B线","value":"L2"}]')
+```
+
+多选参数：
+```
+ask_user(type="multi_select", title="请选择要分析的参数", options='[{"label":"固化温度","value":"cure_temp"},{"label":"固化时间","value":"cure_time"}]')
+```
+
+确认操作：
+```
+ask_user(type="confirm", title="确认提交此参数集？", confirm_text="确认提交", cancel_text="取消")
+```
+
+**重要：调用 ask_user 后，停止当前回复，等待用户在交互组件中的操作结果。**
+"""
+    full_system_prompt = process_skill["system_prompt"] + interactive_instructions
+
     agent = create_deep_agent(
         model=llm,
         tools=tools,
-        system_prompt=process_skill["system_prompt"],  # Markdown body
+        system_prompt=full_system_prompt,
     )
     return agent

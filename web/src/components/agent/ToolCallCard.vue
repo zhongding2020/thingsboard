@@ -10,21 +10,27 @@
     <pre v-if="tc.args && Object.keys(tc.args).length" class="m-0 text-[11px] whitespace-pre-wrap break-all text-blue-400 font-mono">{{ JSON.stringify(tc.args, null, 2) }}</pre>
   </div>
 
-  <!-- Done result — dispatch to renderer -->
-  <div v-else-if="tc.status === 'done'" class="my-1 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs bg-white dark:bg-gray-900 max-w-[95%]">
-    <div class="flex items-center gap-2 mb-2">
+  <!-- Done result — collapsed by default -->
+  <div v-else-if="tc.status === 'done'" class="my-1 border border-gray-200 dark:border-gray-700 rounded-lg text-xs bg-white dark:bg-gray-900 max-w-[95%]">
+    <div
+      class="flex items-center gap-2 px-3 py-2 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
+      @click="collapsed = !collapsed"
+    >
       <span class="text-green-500">✓</span>
-      <span class="font-medium text-gray-500 dark:text-gray-400">
+      <span class="font-medium text-gray-500 dark:text-gray-400 flex-1">
         {{ tc.name }}<span v-if="tc.durationMs"> ({{ tc.durationMs }}ms)</span>
       </span>
+      <span class="text-gray-300 dark:text-gray-600 transition-transform duration-200" :class="{ 'rotate-180': !collapsed }">▾</span>
     </div>
 
-    <!-- Per-tool renderer dispatch -->
-    <FilesRenderer v-if="isFilesTool(tc.name)" :data="tc.result || ''" />
-    <SearchRenderer v-else-if="isSearchTool(tc.name)" :data="tc.result || ''" />
-    <ThinkRenderer v-else-if="isThinkTool(tc.name)" :data="tc.result || ''" />
-    <TodosRenderer v-else-if="isTodoTool(tc.name)" :data="tc.result || ''" />
-    <div v-else class="tool-markdown" v-html="renderMarkdown(tc.result || '')" />
+    <div v-if="!collapsed" class="px-3 pb-2 border-t border-gray-100 dark:border-gray-800">
+      <!-- Per-tool renderer dispatch -->
+      <FilesRenderer v-if="isFilesTool(tc.name)" :data="tc.result || ''" />
+      <SearchRenderer v-else-if="isSearchTool(tc.name)" :data="tc.result || ''" />
+      <ThinkRenderer v-else-if="isThinkTool(tc.name)" :data="tc.result || ''" />
+      <TodosRenderer v-else-if="isTodoTool(tc.name)" :data="tc.result || ''" />
+      <div v-else class="tool-markdown pt-2" v-html="renderMarkdown(tc.result || '')" />
+    </div>
   </div>
 
   <!-- Error -->
@@ -34,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { marked } from 'marked'
 import FilesRenderer from './renderers/FilesRenderer.vue'
 import SearchRenderer from './renderers/SearchRenderer.vue'
@@ -42,6 +49,8 @@ import TodosRenderer from './renderers/TodosRenderer.vue'
 import type { ToolCall } from '@/composables/useAgentStream'
 
 defineProps<{ tc: ToolCall }>()
+
+const collapsed = ref(true)
 
 function renderMarkdown(text: string): string {
   return marked.parse(text, { breaks: true, gfm: true }) as string

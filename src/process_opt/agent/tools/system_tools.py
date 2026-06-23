@@ -13,7 +13,8 @@ def create_system_tools(
 ) -> list:
     @tool
     async def list_production_lines() -> str:
-        """列出所有产线信息。返回每条产线的名称、负责人、位置、设备数量。"""
+        """列出所有产线信息。返回每条产线的ID、名称、负责人、位置、设备数量。
+        调用后使用「产线ID」列的值作为 ask_user 工具 options 的 value 字段。"""
         lines = await line_device_repo.list_lines()
         if not lines:
             return "当前系统没有注册的产线。"
@@ -21,11 +22,11 @@ def create_system_tools(
         result = ["## 产线列表", ""]
         result.append(f"共 **{len(lines)}** 条产线：")
         result.append("")
-        result.append("| 产线名称 | 负责人 | 位置 | 设备数 |")
-        result.append("|----------|--------|------|--------|")
+        result.append("| 产线ID | 产线名称 | 负责人 | 位置 | 设备数 |")
+        result.append("|--------|----------|--------|------|--------|")
         for line in lines:
             result.append(
-                f"| {line.get('name', '-')} | {line.get('responsible', '-')} | "
+                f"| {line.get('id', '-')} | {line.get('name', '-')} | {line.get('responsible', '-')} | "
                 f"{line.get('location', '-')} | {line.get('device_count', 0)} |"
             )
         return "\n".join(result)
@@ -61,7 +62,10 @@ def create_system_tools(
 
     @tool
     async def list_registered_devices(line_id: str = "") -> str:
-        """列出系统中注册的所有设备。可选按产线过滤。line_id: 产线ID（可选，留空查全部）。"""
+        """列出系统中注册的所有设备。可选按产线过滤。
+        返回每条设备的ID、名称、类型、所属产线。
+        调用后使用「设备ID」列的值作为 ask_user 工具 options 的 value 字段。
+        line_id: 产线ID（可选，留空查全部）。"""
         lid = line_id if line_id else None
         devices = await line_device_repo.list_devices(line_id=lid)
 

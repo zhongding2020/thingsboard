@@ -60,6 +60,8 @@ async def test_list_production_lines(tools: list) -> None:
     assert "产线A" in result
     assert "产线B" in result
     assert "张三" in result
+    assert "L1" in result  # ID column present
+    assert "L2" in result
 
 
 @pytest.mark.asyncio

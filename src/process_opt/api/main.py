@@ -33,6 +33,7 @@ from process_opt.agent.tools.parameter_tools import create_parameter_tools
 from process_opt.agent.tools.experiment_tools import create_experiment_tools
 from process_opt.agent.deep_agent import create_process_agent
 from process_opt.experiment.repository import ExperimentRepository
+from process_opt.mock.manager import MockManager
 
 
 class RepositoryProxy:
@@ -279,6 +280,12 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service = AnalysisService(dataset_builder)
         experiment_repo = ExperimentRepository(pool)
         experiment_repo_proxy._repo = experiment_repo
+        mock_manager = MockManager(
+            api_url="http://localhost:8000",
+            gateway_url="http://localhost:8001",
+            api_key=settings.gateway_api_key,
+        )
+        app.state.mock_manager = mock_manager
         if _HAS_CONTAINER_POOL:
             manager = ContainerPoolManager(settings)
             container_pool_proxy.set_manager(manager)
@@ -336,6 +343,7 @@ def create_api_app_from_settings() -> FastAPI:
         agent_factory=agent_factory,
         suggestion_llm=llm,
         experiment_repo=experiment_repo_proxy,
+        mock_manager=mock_manager,
     )
     app.router.lifespan_context = lifespan
     return app

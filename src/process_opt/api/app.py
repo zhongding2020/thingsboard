@@ -129,6 +129,7 @@ def create_app(
     agent_factory: Any = None,
     experiment_repo: Any = None,
     suggestion_llm: Any = None,
+    mock_manager: Any = None,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -620,6 +621,10 @@ def create_app(
         async def update_plan_status(plan_id: int, body: dict[str, Any]) -> Response:
             await experiment_repo.update_plan_status(plan_id, body["status"])
             return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if mock_manager is not None:
+        from process_opt.api.mock_routes import register_mock_routes
+        register_mock_routes(app, mock_manager)
 
     if agent_factory is not None:
         from process_opt.api.agent_routes import register_agent_routes

@@ -39,6 +39,7 @@ class ReflowOvenModel(MechanismModel):
         # 可控噪声
         quality += random.gauss(0, 0.02)
         voiding += random.gauss(0, 0.15)
+        voiding = max(0, voiding)
 
         quality = round(quality, 2)
         voiding = round(voiding, 2)

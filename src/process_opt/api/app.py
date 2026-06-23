@@ -409,7 +409,7 @@ def create_app(
             if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.profiling import profile_dataset
-                ds = get_dataset(body.dataset_id)
+                ds = await get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
                 return profile_dataset(ds)
@@ -420,7 +420,7 @@ def create_app(
             if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.correlation import compute_correlation
-                ds = get_dataset(body.dataset_id)
+                ds = await get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
                 if body.field_x and body.field_y:
@@ -440,7 +440,7 @@ def create_app(
             if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.regression import fit_regression
-                ds = get_dataset(body.dataset_id)
+                ds = await get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
                 return fit_regression(ds, body.feature_fields, body.target_field, body.model_type)
@@ -451,7 +451,7 @@ def create_app(
             if body.dataset_id:
                 from process_opt.analysis.excel import get_dataset
                 from process_opt.analysis.recommendation import compute_recommendation
-                ds = get_dataset(body.dataset_id)
+                ds = await get_dataset(body.dataset_id)
                 if ds is None:
                     raise HTTPException(status_code=404, detail="Dataset not found or expired")
                 return compute_recommendation(ds, body.feature_fields, body)
@@ -466,7 +466,7 @@ def create_app(
             from process_opt.analysis.excel import parse_excel, save_dataset
             content = await file.read()
             ds = parse_excel(content)
-            ds_id = save_dataset(ds)
+            ds_id = await save_dataset(ds)
             feature_fields = sorted({k for f in ds.features for k in f})
             target_fields = sorted({k for t in ds.targets for k in t})
             return {
@@ -482,7 +482,7 @@ def create_app(
             size: int = 50,
         ) -> Any:
             from process_opt.analysis.excel import get_dataset
-            ds = get_dataset(dataset_id)
+            ds = await get_dataset(dataset_id)
             if ds is None:
                 raise HTTPException(status_code=404, detail="Dataset not found or expired")
             total = len(ds.features)
@@ -545,7 +545,7 @@ def create_app(
                 except ValueError:
                     raise HTTPException(status_code=400, detail="Invalid since format, use ISO 8601")
             ds_id = await builder.build_to_dataset_id(device_id, since=since)
-            ds = get_dataset(ds_id)
+            ds = await get_dataset(ds_id)
             feature_fields = sorted({k for f in ds.features for k in f}) if ds else []
             target_fields = sorted({k for t in ds.targets for k in t}) if ds else []
             return {
@@ -558,7 +558,7 @@ def create_app(
         async def pareto_route(body: ParetoRequest) -> list[ParetoItem]:
             from process_opt.analysis.excel import get_dataset
             from process_opt.analysis.pareto import compute_pareto
-            ds = get_dataset(body.dataset_id)
+            ds = await get_dataset(body.dataset_id)
             if ds is None:
                 raise HTTPException(status_code=404, detail="Dataset not found or expired")
             return compute_pareto(ds, body.field_y)
@@ -567,7 +567,7 @@ def create_app(
         async def optimize_route(body: OptimizationConfig) -> OptimizationResult:
             from process_opt.analysis.excel import get_dataset
             from process_opt.analysis.optimization import run_optimization
-            ds = get_dataset(body.dataset_id)
+            ds = await get_dataset(body.dataset_id)
             if ds is None:
                 raise HTTPException(status_code=404, detail="Dataset not found or expired")
             return run_optimization(ds, body)

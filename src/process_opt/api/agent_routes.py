@@ -191,6 +191,7 @@ def register_agent_routes(
                 logger.debug("SSE client disconnected for session %s", session_id)
             except Exception as exc:
                 logger.error("SSE stream error for session %s: %s", session_id, exc)
+                logger.error("Traceback:", exc_info=True)
                 err = json.dumps({"type": "error", "message": str(exc)})
                 yield f"data: {err}\n\n".encode()
                 yield b'data: {"type":"session.status","status":"idle"}\n\n'
@@ -230,7 +231,7 @@ def register_agent_routes(
 
         content = await file.read()
         ds = parse_excel(content)
-        ds_id = save_dataset(ds)
+        ds_id = await save_dataset(ds)
         feature_fields = sorted({k for f in ds.features for k in f})
         target_fields = sorted({k for t in ds.targets for k in t})
         return {

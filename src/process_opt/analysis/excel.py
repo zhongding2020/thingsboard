@@ -16,16 +16,16 @@ def set_dataset_repo(repo: DatasetRepository) -> None:
     _dataset_repo = repo
 
 
-def save_dataset(dataset: AnalysisDataset, ttl: int = 30) -> str:
+async def save_dataset(dataset: AnalysisDataset, ttl: int = 30) -> str:
     if _dataset_repo is None:
         raise RuntimeError("DatasetRepository not initialized")
-    return _dataset_repo.save(dataset, ttl=ttl)
+    return await _dataset_repo.save(dataset, ttl=ttl)
 
 
-def get_dataset(key: str) -> AnalysisDataset | None:
+async def get_dataset(key: str) -> AnalysisDataset | None:
     if _dataset_repo is None:
         raise RuntimeError("DatasetRepository not initialized")
-    return _dataset_repo.get(key)
+    return await _dataset_repo.get(key)
 
 
 def parse_excel(file_bytes: bytes) -> AnalysisDataset:

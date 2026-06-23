@@ -143,7 +143,7 @@ def create_analysis_tools(
         """对数据集进行帕累托分析，找出对 field_y 影响最大的因子排序。"""
         from process_opt.analysis.excel import get_dataset
         from process_opt.analysis.pareto import compute_pareto
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "Dataset not found or expired"
         items = compute_pareto(ds, field_y)
@@ -162,7 +162,7 @@ def create_analysis_tools(
         """拟合回归模型。model_type: linear 或 pls。返回 R²、RMSE、系数。"""
         from process_opt.analysis.excel import get_dataset
         from process_opt.analysis.regression import fit_regression
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "Dataset not found or expired"
         result = fit_regression(ds, feature_fields, target_field, model_type)
@@ -187,7 +187,7 @@ def create_analysis_tools(
         """根据历史数据和目标值，推荐最优参数组合。"""
         from process_opt.analysis.excel import get_dataset
         from process_opt.analysis.recommendation import compute_recommendation
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "Dataset not found or expired"
         req = RecommendationRequest(
@@ -338,7 +338,7 @@ def create_analysis_tools(
         if since:
             since_dt = datetime.fromisoformat(since)
         ds_id = await analysis_service.build_dataset_id(device_id, since=since_dt)
-        ds = get_dataset(ds_id)
+        ds = await get_dataset(ds_id)
         feature_fields = sorted({k for f in ds.features for k in f}) if ds else []
         target_fields = sorted({k for t in ds.targets for k in t}) if ds else []
         sample_count = ds.sample_count if ds else 0
@@ -451,7 +451,7 @@ def create_analysis_tools(
         from process_opt.analysis.excel import get_dataset
         from process_opt.analysis.importance import compute_importance
 
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "数据集未找到或已过期，请重新构建数据集。"
 
@@ -504,7 +504,7 @@ def create_analysis_tools(
         from process_opt.analysis.optimization import run_optimization
         from process_opt.analysis.schemas import OptimizationConfig
 
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "数据集未找到或已过期，请重新构建数据集。"
 
@@ -629,7 +629,7 @@ def create_analysis_tools(
         size: 每页行数（默认20）。"""
         from process_opt.analysis.excel import get_dataset
 
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "数据集未找到或已过期，请重新构建数据集。"
 
@@ -820,7 +820,7 @@ def create_analysis_tools(
         from process_opt.analysis.profiling import profile_dataset
         from process_opt.analysis.correlation import compute_correlation
 
-        ds = get_dataset(dataset_id)
+        ds = await get_dataset(dataset_id)
         if ds is None:
             return "Dataset not found"
 

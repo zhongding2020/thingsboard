@@ -266,4 +266,4 @@ class DatasetBuilder:
                 suggestion=ds.suggestion,
                 details=ds.details,
             )
-        return save_dataset(ds)
+        return await save_dataset(ds)

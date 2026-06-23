@@ -37,7 +37,7 @@ class OvenCuringModel(MechanismModel):
         T_kelvin = temp + 273.15
         k = math.exp(-50000 / (R * T_kelvin))  # Ea ≈ 50 kJ/mol
         cure_raw = k * duration * (1 - humidity / 200) * airflow / 25
-        cure = 0.3 + cure_raw * 8000
+        cure = 0.3 + cure_raw * 12000
 
         # 失重：高温长时 → 更多挥发
         weight_loss = 0.3 + (temp - 80) * 0.015 + duration * 0.008

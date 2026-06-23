@@ -40,6 +40,7 @@ class CncDrillModel(MechanismModel):
 
         accuracy += random.gauss(0, 0.02)
         roughness += random.gauss(0, 0.15)
+        roughness = max(0, roughness)
 
         accuracy = round(accuracy, 2)
         roughness = round(roughness, 2)

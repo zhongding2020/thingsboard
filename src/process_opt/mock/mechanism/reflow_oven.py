@@ -34,7 +34,7 @@ class ReflowOvenModel(MechanismModel):
         quality = 1.0 - abs(heat_input - ideal) / ideal * 0.8
 
         # 空洞率：高温 + 高氧 → 更多空洞
-        voiding = 0.5 + (temp - 230) * 0.02 + oxygen * 0.003
+        voiding = max(0, 0.5 + (temp - 230) * 0.02 + oxygen * 0.003)
 
         # 可控噪声
         quality += random.gauss(0, 0.02)

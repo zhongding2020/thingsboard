@@ -9,6 +9,8 @@ from fastapi import FastAPI
 
 from process_opt.analysis import AnalysisService
 from process_opt.analysis.dataset import DatasetBuilder
+from process_opt.analysis.dataset_repo import DatasetRepository
+from process_opt.analysis.excel import set_dataset_repo
 from process_opt.analysis.schemas import AnalysisDataset, AnalysisDatasetRequest, CorrelationRequest, CorrelationResult, ImportanceRequest, ImportanceResult, ProfilingResult, RecommendationRequest, RecommendationResult, RegressionRequest, RegressionResult, SpcRequest, SpcResult
 from process_opt.api.app import create_app
 from process_opt.common.db import apply_sql_file, create_pool
@@ -272,6 +274,8 @@ def create_api_app_from_settings() -> FastAPI:
         parameter_repo = ParameterRepository(pool)
         parameter_service = ParameterService(parameter_repo)
         dataset_builder = DatasetBuilder(pool)
+        dataset_repo = DatasetRepository(pool)
+        set_dataset_repo(dataset_repo)
         analysis_service = AnalysisService(dataset_builder)
         experiment_repo = ExperimentRepository(pool)
         experiment_repo_proxy._repo = experiment_repo

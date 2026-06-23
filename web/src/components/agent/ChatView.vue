@@ -53,75 +53,84 @@
           >
             <div class="max-w-lg w-full">
               <!-- Hero -->
-              <h1 class="text-center text-sm font-semibold text-slate-700 dark:text-slate-200 mb-0.5">
+              <h1 class="text-center text-xl font-semibold text-slate-700 dark:text-slate-200 mb-1">
                 工艺参数在线分析与调优
               </h1>
-              <p class="text-center text-[11px] text-slate-400 dark:text-slate-500 mb-6">
+              <p class="text-center text-sm text-slate-400 dark:text-slate-500 mb-6">
                 AI 驱动的制造过程优化助手
               </p>
 
               <!-- Optimization workflow (wizard steps) -->
-              <div class="mb-5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-4">
-                <p class="text-[11px] font-semibold text-blue-700 dark:text-blue-300 mb-3 flex items-center gap-1.5">
+              <div class="mb-5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-5">
+                <p class="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-4 flex items-center gap-1.5">
                   <span>🔄</span> 工艺参数优化流程
                 </p>
                 <!-- 5-step indicator -->
-                <div class="flex items-center justify-between mb-3 px-1">
+                <div class="flex items-center justify-between mb-4 px-1">
                   <template v-for="(step, i) in workflowSteps" :key="step.name">
-                    <div class="flex flex-col items-center gap-1">
+                    <div
+                      class="flex flex-col items-center gap-1.5 cursor-pointer group/step"
+                      @mouseenter="hoveredStep = i"
+                    >
                       <span
-                        class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-colors"
-                        :class="step.active
-                          ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500 text-white'
-                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500'"
+                        class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all duration-200"
+                        :class="hoveredStep === i
+                          ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500 text-white scale-110 shadow-md shadow-blue-500/25'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 group-hover/step:border-blue-400 group-hover/step:text-blue-500'"
                       >{{ i + 1 }}</span>
                       <span
-                        class="text-[9px] font-medium transition-colors"
-                        :class="step.active
+                        class="text-[11px] font-medium transition-colors duration-200"
+                        :class="hoveredStep === i
                           ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-slate-400 dark:text-slate-500'"
+                          : 'text-slate-400 dark:text-slate-500 group-hover/step:text-slate-500 dark:group-hover/step:text-slate-300'"
                       >{{ step.name }}</span>
                     </div>
                     <!-- connector line -->
                     <div
                       v-if="i < workflowSteps.length - 1"
-                      class="flex-1 h-0.5 mx-0.5 -mt-3 rounded transition-colors"
-                      :class="step.active && workflowSteps[i + 1].active
+                      class="flex-1 h-0.5 mx-1 -mt-3 rounded transition-colors duration-200"
+                      :class="hoveredStep > i || (hoveredStep === 0 && i === 0)
                         ? 'bg-blue-400 dark:bg-blue-500'
                         : 'bg-slate-200 dark:bg-slate-700'"
                     />
                   </template>
                 </div>
-                <!-- Step description + CTA -->
-                <p class="text-[10px] text-slate-500 dark:text-slate-400 mb-2.5 leading-relaxed">
-                  {{ workflowSteps[0].desc }}
-                </p>
+                <!-- Step description (reacts to hover) + CTA -->
+                <div class="min-h-[36px] mb-3 transition-all duration-200">
+                  <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    <span class="inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 align-middle">
+                      {{ hoveredStep + 1 }}
+                    </span>
+                    <span class="align-middle">{{ workflowSteps[hoveredStep].name }} — {{ workflowSteps[hoveredStep].desc }}</span>
+                  </p>
+                </div>
                 <button
-                  class="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border-none cursor-pointer text-[11px] font-medium transition-colors bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-400"
+                  class="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border-none cursor-pointer text-sm font-medium transition-all duration-200 bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-400 hover:shadow-md"
                   @click="onSend(workflowStartPrompt)"
                 >
                   开始优化流程
-                  <span class="text-[10px]">→</span>
+                  <span>→</span>
                 </button>
               </div>
 
               <!-- Feature cards (2x2 grid) -->
-              <div class="grid grid-cols-2 gap-2.5 mb-5">
+              <div class="grid grid-cols-2 gap-3 mb-5">
                 <div
                   v-for="f in features"
                   :key="f.title"
-                  class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3"
+                  class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3.5 cursor-pointer transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/40 hover:shadow-md hover:-translate-y-0.5"
+                  @click="onSend(f.prompt)"
                 >
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <span class="text-base">{{ f.icon }}</span>
-                    <span class="text-[12px] font-semibold text-slate-700 dark:text-slate-200">{{ f.title }}</span>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-lg">{{ f.icon }}</span>
+                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ f.title }}</span>
                   </div>
-                  <p class="text-[10px] text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">{{ f.desc }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mb-2.5 leading-relaxed">{{ f.desc }}</p>
                   <div class="flex flex-wrap gap-1">
                     <span
                       v-for="t in f.tags"
                       :key="t"
-                      class="text-[9px] px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                      class="text-[10px] px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
                     >{{ t }}</span>
                   </div>
                 </div>
@@ -129,18 +138,18 @@
 
               <!-- Use cases -->
               <div class="mb-4">
-                <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                <p class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2.5 flex items-center gap-1">
                   <span>💡</span> 使用案例
                 </p>
                 <div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
                   <button
                     v-for="(uc, i) in useCases"
                     :key="i"
-                    class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors group cursor-pointer border-none bg-transparent"
+                    class="w-full flex items-center gap-2.5 px-3.5 py-3 text-left hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors group cursor-pointer border-none bg-transparent"
                     @click="onSend(uc.prompt)"
                   >
-                    <span class="text-[10px] text-slate-300 dark:text-slate-600 group-hover:text-blue-400 transition-colors flex-shrink-0">➤</span>
-                    <span class="text-[11px] text-slate-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors leading-relaxed">{{ uc.title }}</span>
+                    <span class="text-xs text-slate-300 dark:text-slate-600 group-hover:text-blue-400 transition-colors flex-shrink-0">➤</span>
+                    <span class="text-sm text-slate-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors leading-relaxed">{{ uc.title }}</span>
                   </button>
                 </div>
               </div>
@@ -302,6 +311,8 @@ void _processTypes
 // ---------------------------------------------------------------------------
 // Welcome screen — optimization workflow steps, feature cards & use cases
 // ---------------------------------------------------------------------------
+const hoveredStep = ref(0)
+
 const workflowSteps = [
   { name: '定义', desc: '首先明确优化目标：选择产线、设备和需要优化的质量指标，确定参数搜索范围', active: true },
   { name: '探索', desc: '对数据进行统计画像，了解数据分布特征，发现异常值和潜在规律', active: true },
@@ -319,24 +330,28 @@ const features = [
     title: '数据分析',
     desc: '多维度统计分析，发现数据中的规律与异常',
     tags: ['相关性', '回归', 'SPC', '特征重要性'],
+    prompt: '请帮我分析最近的生产数据，包括相关性分析和特征重要性排序',
   },
   {
     icon: '🎯',
     title: '智能优化',
     desc: '基于历史数据推荐最优工艺参数组合',
     tags: ['参数推荐', '多目标优化', 'Pareto', '报告'],
+    prompt: '请根据最近的生产数据推荐最优工艺参数组合',
   },
   {
     icon: '🔍',
     title: '追溯监控',
     desc: '产品质量追溯与产线实时状态监控',
     tags: ['产品追溯', '产线SPC', '统计概览'],
+    prompt: '请对当前产线做一次完整的SPC监控总览',
   },
   {
     icon: '🧪',
     title: '实验设计',
     desc: '科学的实验方案设计与结果分析',
     tags: ['DOE', 'ANOVA', '参数管理'],
+    prompt: '请帮我设计一个工艺参数优化实验方案',
   },
 ] as const
 

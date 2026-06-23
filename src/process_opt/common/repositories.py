@@ -365,12 +365,43 @@ class LineDeviceRepository:
                         idx, device_id, line_id,
                     )
 
-    async def ensure_device_exists(self, device_id: str, device_type: str) -> None:
-        """Idempotent device registration for mock generator."""
+    async def ensure_device_exists(
+        self, device_id: str, device_type: str,
+        line_id: str | None = None, name: str | None = None,
+    ) -> None:
+        """Idempotent device registration for mock generator.
+
+        Resolves line_id by id first, then by name, then falls back to 默认产线.
+        """
+        device_name = name or device_id
         async with self._pool.acquire() as connection:
+            resolved_line_id: str | None = None
+
+            if line_id:
+                # Try as UUID first
+                try:
+                    resolved_line_id = await connection.fetchval(
+                        "SELECT id FROM production_lines WHERE id = $1::uuid",
+                        line_id,
+                    )
+                except Exception:
+                    resolved_line_id = None
+
+                # If not found by UUID, try by name
+                if resolved_line_id is None:
+                    resolved_line_id = await connection.fetchval(
+                        "SELECT id FROM production_lines WHERE name = $1",
+                        line_id,
+                    )
+
+            # Fallback to 默认产线
+            if resolved_line_id is None:
+                resolved_line_id = await connection.fetchval(
+                    "SELECT id FROM production_lines WHERE name = '默认产线' LIMIT 1"
+                )
+
             await connection.execute("""
                 INSERT INTO device_registry (id, line_id, name, type, icon, description)
-                VALUES ($1, (SELECT id FROM production_lines WHERE name = '默认产线'),
-                        $1, $2, 'Monitor', '自动注册')
+                VALUES ($1, $2, $3, $4, 'Monitor', '自动注册')
                 ON CONFLICT (id) DO NOTHING
-            """, device_id, device_type)
+            """, device_id, resolved_line_id, device_name, device_type)

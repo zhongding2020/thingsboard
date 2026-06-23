@@ -622,6 +622,22 @@ def create_app(
             await experiment_repo.update_plan_status(plan_id, body["status"])
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+        @app.get("/api/v1/experiment/results")
+        async def get_experiment_results_by_device(
+            device_id: str = "",
+            limit: int = 50,
+        ) -> dict:
+            """读取指定设备上报的试验结果，按记录时间倒序。
+            若未指定 device_id 则返回空列表。"""
+            if not device_id:
+                return {"device_id": "", "results": [], "count": 0}
+            results = await experiment_repo.get_results_by_device(device_id, limit)
+            return {
+                "device_id": device_id,
+                "results": [r.model_dump() for r in results],
+                "count": len(results),
+            }
+
     if mock_manager is not None:
         from process_opt.api.mock_routes import register_mock_routes
         register_mock_routes(app, mock_manager)

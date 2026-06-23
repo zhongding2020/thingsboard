@@ -59,7 +59,15 @@ services:
     environment:
       PROCESS_OPT_POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/process_opt"
       PROCESS_OPT_API_PORT: "8000"
-      PROCESS_OPT_AGENT_API_KEY: "${AGENT_API_KEY}"
+      # ── LLM / Agent 配置 ──
+      PROCESS_OPT_AGENT_MODEL: "${AGENT_MODEL:-ark-code-latest}"
+      PROCESS_OPT_AGENT_API_BASE: "${AGENT_API_BASE:-https://ark.cn-beijing.volces.com/api/coding/v3}"
+      PROCESS_OPT_AGENT_API_KEY: "${AGENT_API_KEY:-}"
+      PROCESS_OPT_AGENT_TEMPERATURE: "${AGENT_TEMPERATURE:-0.0}"
+      # ── 内部服务 ──
+      PROCESS_OPT_GATEWAY_URL: "http://gateway:8001"
+      PROCESS_OPT_GATEWAY_API_KEY: "change-me"
+      PROCESS_OPT_NATS_URL: "nats://nats:4222"
     depends_on:
       postgres:
         condition: service_healthy

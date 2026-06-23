@@ -33,6 +33,7 @@ class ExperimentResultCreate(BaseModel):
     run_order: int
     response_value: float | None = None
     notes: str | None = None
+    device_id: str | None = None
 
 
 class ExperimentResult(BaseModel):
@@ -41,6 +42,7 @@ class ExperimentResult(BaseModel):
     run_order: int
     response_value: float | None
     notes: str | None
+    device_id: str | None = None
     recorded_at: datetime
 
 
@@ -85,12 +87,12 @@ class ExperimentRepository:
 
     async def record_result(self, plan_id: int, data: ExperimentResultCreate) -> ExperimentResult:
         row = await self._pool.fetchrow(
-            """INSERT INTO experiment_results (plan_id, run_order, response_value, notes)
-               VALUES ($1,$2,$3,$4)
+            """INSERT INTO experiment_results (plan_id, run_order, response_value, notes, device_id)
+               VALUES ($1,$2,$3,$4,$5)
                ON CONFLICT (plan_id, run_order) DO UPDATE
-               SET response_value=$3, notes=$4, recorded_at=NOW()
+               SET response_value=$3, notes=$4, device_id=$5, recorded_at=NOW()
                RETURNING *""",
-            plan_id, data.run_order, data.response_value, data.notes,
+            plan_id, data.run_order, data.response_value, data.notes, data.device_id,
         )
         await self._update_plan_status(plan_id)
         return ExperimentResult(**dict(row))
@@ -102,6 +104,18 @@ class ExperimentRepository:
         for r in results:
             recorded.append(await self.record_result(plan_id, r))
         return recorded
+
+    async def get_results_by_device(
+        self, device_id: str, limit: int = 50,
+    ) -> list[ExperimentResult]:
+        """Return experiment results recorded by a specific device, newest first."""
+        rows = await self._pool.fetch(
+            """SELECT * FROM experiment_results
+               WHERE device_id = $1
+               ORDER BY recorded_at DESC LIMIT $2""",
+            device_id, limit,
+        )
+        return [ExperimentResult(**dict(r)) for r in rows]
 
     async def update_plan_status(self, plan_id: int, status: str) -> None:
         await self._pool.execute(

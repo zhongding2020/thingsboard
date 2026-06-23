@@ -28,9 +28,11 @@ except ImportError:
     ContainerPoolProxy = None  # type: ignore
     _HAS_CONTAINER_POOL = False
 from process_opt.agent.tools.analysis_tools import create_analysis_tools
+from process_opt.agent.tools.data_tools import create_data_tools
 from process_opt.agent.tools.system_tools import create_system_tools
 from process_opt.agent.tools.parameter_tools import create_parameter_tools
 from process_opt.agent.tools.experiment_tools import create_experiment_tools
+from process_opt.agent.tools.mock_tools import create_mock_tools
 from process_opt.agent.deep_agent import create_process_agent
 from process_opt.experiment.repository import ExperimentRepository
 from process_opt.mock.manager import MockManager
@@ -247,6 +249,9 @@ class ExperimentRepositoryProxy:
     async def update_plan_status(self, plan_id: int, status: str) -> None:
         await self._repo.update_plan_status(plan_id, status)
 
+    async def get_results_by_device(self, device_id: str, limit: int = 50) -> list:
+        return await self._repo.get_results_by_device(device_id, limit)
+
 
 def create_api_app_from_settings() -> FastAPI:
     settings = Settings()
@@ -268,7 +273,7 @@ def create_api_app_from_settings() -> FastAPI:
     from process_opt.mock.manager import MockManager
     mock_manager = MockManager(
         api_url="http://localhost:8000",
-        gateway_url="http://localhost:8001",
+        gateway_url=settings.gateway_url,
         api_key=settings.gateway_api_key,
     )
 
@@ -280,6 +285,7 @@ def create_api_app_from_settings() -> FastAPI:
             await apply_sql_file(pool, fpath)
         repository = DataRepository(pool)
         line_device_repo = LineDeviceRepository(pool)
+        mock_manager.register_device_callback = line_device_repo.ensure_device_exists
         parameter_repo = ParameterRepository(pool)
         parameter_service = ParameterService(parameter_repo)
         dataset_builder = DatasetBuilder(pool)
@@ -324,9 +330,14 @@ def create_api_app_from_settings() -> FastAPI:
             repository_proxy, analysis_service_proxy, parameter_service_proxy,
             knowledge_loader, experiment_repo_proxy,
         ) +
+        create_data_tools(
+            repository_proxy, analysis_service_proxy, parameter_service_proxy,
+            experiment_repo_proxy,
+        ) +
         create_system_tools(line_device_repo_proxy, analysis_service_proxy) +
         create_parameter_tools(parameter_service_proxy) +
-        create_experiment_tools(experiment_repo_proxy)
+        create_experiment_tools(experiment_repo_proxy) +
+        create_mock_tools(mock_manager)
     )
     for t in all_tools:
         tool_pool[t.name] = t

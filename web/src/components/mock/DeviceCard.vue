@@ -19,6 +19,7 @@
     <div class="card-footer">
       <el-button size="small" @click="$emit('configure', device)">参数配置</el-button>
       <el-button size="small" @click="$emit('experiment', device)">实验</el-button>
+      <el-button size="small" @click="$emit('log', device)">日志</el-button>
       <template v-if="device.status === 'running'">
         <el-button size="small" type="warning" @click="$emit('pause')">暂停</el-button>
         <el-button size="small" type="danger" @click="$emit('stop')">停止</el-button>
@@ -36,7 +37,7 @@
 import { computed } from 'vue'
 
 const props = defineProps<{ device: any }>()
-defineEmits(['configure', 'experiment', 'start', 'pause', 'stop', 'delete'])
+defineEmits(['configure', 'experiment', 'log', 'start', 'pause', 'stop', 'delete'])
 
 const TYPE_LABELS: Record<string, string> = {
   'reflow-oven': '回流焊',

@@ -4,7 +4,5 @@ __pycache__
 node_modules
 tests
 web/node_modules
-web/src
-web/node_modules
 *.pyc
 .env

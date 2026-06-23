@@ -281,7 +281,11 @@ class MockDevice:
             # Report result
             await self._http.post(
                 f"{self._api_url}/api/v1/experiment/plans/{plan_id}/results",
-                json={"run_order": run.get("run_order", idx), "response_value": response_value},
+                json={
+                    "run_order": run.get("run_order", idx),
+                    "response_value": response_value,
+                    "device_id": self.device_id,
+                },
             )
             await self._emit("experiment.progress", {
                 "plan_id": plan_id, "run_order": idx, "total_runs": total,

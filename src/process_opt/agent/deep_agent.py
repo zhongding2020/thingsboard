@@ -53,8 +53,14 @@ async def create_process_agent(
     all_tool_names: set[str] = set(process_skill.get("tools", []))
     for cap in capability_skills:
         all_tool_names.update(cap.get("tools", []))
-    # Always include ask_user for interactive prompts
+    # Always include core infrastructure tools
     all_tool_names.add("ask_user")
+    all_tool_names.add("list_mock_devices")
+    all_tool_names.add("assign_experiment")
+    all_tool_names.add("get_experiment_results")
+    all_tool_names.add("get_plan_results")
+    all_tool_names.add("save_experiment_plan")
+    all_tool_names.add("list_experiment_plans")
 
     tools = [tool_pool[name] for name in all_tool_names if name in tool_pool]
     missing = all_tool_names - set(tool_pool.keys())

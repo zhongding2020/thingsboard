@@ -26,7 +26,7 @@ def register_mock_routes(app: Any, mock_manager: MockManager) -> None:
             config = DeviceConfig(**body)
         except Exception as e:
             raise HTTPException(status_code=422, detail=str(e))
-        device = mock_manager.create(config)
+        device = await mock_manager.create(config)
         return {
             "device_id": device.device_id,
             "device_type": device.device_type,

@@ -16,7 +16,8 @@ def manager():
 
 # ---- Create, List, Get ----
 
-def test_create_device_idle(manager):
+@pytest.mark.asyncio
+async def test_create_device_idle(manager):
     cfg = DeviceConfig(
         device_id="test-reflow-001",
         device_type="reflow-oven",
@@ -24,22 +25,24 @@ def test_create_device_idle(manager):
         line_id="L1",
         report_interval=999,
     )
-    dev = manager.create(cfg)
+    dev = await manager.create(cfg)
     assert dev.device_id == "test-reflow-001"
     assert dev.device_type == "reflow-oven"
     assert dev.state == "idle"
     assert dev.name == "测试回流焊"
 
 
-def test_list_all(manager):
-    manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
-    manager.create(DeviceConfig(device_id="d2", device_type="injection-molder", name="B", line_id="L2"))
+@pytest.mark.asyncio
+async def test_list_all(manager):
+    await manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
+    await manager.create(DeviceConfig(device_id="d2", device_type="injection-molder", name="B", line_id="L2"))
     devices = manager.list_all()
     assert len(devices) == 2
 
 
-def test_get_device(manager):
-    manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
+@pytest.mark.asyncio
+async def test_get_device(manager):
+    await manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
     dev = manager.get("d1")
     assert dev is not None
     assert dev.name == "A"
@@ -53,7 +56,7 @@ def test_get_nonexistent(manager):
 
 @pytest.mark.asyncio
 async def test_delete_device(manager):
-    manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
+    await manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
     await manager.delete("d1")
     assert manager.get("d1") is None
 
@@ -61,7 +64,7 @@ async def test_delete_device(manager):
 @pytest.mark.asyncio
 async def test_delete_running_device_stops_first(manager):
     cfg = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1")
-    manager.create(cfg)
+    await manager.create(cfg)
     await manager.start("d1")
     assert manager.get("d1").state == "running"
     await manager.delete("d1")
@@ -75,7 +78,7 @@ async def test_delete_running_device_stops_first(manager):
 @pytest.mark.asyncio
 async def test_start_stop_pause(manager):
     cfg = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1")
-    manager.create(cfg)
+    await manager.create(cfg)
     dev = manager.get("d1")
     assert dev.state == "idle"
 
@@ -99,7 +102,7 @@ async def test_start_stop_pause(manager):
 @pytest.mark.asyncio
 async def test_configure_params(manager):
     cfg = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1")
-    manager.create(cfg)
+    await manager.create(cfg)
     dev = manager.get("d1")
     await manager.configure("d1", {"temperature": 260, "conveyor_speed": 70, "oxygen_ppm": 150})
     assert dev.current_params["temperature"] == 260
@@ -111,7 +114,7 @@ async def test_configure_params(manager):
 @pytest.mark.asyncio
 async def test_enqueue_experiment(manager):
     cfg = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1")
-    manager.create(cfg)
+    await manager.create(cfg)
     dev = manager.get("d1")
     await manager.enqueue_experiment("d1", 3)
     assert dev.experiment_queue.qsize() == 1
@@ -121,9 +124,10 @@ async def test_enqueue_experiment(manager):
 
 # ---- Get State ----
 
-def test_get_state_snapshot(manager):
-    manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
-    manager.create(DeviceConfig(device_id="d2", device_type="cnc-drill", name="B", line_id="L2"))
+@pytest.mark.asyncio
+async def test_get_state_snapshot(manager):
+    await manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
+    await manager.create(DeviceConfig(device_id="d2", device_type="cnc-drill", name="B", line_id="L2"))
     state = manager.get_state()
     assert state["summary"]["running"] == 0
     assert state["summary"]["idle"] == 2
@@ -132,8 +136,8 @@ def test_get_state_snapshot(manager):
 
 @pytest.mark.asyncio
 async def test_get_state_with_running(manager):
-    manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
-    manager.create(DeviceConfig(device_id="d2", device_type="cnc-drill", name="B", line_id="L2"))
+    await manager.create(DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1"))
+    await manager.create(DeviceConfig(device_id="d2", device_type="cnc-drill", name="B", line_id="L2"))
     await manager.start("d1")
     state = manager.get_state()
     assert state["summary"]["running"] == 1
@@ -149,9 +153,9 @@ async def test_get_state_with_running(manager):
 async def test_duplicate_create_replaces_existing(manager):
     c1 = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1")
     c2 = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A-v2", line_id="L2")
-    manager.create(c1)
+    await manager.create(c1)
     await manager.start("d1")
-    manager.create(c2)  # should stop old, replace with new
+    await manager.create(c2)  # should stop old, replace with new
     dev = manager.get("d1")
     assert dev.name == "A-v2"
     assert dev.line_id == "L2"
@@ -163,7 +167,7 @@ async def test_duplicate_create_replaces_existing(manager):
 @pytest.mark.asyncio
 async def test_device_events_queue(manager):
     cfg = DeviceConfig(device_id="d1", device_type="reflow-oven", name="A", line_id="L1")
-    manager.create(cfg)
+    await manager.create(cfg)
     dev = manager.get("d1")
     # Put a test event
     await dev.events.put({"type": "test", "msg": "hello"})

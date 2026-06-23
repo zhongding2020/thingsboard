@@ -20,6 +20,7 @@
         :device="d"
         @configure="openConfig"
         @experiment="openExperiment"
+        @log="openLog"
         @start="handleStart(d.device_id)"
         @pause="handlePause(d.device_id)"
         @stop="handleStop(d.device_id)"
@@ -46,6 +47,12 @@
       v-model:visible="experimentDrawer.visible"
       :device="experimentDrawer.device"
     />
+
+    <!-- 设备日志抽屉 -->
+    <DeviceLogDrawer
+      v-model:visible="logDrawer.visible"
+      :device="logDrawer.device"
+    />
   </div>
 </template>
 
@@ -56,6 +63,7 @@ import DeviceCard from '@/components/mock/DeviceCard.vue'
 import AddDeviceDialog from '@/components/mock/AddDeviceDialog.vue'
 import DeviceConfigDrawer from '@/components/mock/DeviceConfigDrawer.vue'
 import ExperimentPanel from '@/components/mock/ExperimentPanel.vue'
+import DeviceLogDrawer from '@/components/mock/DeviceLogDrawer.vue'
 
 interface MockDevice {
   device_id: string
@@ -78,6 +86,9 @@ const configDrawer = reactive<{ visible: boolean; device: MockDevice | null }>({
   visible: false, device: null,
 })
 const experimentDrawer = reactive<{ visible: boolean; device: MockDevice | null }>({
+  visible: false, device: null,
+})
+const logDrawer = reactive<{ visible: boolean; device: MockDevice | null }>({
   visible: false, device: null,
 })
 
@@ -121,6 +132,10 @@ function openConfig(d: MockDevice) {
 function openExperiment(d: MockDevice) {
   experimentDrawer.device = d
   experimentDrawer.visible = true
+}
+function openLog(d: MockDevice) {
+  logDrawer.device = d
+  logDrawer.visible = true
 }
 
 let timer: number | undefined

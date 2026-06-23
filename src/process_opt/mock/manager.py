@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from process_opt.mock.device import MockDevice
+
+# Ensure mechanism models are registered (side-effect imports trigger @register_mechanism)
+import process_opt.mock.mechanism.cnc_drill  # noqa: F401
+import process_opt.mock.mechanism.coating_machine  # noqa: F401
+import process_opt.mock.mechanism.injection_molder  # noqa: F401
+import process_opt.mock.mechanism.oven_curing  # noqa: F401
+import process_opt.mock.mechanism.reflow_oven  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +30,20 @@ class DeviceConfig(BaseModel):
 class MockManager:
     """管理所有模拟设备生命周期，作为 Backend API 的单例。"""
 
-    def __init__(self, api_url: str, gateway_url: str, api_key: str):
+    def __init__(
+        self,
+        api_url: str,
+        gateway_url: str,
+        api_key: str,
+        register_device_callback: Callable[[str, str, str | None, str | None], Awaitable[None]] | None = None,
+    ):
         self._devices: dict[str, MockDevice] = {}
         self._api_url = api_url
         self._gateway_url = gateway_url
         self._api_key = api_key
+        self.register_device_callback = register_device_callback
 
-    def create(self, config: DeviceConfig) -> MockDevice:
+    async def create(self, config: DeviceConfig) -> MockDevice:
         """创建或替换设备（如已存在则先停止旧设备）。"""
         if config.device_id in self._devices:
             old = self._devices[config.device_id]
@@ -41,6 +56,19 @@ class MockManager:
                     t.cancel()
                 old._tasks.clear()
                 old.state = "idle"
+
+        # Register device in device_registry so it appears in 设备管理
+        if self.register_device_callback is not None:
+            try:
+                await self.register_device_callback(
+                    config.device_id, config.device_type,
+                    config.line_id or None, config.name or None,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to register device %s in device_registry",
+                    config.device_id, exc_info=True,
+                )
 
         device = MockDevice(
             device_id=config.device_id,

@@ -160,8 +160,9 @@ def register_agent_routes(
                     if event.get("event") == "on_tool_end":
                         try:
                             state = await session["agent"].aget_state(stream_config)
-                            todos = state.values.get("todos", [])
-                            todo_data = json.dumps({"type": "todo.update", "todos": todos})
+                            raw_todos = state.values.get("todos", [])
+                            normalized = _normalize_todos(raw_todos)
+                            todo_data = json.dumps({"type": "todo.update", "todos": normalized})
                             yield f"data: {todo_data}\n\n".encode()
                         except Exception:
                             pass
@@ -169,8 +170,9 @@ def register_agent_routes(
                 # Emit final todo.update at stream end
                 try:
                     state = await session["agent"].aget_state(stream_config)
-                    todos = state.values.get("todos", [])
-                    todo_data = json.dumps({"type": "todo.update", "todos": todos})
+                    raw_todos = state.values.get("todos", [])
+                    normalized = _normalize_todos(raw_todos)
+                    todo_data = json.dumps({"type": "todo.update", "todos": normalized})
                     yield f"data: {todo_data}\n\n".encode()
                 except Exception:
                     pass
@@ -238,6 +240,19 @@ def register_agent_routes(
         }
 
     app.include_router(router)
+
+
+def _normalize_todos(raw_todos: list[dict]) -> list[dict]:
+    """Map DeepAgents todo format {content, status} → frontend format {id, text, done}."""
+    normalized = []
+    for i, t in enumerate(raw_todos or []):
+        status = t.get("status", "pending")
+        normalized.append({
+            "id": t.get("id", f"todo_{i}"),
+            "text": t.get("content", t.get("text", "")),
+            "done": status in ("completed", "done"),
+        })
+    return normalized
 
 
 def _map_event(event: dict, subagent_run_ids: set[str] | None = None) -> bytes | None:

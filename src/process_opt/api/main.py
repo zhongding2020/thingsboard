@@ -264,6 +264,14 @@ def create_api_app_from_settings() -> FastAPI:
     from process_opt.knowledge.loader import KnowledgeLoader
     knowledge_loader = KnowledgeLoader()
 
+    # Create MockManager outside lifespan so it's accessible to create_app()
+    from process_opt.mock.manager import MockManager
+    mock_manager = MockManager(
+        api_url="http://localhost:8000",
+        gateway_url="http://localhost:8001",
+        api_key=settings.gateway_api_key,
+    )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         pool = await create_pool(settings.postgres_dsn)
@@ -280,11 +288,6 @@ def create_api_app_from_settings() -> FastAPI:
         analysis_service = AnalysisService(dataset_builder)
         experiment_repo = ExperimentRepository(pool)
         experiment_repo_proxy._repo = experiment_repo
-        mock_manager = MockManager(
-            api_url="http://localhost:8000",
-            gateway_url="http://localhost:8001",
-            api_key=settings.gateway_api_key,
-        )
         app.state.mock_manager = mock_manager
         if _HAS_CONTAINER_POOL:
             manager = ContainerPoolManager(settings)

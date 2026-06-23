@@ -51,7 +51,7 @@
             v-if="!msgs.length && !loading"
             class="flex-1 flex items-center justify-center px-4 py-6 overflow-y-auto"
           >
-            <div class="max-w-lg w-full">
+            <div class="max-w-2xl w-full">
               <!-- Hero -->
               <h1 class="text-center text-xl font-semibold text-slate-700 dark:text-slate-200 mb-1">
                 工艺参数在线分析与调优

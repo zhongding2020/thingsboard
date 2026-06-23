@@ -41,28 +41,49 @@
       </div>
 
       <!-- Event list -->
-      <div ref="listRef" class="overflow-y-auto font-mono text-xs leading-relaxed" style="max-height: 260px">
+      <div ref="listRef" class="overflow-y-auto font-mono text-xs leading-relaxed" style="max-height: 400px">
         <template v-if="visibleEvents.length > 0">
           <div
             v-for="(evt, i) in visibleEvents"
             :key="i"
-            class="flex items-start gap-2 px-3 py-0.5 border-b border-gray-100 dark:border-gray-800/40"
+            class="border-b border-gray-100 dark:border-gray-800/40"
             :class="i % 2 === 0 ? 'bg-transparent' : 'bg-white/50 dark:bg-gray-950/30'"
           >
-            <!-- Category badge -->
-            <span
-              class="flex-shrink-0 mt-0.5 px-1.5 py-px rounded text-[10px] font-medium"
-              :class="categoryBadge(evt.type)"
-            >{{ categoryLabel(evt.type) }}</span>
-            <!-- Type -->
-            <span class="flex-shrink-0 text-gray-500 dark:text-gray-400 min-w-[120px]">{{ evt.type }}</span>
-            <!-- Name -->
-            <span
-              v-if="evt.name"
-              class="flex-shrink-0 text-blue-500 dark:text-blue-400 truncate max-w-[140px]"
-            >{{ evt.name }}</span>
-            <!-- Time -->
-            <span class="flex-shrink-0 text-gray-400 dark:text-gray-600 ml-auto tabular-nums">{{ formatTime(evt.timestamp) }}</span>
+            <!-- Summary row — click to expand -->
+            <div
+              class="flex items-start gap-2 px-3 py-1 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800/30 transition-colors"
+              @click="toggleEvent(i)"
+            >
+              <!-- Expand indicator -->
+              <span class="flex-shrink-0 w-3 text-gray-300 dark:text-gray-600 transition-transform duration-150 mt-0.5"
+                :class="{ 'rotate-90': expandedEvents.has(i) }">▸</span>
+              <!-- Category badge -->
+              <span
+                class="flex-shrink-0 mt-0.5 px-1.5 py-px rounded text-[10px] font-medium"
+                :class="categoryBadge(evt.type)"
+              >{{ categoryLabel(evt.type) }}</span>
+              <!-- Type -->
+              <span class="flex-shrink-0 text-gray-500 dark:text-gray-400 min-w-[130px]">{{ evt.type }}</span>
+              <!-- Name -->
+              <span
+                v-if="evt.name"
+                class="flex-shrink-0 text-blue-500 dark:text-blue-400 truncate max-w-[140px]"
+              >{{ evt.name }}</span>
+              <!-- Preview snippet -->
+              <span class="flex-1 text-gray-400 dark:text-gray-600 truncate text-[10px]">{{ payloadPreview(evt) }}</span>
+              <!-- Time -->
+              <span class="flex-shrink-0 text-gray-400 dark:text-gray-600 tabular-nums">{{ formatTime(evt.timestamp) }}</span>
+            </div>
+
+            <!-- Expanded detail -->
+            <div v-if="expandedEvents.has(i)" class="px-8 pb-2">
+              <pre
+                class="m-0 p-2 rounded text-[10px] leading-relaxed whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto"
+                :class="evt.type === 'error'
+                  ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-900/50'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'"
+              >{{ formatPayload(evt) }}</pre>
+            </div>
           </div>
         </template>
         <div v-else class="px-4 py-6 text-center text-gray-400 dark:text-gray-600 text-xs">
@@ -93,9 +114,20 @@ const props = defineProps<{
 const emit = defineEmits<{ clear: [] }>()
 
 // ---------------------------------------------------------------------------
-// Collapse state
+// State
 // ---------------------------------------------------------------------------
 const expanded = ref(false)
+const expandedEvents = ref(new Set<number>())
+
+function toggleEvent(i: number) {
+  const next = new Set(expandedEvents.value)
+  if (next.has(i)) {
+    next.delete(i)
+  } else {
+    next.add(i)
+  }
+  expandedEvents.value = next
+}
 
 // ---------------------------------------------------------------------------
 // Filter state
@@ -131,7 +163,6 @@ function eventCategory(type: string): string {
 }
 
 function categoryLabel(type: string): string {
-  const cat = eventCategory(type)
   const map: Record<string, string> = {
     message: 'MSG',
     tool: 'TOOL',
@@ -140,11 +171,10 @@ function categoryLabel(type: string): string {
     system: 'SYS',
     error: 'ERR',
   }
-  return map[cat] || 'SYS'
+  return map[eventCategory(type)] || 'SYS'
 }
 
 function categoryBadge(type: string): string {
-  const cat = eventCategory(type)
   const map: Record<string, string> = {
     message: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
     tool: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
@@ -153,7 +183,31 @@ function categoryBadge(type: string): string {
     system: 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
     error: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
   }
-  return map[cat] || 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+  return map[eventCategory(type)] || 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+}
+
+// ---------------------------------------------------------------------------
+// Payload formatting
+// ---------------------------------------------------------------------------
+function payloadPreview(evt: DebugEvent): string {
+  if (!evt.payload) return ''
+  const p = evt.payload as Record<string, unknown>
+  // Show most relevant field as preview
+  if (evt.type === 'error') return p.message as string || ''
+  if (evt.type === 'message.delta') return p.text as string || ''
+  if (evt.type === 'tool.call') return `args: ${JSON.stringify(p.args || p)}`
+  if (evt.type === 'tool.result') return (p.data as string || '').slice(0, 80)
+  if (evt.type === 'interactive.prompt') return (p.action as Record<string, unknown>)?.title as string || ''
+  return ''
+}
+
+function formatPayload(evt: DebugEvent): string {
+  if (!evt.payload) return '(无 payload)'
+  try {
+    return JSON.stringify(evt.payload, null, 2)
+  } catch {
+    return String(evt.payload)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +243,7 @@ function formatTime(ts: number): string {
 // Clear
 // ---------------------------------------------------------------------------
 function clearEvents() {
+  expandedEvents.value = new Set()
   emit('clear')
 }
 

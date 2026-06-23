@@ -26,6 +26,7 @@ const router = createRouter({
         { path: 'guide', component: () => import('@/views/GuideView.vue') },
         { path: 'analysis', component: () => import('@/views/AnalysisView.vue') },
         { path: 'parameters', component: () => import('@/views/ParametersView.vue') },
+        { path: 'mock-devices', component: () => import('@/views/MockDevices.vue') },
         { path: 'settings', component: () => import('@/views/SettingsView.vue') },
       ],
     },

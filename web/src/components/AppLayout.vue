@@ -35,6 +35,10 @@
           <el-icon class="nav-icon-params"><Setting /></el-icon>
           <span>参数管理</span>
         </el-menu-item>
+        <el-menu-item index="/mock-devices">
+          <el-icon class="nav-icon-mock"><Cpu /></el-icon>
+          <span>装备模拟</span>
+        </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon class="nav-icon-settings"><Tools /></el-icon>
           <span>设置</span>
@@ -78,7 +82,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Monitor, DocumentCopy, TrendCharts, DataAnalysis, Setting, Tools, Fold, Expand } from '@element-plus/icons-vue'
+import { Monitor, DocumentCopy, TrendCharts, DataAnalysis, Setting, Tools, Fold, Expand, Cpu } from '@element-plus/icons-vue'
 import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -177,6 +181,7 @@ function handleLogout() {
 .nav-icon-lines { color: #8B5CF6; }
 .nav-icon-analysis { color: #F59E0B; }
 .nav-icon-params { color: #EC4899; }
+.nav-icon-mock { color: #06B6D4; }
 .nav-icon-settings { color: #6B7280; }
 
 .sidebar-user {

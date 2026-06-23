@@ -314,7 +314,7 @@ void _processTypes
 const hoveredStep = ref(0)
 
 const workflowSteps = [
-  { name: '定义', desc: '明确优化目标 (Y) 与当前基线：选定关键质量特性，评估 Cpk / 良率现状，确认测量系统可信，为优化建立比较基准', active: true },
+  { name: '定义', desc: '明确目标与基准：定义关键质量特性 (Y)，确定望目/望大/望小特性与规格限；评估当前 Cpk、良率、缺陷率作为改进基线', active: true },
   { name: '探索', desc: '低成本筛选关键因子 (X)：鱼骨图穷举 → 因果矩阵初筛 → 部分因子实验，从几十个参数中锁定 2–5 个真正显著的因子', active: true },
   { name: '分析', desc: '数据画像与数学建模：对关键因子实施 RSM 响应曲面实验，拟合回归方程 Y = f(X)，通过 ANOVA 验证模型显著性', active: true },
   { name: '优化', desc: '寻优与参数推荐：单目标用响应曲面寻极值，多目标用渴求函数平衡权衡，推荐平坦抗干扰的稳健参数窗口', active: true },
@@ -322,7 +322,7 @@ const workflowSteps = [
 ] as const
 
 const workflowStartPrompt =
-  '请启动工艺参数优化流程（define → explore → analyze → optimize → validate）。首先进入 Define 阶段：询问我要优化的产线、设备和目标质量指标。'
+  '请启动工艺参数优化流程（定义 → 探索 → 分析 → 优化 → 验证）。首先进入定义阶段：询问我要优化的产线、设备、目标质量指标 (Y) 及其规格限，并评估当前 Cpk 基线。'
 
 const features = [
   {

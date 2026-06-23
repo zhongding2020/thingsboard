@@ -40,9 +40,11 @@ def test_mechanism_model_concrete_works():
 @pytest.fixture(autouse=True)
 def _clear_registry():
     from process_opt.mock import mechanism
+    saved = dict(mechanism._registry)
     mechanism._registry.clear()
     yield
     mechanism._registry.clear()
+    mechanism._registry.update(saved)
 
 
 def test_registry_empty_raises():

@@ -163,6 +163,7 @@ class MockDevice:
                 json=payload,
                 headers={"X-API-Key": self._api_key, "Content-Type": "application/json"},
             )
+            r.raise_for_status()
         self._last_heartbeat = time.monotonic()
         await self._emit("heartbeat", {"status": self.state, "current_params": dict(self.current_params)})
 
@@ -210,16 +211,18 @@ class MockDevice:
         }
 
         if self._http:
-            await self._http.post(
+            r1 = await self._http.post(
                 f"{self._gateway_url}/api/v1/data/process",
                 json=process_payload,
                 headers={"X-API-Key": self._api_key, "Content-Type": "application/json"},
             )
-            await self._http.post(
+            r1.raise_for_status()
+            r2 = await self._http.post(
                 f"{self._gateway_url}/api/v1/data/inspection",
                 json=inspection_payload,
                 headers={"X-API-Key": self._api_key, "Content-Type": "application/json"},
             )
+            r2.raise_for_status()
         self._report_count += 1
         await self._emit("data.reported", {"barcode": barcode})
 

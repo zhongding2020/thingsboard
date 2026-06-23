@@ -307,6 +307,11 @@ def create_api_app_from_settings() -> FastAPI:
             parameter_service_proxy._service = None
             analysis_service_proxy._service = None
             experiment_repo_proxy._repo = None
+            for device_id in list(mock_manager._devices):
+                try:
+                    await mock_manager.stop(device_id)
+                except Exception:
+                    pass
             await pool.close()
 
     # Build tool pool as flat dict keyed by tool name

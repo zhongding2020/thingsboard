@@ -314,11 +314,11 @@ void _processTypes
 const hoveredStep = ref(0)
 
 const workflowSteps = [
-  { name: '定义', desc: '首先明确优化目标：选择产线、设备和需要优化的质量指标，确定参数搜索范围', active: true },
-  { name: '探索', desc: '对数据进行统计画像，了解数据分布特征，发现异常值和潜在规律', active: true },
-  { name: '分析', desc: '深入分析：相关性矩阵 → 回归建模 → 特征重要性排序 → SPC 过程能力评估', active: true },
-  { name: '优化', desc: '基于分析结果，结合约束规则推荐最优参数组合，并通过多目标优化验证', active: true },
-  { name: '验证', desc: '生成分析报告，对比优化前后效果，可将推荐参数保存为参数集草案', active: true },
+  { name: '定义', desc: '明确优化目标 (Y) 与当前基线：选定关键质量特性，评估 Cpk / 良率现状，确认测量系统可信，为优化建立比较基准', active: true },
+  { name: '探索', desc: '低成本筛选关键因子 (X)：鱼骨图穷举 → 因果矩阵初筛 → 部分因子实验，从几十个参数中锁定 2–5 个真正显著的因子', active: true },
+  { name: '分析', desc: '数据画像与数学建模：对关键因子实施 RSM 响应曲面实验，拟合回归方程 Y = f(X)，通过 ANOVA 验证模型显著性', active: true },
+  { name: '优化', desc: '寻优与参数推荐：单目标用响应曲面寻极值，多目标用渴求函数平衡权衡，推荐平坦抗干扰的稳健参数窗口', active: true },
+  { name: '验证', desc: '落地固化与闭环：小批量确认性验证 → 更新 SOP / 控制计划 → SPC 控制图实时监控 → 参数锁定防呆，确保长期维持', active: true },
 ] as const
 
 const workflowStartPrompt =

@@ -75,25 +75,30 @@ async def create_process_agent(
     interactive_instructions = """
 ## 与用户交互的方式
 
-当需要用户提供信息（选择产线、设备、参数、确认操作等）时，**必须使用 `ask_user` 工具**，不要直接在文本中提问。`ask_user` 会在前端渲染为下拉框、多选、确认按钮等交互组件。
+当需要用户提供信息时，**必须使用 `ask_user` 工具**，不要在文本中提问。前端会渲染为对应的交互组件。
 
-### 何时使用 ask_user
+### 如何选择 type
 
-- 需要用户选择产线或设备 → type="cascader" 或 type="select"
-- 需要用户勾选要分析的参数 → type="multi_select"
-- 需要用户确认操作（如提交参数集）→ type="confirm"
-- 需要用户输入具体数值 → type="input"
+- 需要用户从已知列表中**选择**产线/设备/参数 → 先调用对应的 list/get 工具获取数据，再用 type="select" 或 type="multi_select"
+- 需要用户**自由输入**文本（如目标指标名称、目标值、备注等）→ type="input"
+- 需要用户**确认**操作 → type="confirm"
+- 需要**级联选择**（如先选产线再选设备）→ type="cascader"
 
 ### 使用示例
 
-选择产线：
+自由输入（无预设选项时使用）：
 ```
-ask_user(type="select", title="请选择要分析的产线", options='[{"label":"注塑A线","value":"L1"},{"label":"注塑B线","value":"L2"}]')
+ask_user(type="input", title="请输入目标质量指标 (Y) 的名称", placeholder="例如 shear_strength")
 ```
 
-多选参数：
+下拉选择（有明确选项时使用）：
 ```
-ask_user(type="multi_select", title="请选择要分析的参数", options='[{"label":"固化温度","value":"cure_temp"},{"label":"固化时间","value":"cure_time"}]')
+ask_user(type="select", title="请选择要分析的产线", options='[{"label":"注塑A线","value":"L1"}]')
+```
+
+多选勾选：
+```
+ask_user(type="multi_select", title="请选择要分析的参数", options='[{"label":"固化温度","value":"cure_temp"}]')
 ```
 
 确认操作：
@@ -101,8 +106,9 @@ ask_user(type="multi_select", title="请选择要分析的参数", options='[{"l
 ask_user(type="confirm", title="确认提交此参数集？", confirm_text="确认提交", cancel_text="取消")
 ```
 
-**重要：调用 ask_user 后，停止当前回复，等待用户在交互组件中的操作结果。**
+**重要：调用 ask_user 后，停止当前回复，等待用户操作结果。**
 """
+    full_system_prompt = process_skill["system_prompt"] + interactive_instructions
     full_system_prompt = process_skill["system_prompt"] + interactive_instructions
 
     agent = create_deep_agent(

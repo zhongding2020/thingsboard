@@ -75,12 +75,27 @@ def stream(interval: int, device_type: str, gateway_url: str, api_key: str) -> N
 @click.option("--records", default=5000, show_default=True, help="Total records to generate")
 @click.option("--clear", is_flag=True, help="Clear existing data before seeding")
 def seed_db(dsn: str, device_count: int, records: int, clear: bool) -> None:
-    """Seed database directly (bypass gateway/NATS)."""
+    """Seed database directly (bypass gateway/NATS).
+    Automatically applies migrations if tables don't exist yet."""
     import asyncio
+    from pathlib import Path
 
     async def _run() -> None:
         pool = await asyncpg.create_pool(dsn)
         try:
+            # Ensure tables exist by running migrations
+            migrations_dir = Path(__file__).resolve().parent.parent.parent.parent / "db" / "migrations"
+            async with pool.acquire() as conn:
+                res = await conn.fetchval(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='production_lines')"
+                )
+                if not res:
+                    click.echo("Tables not found, applying migrations...")
+                    for fpath in sorted(migrations_dir.glob("*.sql")):
+                        click.echo(f"  {fpath.name}")
+                        await conn.execute(fpath.read_text())
+                    click.echo("Migrations complete.")
+
             if clear:
                 async with pool.acquire() as conn:
                     await conn.execute("DELETE FROM inspection_results")

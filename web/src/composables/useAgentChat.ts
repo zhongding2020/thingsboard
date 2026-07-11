@@ -37,7 +37,7 @@ export function useAgentChat(processType: string = 'injection_molding') {
       role: 'user',
       parts: [{ type: 'text', text: opts.text }],
     }
-    messages.value = [...messages.value, userMsg]
+    messages.value.push(userMsg)
 
     abort = new AbortController()
 
@@ -54,7 +54,6 @@ export function useAgentChat(processType: string = 'injection_molding') {
       })
 
       if (!res.ok) {
-        // Try read error body
         const bodyText = await res.text()
         let detail = ''
         try { const b = JSON.parse(bodyText); detail = b.detail || b.message || '' } catch { detail = bodyText }
@@ -69,7 +68,7 @@ export function useAgentChat(processType: string = 'injection_molding') {
         role: 'assistant',
         parts: result.parts,
       }
-      messages.value = [...messages.value, assistantMsg]
+      messages.value.push(assistantMsg)
       status.value = 'ready'
     } catch (e: any) {
       if (e.name !== 'AbortError') {

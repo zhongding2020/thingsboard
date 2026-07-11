@@ -1,90 +1,77 @@
 <template>
-  <div class="flex flex-col gap-1.5 group">
-    <!-- User message -->
-    <div
-      v-if="msg.role === 'user'"
-      class="self-end bg-blue-600 text-white px-3 py-2 rounded-2xl rounded-br-sm max-w-[85%] text-xs leading-relaxed break-words"
-    >
-      {{ msg.content }}
+  <div class="message-card" :class="msg.role">
+    <div class="msg-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
+    <div class="msg-content">
+      <div v-if="msg.role === 'user' && msg.content" class="user-text">{{ msg.content }}</div>
+      <div v-else class="assistant-parts">
+        <template v-for="(part, i) in msg.parts" :key="i">
+          <TextPart v-if="part.type === 'text'" :text="part.text" />
+          <ToolPart
+            v-else-if="part.type.startsWith('tool-')"
+            :part="part"
+            @output="emitToolResult"
+          />
+          <div
+            v-else-if="part.type.startsWith('data-') && part.type !== 'data-todos'"
+            class="data-part"
+          >{{ part.data }}</div>
+        </template>
+        <div v-if="loading" class="thinking-indicator">
+          <span class="dot" /><span class="dot" /><span class="dot" />
+        </div>
+      </div>
     </div>
-
-    <!-- Assistant message -->
-    <template v-else>
-      <!-- Thinking block -->
-      <ThinkingBlock
-        v-if="msg.thinking"
-        :text="msg.thinking"
-        :isStreaming="isStreaming && !msg.content"
-      />
-
-      <!-- Text content -->
-      <div
-        v-if="msg.content"
-        class="self-start bg-gray-100 dark:bg-gray-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%]"
-      >
-        <TextBlock :text="msg.content" :isStreaming="isStreaming" />
-      </div>
-
-      <!-- Interactive actions -->
-      <InteractiveActions
-        v-if="msg.actions?.length"
-        :actions="msg.actions"
-        @resolve="(actionId: string, value: unknown) => $emit('resolveAction', msg, actionId, value)"
-      />
-
-      <!-- Tool calls -->
-      <ToolCallCard
-        v-for="(tc, j) in msg.toolCalls"
-        :key="j"
-        :tc="tc"
-      />
-
-      <!-- Subagent cards -->
-      <SubagentCard
-        v-for="(sa, k) in msg.subagents"
-        :key="k"
-        :name="sa.name"
-        :content="sa.content"
-        :status="sa.status"
-        :open="sa.open"
-      />
-
-      <!-- Action buttons (only when not streaming) -->
-      <div
-        v-if="!isStreaming"
-        class="flex gap-1.5 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity self-start"
-      >
-        <button
-          class="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-transparent border-none rounded cursor-pointer"
-          @click="$emit('copy')"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          复制
-        </button>
-        <button
-          class="flex items-center gap-1 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-transparent border-none rounded cursor-pointer"
-          @click="$emit('regenerate')"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
-          重新生成
-        </button>
-      </div>
-    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import TextBlock from './TextBlock.vue'
-import ThinkingBlock from './ThinkingBlock.vue'
-import ToolCallCard from './ToolCallCard.vue'
-import SubagentCard from './SubagentCard.vue'
-import InteractiveActions from './InteractiveActions.vue'
-import type { ChatMessage } from '@/composables/useAgentStream'
+import TextPart from './parts/TextPart.vue'
+import ToolPart from './parts/ToolPart.vue'
 
-defineProps<{ msg: ChatMessage; isStreaming: boolean }>()
-defineEmits<{
-  copy: []
-  regenerate: []
-  resolveAction: [msg: ChatMessage, actionId: string, value: unknown]
+defineProps<{
+  msg: any
+  loading?: boolean
 }>()
+const emit = defineEmits<{ resolveAction: [toolCallId: string, value: unknown] }>()
+
+function emitToolResult(toolCallId: string, value: unknown) {
+  emit('resolveAction', toolCallId, value)
+}
 </script>
+
+<style scoped>
+.message-card {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+}
+.msg-avatar { font-size: 18px; flex-shrink: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+.msg-content { flex: 1; min-width: 0; }
+.user-text {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px 12px 4px 12px;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+  display: inline-block;
+  max-width: 85%;
+}
+.assistant-parts { font-size: 14px; }
+.thinking-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+.dot {
+  width: 6px; height: 6px;
+  background: #93c5fd;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite;
+}
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+.data-part { color: #6b7280; font-size: 12px; padding: 4px 0; }
+</style>

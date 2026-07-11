@@ -131,7 +131,11 @@ def create_app(
     suggestion_llm: Any = None,
     mock_manager: Any = None,
 ) -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(
+        title="工艺参数在线分析与调优系统",
+        version="0.1.0",
+        description="Process Parameter Online Analysis & Optimization System API",
+    )
 
     @app.exception_handler(ValueError)
     async def value_error_handler(request: Request, exc: ValueError) -> Response:

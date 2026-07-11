@@ -76,7 +76,6 @@
       </el-main>
     </el-container>
   </el-container>
-  <AgentChat />
 </template>
 
 <script setup lang="ts">
@@ -86,7 +85,6 @@ import { Monitor, DocumentCopy, TrendCharts, DataAnalysis, Setting, Tools, Fold,
 import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
 import ThemeToggle from '@/components/ThemeToggle.vue'
-import AgentChat from '@/components/AgentChat.vue'
 
 const route = useRoute()
 const router = useRouter()

@@ -126,6 +126,29 @@ PostgreSQL 15 with JSONB columns for flexible process/inspection data storage. K
 
 All settings via environment variables with `PROCESS_OPT_` prefix (see [settings.py](src/process_opt/common/settings.py)). Key vars: `PROCESS_OPT_POSTGRES_DSN`, `PROCESS_OPT_NATS_URL`, `PROCESS_OPT_GATEWAY_API_KEY`, `PROCESS_OPT_AGENT_API_KEY`, `PROCESS_OPT_AGENT_MODEL`.
 
+## Knowledge Graph (graphify)
+
+When exploring codebase structure, relationships, or architecture, **always use graphify first** — it produces a persistent knowledge graph from AST extraction (zero LLM cost) with community detection, god nodes, and query capabilities.
+
+```bash
+graphify query "<question>"                         # BFS traversal — broad context
+graphify query "<question>" --dfs                    # DFS — trace specific path
+graphify path "<node>" "<node>"                     # shortest path between two concepts
+graphify explain "<node>"                           # plain-language explanation of a node
+```
+
+**If graph.json does not exist** (first run or after major changes):
+```bash
+graphify export html    # rebuild graph (automatic from detect→extract→build)
+```
+
+The graph output lives in `graphify-out/`:
+- `graph.html` — interactive browser visualization
+- `graph.json` — raw graph data
+- `GRAPH_REPORT.md` — audit report with communities, god nodes, surprising connections
+
+**Rule**: Before asking "how does X relate to Y" or "what modules call Z", run `graphify path "X" "Y"` or `graphify query "what does Z depend on"`. The graph has ~2100 nodes / ~4000 edges / ~150 communities — most cross-module answers are one query away.
+
 ## Development notes
 
 - **Python 3.11+** required. Dependencies managed with `uv` (see `uv.lock`).

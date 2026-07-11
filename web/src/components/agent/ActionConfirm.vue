@@ -1,19 +1,21 @@
 <template>
   <div class="flex items-center gap-2">
-    <button
-      class="px-4 py-1.5 text-[11px] rounded-md bg-blue-500 hover:bg-blue-600 text-white border-none cursor-pointer transition-colors"
-      @click="emit('resolve', { confirmed: true })"
-    >{{ action.confirmText || '确认' }}</button>
-    <button
-      class="px-4 py-1.5 text-[11px] rounded-md bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-slate-500 border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
-      @click="emit('resolve', { confirmed: false })"
-    >{{ action.cancelText || '取消' }}</button>
+    <button class="confirm-btn" @click="$emit('confirm')">{{ confirmText || '确认' }}</button>
+    <button class="cancel-btn" @click="$emit('cancel')">{{ cancelText || '取消' }}</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { InteractiveAction } from '@/composables/useAgentStream'
-
-defineProps<{ action: InteractiveAction }>()
-const emit = defineEmits<{ resolve: [value: unknown] }>()
+defineProps<{
+  confirmText?: string
+  cancelText?: string
+}>()
+defineEmits<{ confirm: []; cancel: [] }>()
 </script>
+
+<style scoped>
+.confirm-btn { padding: 6px 16px; font-size: 12px; border-radius: 6px; background: #3b82f6; color: #fff; border: none; cursor: pointer; }
+.confirm-btn:hover { background: #2563eb; }
+.cancel-btn { padding: 6px 16px; font-size: 12px; border-radius: 6px; background: transparent; color: #6b7280; border: 1px solid #d1d5db; cursor: pointer; }
+.cancel-btn:hover { background: #f3f4f6; }
+</style>

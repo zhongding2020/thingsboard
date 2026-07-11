@@ -2,13 +2,13 @@
   <div class="flex items-center gap-2">
     <el-select
       v-model="selected"
-      :placeholder="action.placeholder || '请选择'"
+      :placeholder="'请选择'"
       size="small"
       class="flex-1"
       @change="onChange"
     >
       <el-option
-        v-for="opt in action.options"
+        v-for="opt in options || []"
         :key="opt.value"
         :label="opt.label"
         :value="opt.value"
@@ -20,15 +20,16 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { InteractiveAction } from '@/composables/useAgentStream'
 
-const props = defineProps<{ action: InteractiveAction }>()
-const emit = defineEmits<{ resolve: [value: unknown] }>()
+defineProps<{
+  options?: { label: string; value: string; disabled?: boolean }[]
+  modelValue?: string
+}>()
+const emit = defineEmits<{ select: [value: string] }>()
 
-const selected = ref((props.action.defaultValue as string) || '')
+const selected = ref('')
 
 function onChange(val: string) {
-  const opt = props.action.options?.find(o => o.value === val)
-  emit('resolve', { value: val, label: opt?.label || val })
+  emit('select', val)
 }
 </script>

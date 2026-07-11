@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-2">
     <el-checkbox-group v-model="checked" size="small" class="flex flex-col gap-1.5">
       <el-checkbox
-        v-for="opt in action.options"
+        v-for="opt in options || []"
         :key="opt.value"
         :value="opt.value"
         :disabled="opt.disabled"
@@ -19,16 +19,16 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { InteractiveAction } from '@/composables/useAgentStream'
 
-const props = defineProps<{ action: InteractiveAction }>()
-const emit = defineEmits<{ resolve: [value: unknown] }>()
+defineProps<{
+  options?: { label: string; value: string; disabled?: boolean }[]
+  modelValue?: string
+}>()
+const emit = defineEmits<{ select: [values: string[]] }>()
 
-const checked = ref<string[]>((props.action.defaultValue as string[]) || [])
+const checked = ref<string[]>([])
 
 function submit() {
-  const selected = props.action.options?.filter(o => checked.value.includes(o.value))
-    .map(o => ({ value: o.value, label: o.label }))
-  emit('resolve', { values: selected, raw: checked.value })
+  emit('select', checked.value)
 }
 </script>

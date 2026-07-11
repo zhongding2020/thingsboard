@@ -54,7 +54,11 @@ export function useAgentChat(processType: string = 'injection_molding') {
       })
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+        // Try read error body
+        const bodyText = await res.text()
+        let detail = ''
+        try { const b = JSON.parse(bodyText); detail = b.detail || b.message || '' } catch { detail = bodyText }
+        throw new Error(detail ? `请求失败 (${res.status}): ${detail}` : `请求失败 (${res.status})`)
       }
 
       status.value = 'streaming'

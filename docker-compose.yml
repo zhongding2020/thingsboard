@@ -60,10 +60,10 @@ services:
       PROCESS_OPT_POSTGRES_DSN: "postgresql://postgres:postgres@postgres:5432/process_opt"
       PROCESS_OPT_API_PORT: "8000"
       # ── LLM / Agent 配置 ──
-      PROCESS_OPT_AGENT_MODEL: "${AGENT_MODEL:-ark-code-latest}"
-      PROCESS_OPT_AGENT_API_BASE: "${AGENT_API_BASE:-https://ark.cn-beijing.volces.com/api/coding/v3}"
-      PROCESS_OPT_AGENT_API_KEY: "${AGENT_API_KEY:-}"
-      PROCESS_OPT_AGENT_TEMPERATURE: "${AGENT_TEMPERATURE:-0.0}"
+      PROCESS_OPT_AGENT_MODEL: "deepseek-v4-flash"
+      PROCESS_OPT_AGENT_API_BASE: "https://api.deepseek.com/v1"
+      PROCESS_OPT_AGENT_API_KEY: "sk-4db582ab2f01446ba22e591fe1799e91"
+      PROCESS_OPT_AGENT_TEMPERATURE: "0.0"
       # ── 内部服务 ──
       PROCESS_OPT_GATEWAY_URL: "http://gateway:8001"
       PROCESS_OPT_GATEWAY_API_KEY: "change-me"

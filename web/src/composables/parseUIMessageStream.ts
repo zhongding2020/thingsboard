@@ -93,6 +93,18 @@ export async function streamToParts(
               output: chunk.output,
             })
           }
+        } else if (type === 'error') {
+          // Signal error back to the caller via thrown Error
+          // The catch at the top of the loop (without throwing) skips all
+          // chunks by default, so we use a dedicated variable to propagate.
+          let errMsg = chunk.errorText || 'LLM 调用失败'
+          // Extract only the `message` field from the nested error structure
+          try {
+            const parsed = JSON.parse(errMsg)
+            if (parsed.error?.message) errMsg = parsed.error.message
+          } catch { /* not JSON, use as-is */ }
+          // Store for the caller to check
+          throw new Error(errMsg)
         }
       } catch {
         // Skip malformed JSON

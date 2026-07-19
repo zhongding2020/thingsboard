@@ -166,10 +166,10 @@ ENV_TEMPLATE = """# 工艺参数在线分析与调优系统 — 环境变量
 # 安装后可编辑此文件调整配置，需重启服务生效
 
 # ── LLM / Agent 配置 ──
-AGENT_MODEL=deepseek-chat
-AGENT_API_BASE=https://api.deepseek.com/v1
-AGENT_API_KEY=your-api-key-here
-# AGENT_TEMPERATURE=0.0
+PROCESS_OPT_AGENT_MODEL=deepseek-chat
+PROCESS_OPT_AGENT_API_BASE=https://api.deepseek.com/v1
+PROCESS_OPT_AGENT_API_KEY=your-api-key-here
+# PROCESS_OPT_AGENT_TEMPERATURE=0.0
 
 # ── 服务端口 ──
 PROCESS_OPT_API_PORT=8000

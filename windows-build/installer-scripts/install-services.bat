@@ -39,9 +39,7 @@ REM ── 3. Gateway (HTTP 数据接入网关，端口 8001) ──
 "%NSSM%" set ProcessOptGateway DisplayName "工艺优化-数据网关"
 "%NSSM%" set ProcessOptGateway Description "HTTP data ingestion gateway (port 8001)"
 "%NSSM%" set ProcessOptGateway AppDirectory "%INSTALL_DIR%\app"
-"%NSSM%" set ProcessOptGateway AppEnvironmentExtra ^
-    PYTHONPATH="%INSTALL_DIR%\app" ^
-    PROCESS_OPT_ENV_FILE="%INSTALL_DIR%\app\.env"
+"%NSSM%" set ProcessOptGateway AppEnvironmentExtra PYTHONPATH="%INSTALL_DIR%\app"
 "%NSSM%" set ProcessOptGateway Start SERVICE_AUTO_START
 "%NSSM%" set ProcessOptGateway DependOnService ProcessOptNats
 "%NSSM%" set ProcessOptGateway AppStdout "%LOGS%\gateway.log"
@@ -55,9 +53,7 @@ REM ── 4. Consumer (NATS → PostgreSQL) ──
 "%NSSM%" set ProcessOptConsumer DisplayName "工艺优化-数据消费"
 "%NSSM%" set ProcessOptConsumer Description "NATS-to-PostgreSQL consumer worker"
 "%NSSM%" set ProcessOptConsumer AppDirectory "%INSTALL_DIR%\app"
-"%NSSM%" set ProcessOptConsumer AppEnvironmentExtra ^
-    PYTHONPATH="%INSTALL_DIR%\app" ^
-    PROCESS_OPT_ENV_FILE="%INSTALL_DIR%\app\.env"
+"%NSSM%" set ProcessOptConsumer AppEnvironmentExtra PYTHONPATH="%INSTALL_DIR%\app"
 "%NSSM%" set ProcessOptConsumer Start SERVICE_AUTO_START
 "%NSSM%" set ProcessOptConsumer DependOnService ProcessOptPostgres ProcessOptNats
 "%NSSM%" set ProcessOptConsumer AppStdout "%LOGS%\consumer.log"
@@ -71,9 +67,7 @@ REM ── 5. Backend API + Frontend (端口 8000) ──
 "%NSSM%" set ProcessOptApi DisplayName "工艺优化-Web服务"
 "%NSSM%" set ProcessOptApi Description "Backend API + Frontend (port 8000)"
 "%NSSM%" set ProcessOptApi AppDirectory "%INSTALL_DIR%\app"
-"%NSSM%" set ProcessOptApi AppEnvironmentExtra ^
-    PYTHONPATH="%INSTALL_DIR%\app" ^
-    PROCESS_OPT_ENV_FILE="%INSTALL_DIR%\app\.env"
+"%NSSM%" set ProcessOptApi AppEnvironmentExtra PYTHONPATH="%INSTALL_DIR%\app"
 "%NSSM%" set ProcessOptApi Start SERVICE_AUTO_START
 "%NSSM%" set ProcessOptApi DependOnService ProcessOptPostgres
 "%NSSM%" set ProcessOptApi AppStdout "%LOGS%\api.log"

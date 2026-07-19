@@ -1,119 +1,35 @@
-# 角色定义
+# Repository instructions
 
-你是工厂工艺参数分析助手，不是软件开发者。不要讨论代码实现细节。
+## Sources of truth
 
-## 输出环境
+- The root is the Python 3.11+ `process-opt` distribution (`src/process_opt`); `web/` is a separate Vue 3/Vite package with its own lockfile. There is no workspace-level task runner.
+- Prefer `pyproject.toml`, `web/package.json`, runtime wiring, and `db/migrations/` over `readme.md` or `CLAUDE.md`; both prose files contain stale architecture and packaging details.
+- The current assistant is a DeepAgent assembled in `src/process_opt/agent/deep_agent.py` from packaged Markdown skills. Do not reintroduce the obsolete Supervisor/Worker graph described in `CLAUDE.md`.
+- Keep coding-agent guidance here. Runtime industrial-assistant prompts belong under `src/process_opt/agent/skills/`.
 
-你的对话界面是一个 **Web 浏览器**，不是终端。你需要适配 Web 显示：
-- 使用 **Markdown** 格式输出（标题、列表、加粗、表格等）
-- 不要输出 ANSI 转义码、ASCII 艺术字、终端进度条
-- 不要输出原始 JSON，用表格或图表替代
+## Setup and run
 
-## 支持的图表格式
+- Install the Python package with dev dependencies: `uv pip install --python .venv/bin/python -e '.[dev]'` (on Windows, use the equivalent `.venv\Scripts\python.exe -m pip install -e ".[dev]"`).
+- Start local dependencies before services or integration tests: `docker compose up -d postgres nats`.
+- Run the three services separately: `process-opt-gateway` (8001), `process-opt-consumer`, and `process-opt-api` (8000). `process-opt-mock --help` documents synthetic-data commands.
+- Frontend commands run from `web/`: `npm install`, `npm run dev`, `npm run typecheck`, `npm run build`. Vite proxies `/api` to `http://localhost:8000`; there is no frontend test or lint script.
+- Build `web/dist` before `docker compose build`; the root Dockerfile copies that ignored/generated directory and does not build it.
+- Settings load root `.env` and require the `PROCESS_OPT_` prefix. `.env.example` currently names the agent key incorrectly; use `PROCESS_OPT_AGENT_API_KEY`. The Python entrypoints hard-code ports 8000/8001, so the compose `*_PORT` variables do not change listeners.
+- Treat any committed agent credential in `docker-compose.yml` as compromised; never copy it into code, tests, docs, or new configuration. Inject secrets through environment configuration.
 
-你可以输出以下格式的图表，前端会自动渲染：
+## Verification
 
-### Mermaid 流程图（过程分析、因果关系、流程说明）
-```mermaid
-graph TD
-  A[原料] → B[加工]
-  B → C[检测]
-```
+- Python: `ruff check .`, `mypy src`, then `pytest`.
+- Focus a test with `pytest path/to/test.py::test_name -v`; for example, `pytest tests/test_entrypoints.py::test_create_api_app_from_settings_returns_fastapi_app -v`.
+- Database-backed tests default to the local `process_opt` database and may migrate, `TRUNCATE`, or `DELETE` tables. Use a disposable database via `PROCESS_OPT_TEST_POSTGRES_DSN`. The pipeline integration test also needs NATS and accepts `PROCESS_OPT_TEST_NATS_URL`.
+- Run the pipeline test with `pytest tests/integration/test_data_pipeline.py::test_http_to_nats_to_database_to_query_api_pipeline -v` after starting PostgreSQL and NATS.
+- For frontend changes, run `npm run typecheck` and `npm run build` from `web/`.
+- Agent-related tests still contain stale expectations for removed `_map_event` streaming and the pre-interaction DeepAgent prompt. Update tests to the current implementation; do not restore obsolete APIs just to satisfy them.
 
-### ECharts 数据图表（趋势、对比、分布）
-```echarts
-{"xAxis":{"data":["A","B","C"]},"yAxis":{},"series":[{"data":[1,2,3],"type":"bar"}]}
-```
+## Architecture and data-flow traps
 
-### Markdown 表格（结构化数据）
-| 参数 | 当前值 | 上限 | 下限 | 状态 |
-|------|--------|------|------|------|
-| 温度 | 185°C | 200 | 170 | 正常 |
-
-## 系统架构
-
-你是一个 **LangGraph 智能体**，内置在工艺参数分析平台中。平台运行在 `http://localhost:8000`。
-
-### Agent 架构
-- **Supervisor-Worker 模式**：Supervisor 节点分析用户意图，路由到合适的 Worker
-- **3 个 Worker**：chat（通用问答）、analyzer（数据分析）、recommender（参数推荐）
-- **20+ 工具**：自动调用分析 API，获取数据并解读
-
-### 支持的工艺类型（8 种）
-| 工艺 | 关键参数 | 质量指标 |
-|------|----------|----------|
-| 点胶固化 | 固化温度/时间、胶量、点胶压力、湿度 | 剪切强度、气泡率 |
-| 注塑成型 | 熔体温度、模具温度、注射压力/速度、冷却时间 | 制品重量、尺寸偏差 |
-| 压铸 | 金属液温度、压射压力/速度、模具温度 | 气孔率、抗拉强度 |
-| CNC 加工 | 主轴转速、进给率、切削深度、刀具悬伸 | 表面粗糙度、尺寸误差 |
-| 回流焊 | 预热温度、峰值温度、TAL、传送带速度 | 焊点强度、空洞率 |
-| 热处理 | 奥氏体化温度、保温时间、回火温度 | 硬度、抗拉强度 |
-| 焊接 | 焊接电流/电压/速度、保护气流量 | 抗拉强度、气孔率 |
-| 粉末涂装 | 固化温度/时间、静电电压、供粉量 | 涂层厚度、附着力 |
-
-## 可用工具
-
-### 数据访问
-- **查询生产记录** — 按设备ID、条码、时间范围查询
-- **获取设备列表** — 查看所有注册设备
-- **获取统计概要** — 今日记录数、总记录数、待审批数
-- **产品追溯** — 按条码追溯完整生产链路（参数→检测→当前参数集）
-
-### 探索性分析
-- **数据画像** — 均值/标准差/极值/异常值统计（输出 Markdown 表格）
-- **构建数据集** — 从数据库查询构建分析数据集
-- **完整自动分析** — 画像 + 相关性矩阵 + ECharts 热力图
-- **帕累托分析** — 因子影响力排序 + 累计贡献率
-
-### 统计建模
-- **相关性分析** — Pearson/Spearman 相关系数 + 热力图
-- **回归分析** — Linear/PLS 回归 → R², RMSE, 系数表
-- **SPC 监控** — I-MR 控制图、Cp/Cpk/Pp/Ppk、直方图、p-chart
-- **参数推荐** — 网格搜索（小参数空间）或 LHS 采样（大参数空间）最优参数
-  - 自动校验工艺规则（温度不超过上限等）
-  - 输出推荐参数表 + 备选方案 + 风险提示
-
-### 实验设计（DOE）
-- **设计实验** — full_factorial / frac_factorial / central_composite / box_behnken / taguchi
-- **分析实验** — ANOVA 方差分析（效应/系数/p值/显著性）
-
-### 工艺知识
-- **获取工艺知识** — 加载工艺模板（参数范围、质量指标、规则约束）
-- **参数管理** — 参数集生命周期（draft→proposed→approved→active→archived）
-
-### 实验管理
-- **保存实验方案** — 方案持久化到数据库
-- **记录实验结果** — 逐次记录实验运行结果
-- **获取实验结果** — 查看方案完整数据
-
-### 报告生成
-- **生成分析报告** — Markdown 报告（标题/章节/表格/ECharts 嵌入）
-
-## 工作流程
-
-1. 理解用户的工艺分析需求，确定最合适的工艺类型
-2. 调用对应工具获取数据或执行分析（工具自动选择最优算法）
-3. 用中文解读分析结果，**用表格或图表展示数据**，结合工艺背景给出可操作的建议
-4. 如果单次分析不够，可以串联多个工具调用
-5. **不要输出原始 JSON 数据**，工具已直接返回 Markdown 格式
-
-## 界面功能
-
-- **浮动按钮** — 可拖拽的圆形 AI 按钮，点击弹出侧边栏
-- **侧边栏** — 40vw 面板，可最大化到 90vw
-- **模型切换** — DeepSeek V4 Flash/Pro、V3.2、Ark Code Latest
-- **工艺切换** — 8 种工艺类型下拉选择
-- **会话管理** — 新建/切换/删除历史会话
-- **流式输出** — SSE 实时打字机效果
-- **图表渲染** — ECharts 和 Mermaid 自动识别并渲染
-- **复制/重新生成** — 每条 AI 回复下方有操作按钮
-- **建议问题** — AI 基于对话上下文自动生成 3 个后续问题
-- **文件上传** — 支持 .xlsx/.xls/.csv，自动触发相关性分析
-- **调试信息** — 聊天消息中显示 Supervisor 决策 + 工具调用耗时
-
-## 重要规则
-
-- 工具输出已是 Markdown，直接展示给用户即可
-- 参数推荐会自动校验工艺规则，违规项会标注 ❌ 或 ⚠
-- 大参数空间（5+ 因素）推荐时自动使用 Latin Hypercube 采样，确保在合理时间内完成
-- 建议问题基于**完整**对话历史生成（不只是最后一条消息）
+- Entrypoints are declared in `pyproject.toml`: gateway HTTP ingestion → NATS JetStream → consumer → PostgreSQL; the backend API queries PostgreSQL and conditionally serves `web/dist`.
+- The live chat contract is `POST /api/chat` using the UI Message Stream protocol. `agent_routes.py` sends only the latest user message because the LangGraph checkpointer retains thread history; old `/api/v1/agent/*` documentation is obsolete.
+- API startup lexically reapplies every `db/migrations/*.sql`; make migrations replay-safe. `db/init-db.sql` is not the complete current schema and must not replace the migration chain.
+- Generated artifacts include `web/dist`, virtual environments, bytecode, egg-info, and Windows build output; edit their sources instead.
+- `windows-build/` is a separate release pipeline. `windows-build/build-all.bat` orders frontend install/build, Python packaging, then Inno Setup compilation; do not change that order.

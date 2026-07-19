@@ -86,8 +86,11 @@ def setup_python(app_dir: Path) -> Path:
     text = pth_file.read_text()
     if "#import site" in text:
         text = text.replace("#import site", "import site")
-        pth_file.write_text(text)
-        print(f"  Enabled site-packages in {pth_file.name}")
+    lines = text.splitlines()
+    if ".." not in lines:
+        lines.insert(2, "..")
+    pth_file.write_text("\n".join(lines) + "\n")
+    print(f"  Enabled application and site-packages in {pth_file.name}")
 
     python_exe = py_dir / "python.exe"
     print(f"  Python ready: {python_exe}")
@@ -132,7 +135,7 @@ def compile_and_copy_source(app_dir: Path) -> None:
     dst = app_dir / "process_opt"
     subprocess.run(
         [
-            sys.executable,
+            str(app_dir / "python" / "python.exe"),
             str(WIN_BUILD / "build-scripts" / "compile-pyc.py"),
             str(src), str(dst),
         ],
@@ -171,10 +174,6 @@ PROCESS_OPT_AGENT_API_BASE=https://api.deepseek.com/v1
 PROCESS_OPT_AGENT_API_KEY=your-api-key-here
 # PROCESS_OPT_AGENT_TEMPERATURE=0.0
 
-# ── 服务端口 ──
-PROCESS_OPT_API_PORT=8000
-PROCESS_OPT_GATEWAY_PORT=8001
-
 # ── 数据库/消息队列（本地） ──
 PROCESS_OPT_POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/process_opt
 PROCESS_OPT_NATS_URL=nats://localhost:4222
@@ -189,6 +188,11 @@ def setup_postgres(root: Path) -> None:
     pg_dir = root / "postgresql"
     # PostgreSQL zip has a top-level 'pgsql/' dir — strip it
     extract_zip(find_one(POSTGRES_GLOB), pg_dir, strip_top=True)
+    for optional_dir in ("pgAdmin 4", "StackBuilder"):
+        optional_path = pg_dir / optional_dir
+        if optional_path.exists():
+            shutil.rmtree(optional_path)
+            print(f"  Removed optional PostgreSQL component: {optional_dir}")
     print(f"  PostgreSQL ready: {pg_dir}")
 
 

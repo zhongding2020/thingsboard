@@ -52,7 +52,7 @@ def compile_and_strip(src: Path, dst: Path) -> tuple[int, int]:
                 str(py_file),
                 cfile=str(pyc_file),
                 doraise=True,
-                optimize=2,  # Strip docstrings + assertions
+                optimize=1,
             )
         except py_compile.PyCompileError as e:
             print(f"  [ERROR] Failed to compile {py_file}: {e}", file=sys.stderr)

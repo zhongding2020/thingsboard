@@ -25,3 +25,7 @@ async def _run_forever(settings: Settings, sleep_seconds: float = 1.0) -> None:
 
 def main() -> None:
     asyncio.run(_run_forever(Settings()))
+
+
+if __name__ == "__main__":
+    main()

@@ -54,7 +54,7 @@ Uninstallable=yes
 MinVersion=10.0
 
 [Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
 
 [Files]
 ; 主内容：整个 build\ProcessOpt\ 目录
@@ -69,17 +69,17 @@ Name: "{app}\nats\data"; Permissions: users-modify
 [Run]
 ; 安装完成后自动执行：
 ; 1. 初始化 PostgreSQL 数据目录 + 应用 SQL 迁移
-Filename: "{app}\scripts\init-db.bat"; StatusMsg: "初始化数据库..."; Flags: runhidden waituntilterminated
+Filename: "{cmd}"; Parameters: "/D /C call ""{app}\scripts\init-db.bat"""; WorkingDir: "{app}"; StatusMsg: "初始化数据库..."; Flags: runhidden waituntilterminated
 
 ; 2. 注册并启动 Windows 服务
-Filename: "{app}\scripts\install-services.bat"; StatusMsg: "注册 Windows 服务并启动..."; Flags: runhidden waituntilterminated
+Filename: "{cmd}"; Parameters: "/D /C call ""{app}\scripts\install-services.bat"""; WorkingDir: "{app}"; StatusMsg: "注册 Windows 服务并启动..."; Flags: runhidden waituntilterminated
 
 ; 3. （可选）安装完成后打开浏览器
 Filename: "{app}\scripts\open-web.bat"; Description: "启动后打开系统"; Flags: postinstall skipifsilent shellexec
 
 [UninstallRun]
 ; 卸载时先停止并移除服务
-Filename: "{app}\scripts\uninstall-services.bat"; RunOnceId: "RemoveServices"; Flags: runhidden waituntilterminated
+Filename: "{cmd}"; Parameters: "/D /C call ""{app}\scripts\uninstall-services.bat"""; WorkingDir: "{app}"; RunOnceId: "RemoveServices"; Flags: runhidden waituntilterminated
 
 [Icons]
 ; 开始菜单
@@ -105,11 +105,12 @@ function IsPortInUse(Port: Integer): Boolean;
 var
   ResultCode: Integer;
   TempFile: String;
+  TempFileSize: Integer;
 begin
   TempFile := ExpandConstant('{tmp}\port_check.txt');
   Exec(ExpandConstant('{cmd}'), '/C netstat -an | findstr :' + IntToStr(Port) + ' | findstr LISTENING > "' + TempFile + '"',
        '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Result := FileExists(TempFile) and (FileSize(TempFile) > 0);
+  Result := FileSize(TempFile, TempFileSize) and (TempFileSize > 0);
 end;
 
 function InitializeSetup(): Boolean;
@@ -124,8 +125,8 @@ begin
 
   if BusyPorts <> '' then
   begin
-    if MsgBox('检测到以下端口已被占用：' + #13#10 + #13#10 + BusyPorts +
-              #13#10 + '安装可能失败或服务无法启动。是否继续？',
+    if MsgBox('检测到以下端口已被占用：' + #13#10 + #13#10 + BusyPorts + #13#10 +
+              '安装可能失败或服务无法启动。是否继续？',
               mbConfirmation, MB_YESNO) <> IDYES then
     begin
       Result := False;

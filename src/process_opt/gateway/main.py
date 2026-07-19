@@ -12,3 +12,7 @@ def create_gateway_app_from_settings() -> FastAPI:
 
 def main() -> None:
     uvicorn.run(create_gateway_app_from_settings(), host="0.0.0.0", port=8001)
+
+
+if __name__ == "__main__":
+    main()

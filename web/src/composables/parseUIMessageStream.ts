@@ -21,11 +21,17 @@ export interface UIMessage {
   parts: UIMessagePart[]
 }
 
+export interface StreamResult {
+  parts: UIMessagePart[]
+  estimatedTokens: number
+}
+
 export async function streamToParts(
   body: ReadableStream<Uint8Array>,
-): Promise<{ parts: UIMessagePart[] }> {
+): Promise<StreamResult> {
   const parts: UIMessagePart[] = []
   const textParts: UIMessagePart[] = []
+  let estimatedTokens = 0
 
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -42,7 +48,7 @@ export async function streamToParts(
       // End-of-stream marker
       if (t === 'data: [DONE]') {
         // Close pending text part
-        return { parts }
+        return { parts, estimatedTokens }
       }
 
       if (!t.startsWith('data: ')) continue
@@ -93,6 +99,8 @@ export async function streamToParts(
               output: chunk.output,
             })
           }
+        } else if (type === 'data-token-usage') {
+          estimatedTokens = chunk.data?.estimated_tokens || 0
         } else if (type === 'error') {
           // Signal error back to the caller via thrown Error
           // The catch at the top of the loop (without throwing) skips all
@@ -115,5 +123,5 @@ export async function streamToParts(
   // Flush any buffered text parts
   parts.unshift(...textParts)
 
-  return { parts }
+  return { parts, estimatedTokens }
 }

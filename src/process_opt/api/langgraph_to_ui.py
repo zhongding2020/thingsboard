@@ -9,6 +9,8 @@ Design decisions:
     - Todos and suggestions are not emitted (features cut per redesign)
     - Tool inputs are emitted once at on_tool_start (no streaming delta of args)
     - Tool ID from LangGraph run_id (16-char prefix) for stable frontend keys
+    - Large tool outputs (>20k chars) are truncated at SSE layer as safety net
+    - Token usage estimated and emitted as data-token-usage for frontend display
 """
 
 from __future__ import annotations
@@ -21,8 +23,16 @@ from typing import Any
 from langchain_core.messages import AIMessageChunk
 
 from process_opt.api import ui_stream
+from process_opt.agent.tools.token_utils import truncate_output, estimate_tokens
 
 logger = logging.getLogger(__name__)
+
+# Safety net: truncate tool outputs larger than this at the SSE layer
+# (tools should already truncate themselves, but this catches edge cases)
+TOOL_OUTPUT_MAX_CHARS = 40_000
+
+# Rolling token usage counter for this stream
+_token_usage: int = 0
 
 
 async def stream_langgraph_as_ui(
@@ -40,6 +50,7 @@ async def stream_langgraph_as_ui(
     message_id = f"msg_{uuid.uuid4().hex[:16]}"
     text_part_id: str | None = None
     open_tool_calls: set[str] = set()
+    accum_tokens: int = 0
 
     yield ui_stream.start(message_id)
     yield ui_stream.start_step()
@@ -81,6 +92,10 @@ async def stream_langgraph_as_ui(
                 tool_input = event.get("data", {}).get("input", {}) or {}
                 cleaned_input = {k: v for k, v in tool_input.items() if not k.startswith("_")}
 
+                # Estimate token cost of tool input as well
+                input_text = str(cleaned_input)
+                accum_tokens += estimate_tokens(input_text)
+
                 open_tool_calls.add(tool_call_id)
                 yield ui_stream.tool_input_start(tool_call_id, tool_name)
                 yield ui_stream.tool_input_available(tool_call_id, tool_name, cleaned_input)
@@ -94,6 +109,20 @@ async def stream_langgraph_as_ui(
                     output_str = str(output.content)
                 else:
                     output_str = str(output)
+
+                # Estimate and accumulate token cost
+                est_tokens = estimate_tokens(output_str)
+                accum_tokens += est_tokens
+
+                # Safety net truncation for overly large outputs
+                if len(output_str) > TOOL_OUTPUT_MAX_CHARS:
+                    output_str, _, _ = truncate_output(
+                        output_str,
+                        max_tokens=8000,
+                        head_lines=8,
+                        tail_lines=5,
+                    )
+
                 open_tool_calls.discard(tool_call_id)
                 yield ui_stream.tool_output_available(tool_call_id, output_str)
                 continue
@@ -111,6 +140,10 @@ async def stream_langgraph_as_ui(
     finally:
         if text_part_id:
             yield ui_stream.text_end(text_part_id)
+        # Emit token usage as a data part for frontend display
+        yield ui_stream.data_part("token-usage", {
+            "estimated_tokens": accum_tokens,
+        })
         yield ui_stream.finish_step()
         yield ui_stream.finish()
         yield ui_stream.done()

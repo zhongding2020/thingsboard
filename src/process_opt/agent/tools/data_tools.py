@@ -13,6 +13,7 @@ from typing import Any
 from langchain_core.tools import tool
 
 from process_opt.agent.tools.retry import with_retry
+from process_opt.agent.tools.token_utils import truncate_output, estimate_tokens
 
 
 def create_data_tools(
@@ -46,6 +47,12 @@ def create_data_tools(
         if not items:
             return f"未找到设备 `{device_id}` 的生产记录。" if device_id else "当前系统没有生产记录。"
 
+        total_est = 0
+        if total > page_size:
+            # Estimate total tokens for current page
+            est_per_row = estimate_tokens(str(items[0])) if items else 0
+            total_est = est_per_row * len(items)
+
         lines = [
             f"## 生产记录查询",
             f"**设备**: {device_id or '全部'} | **共 {total} 条** | 第 {page} 页",
@@ -68,7 +75,9 @@ def create_data_tools(
                 f"| {item.get('barcode', '-')} | {item.get('device_id', '-')} | "
                 f"{item.get('processed_at', '-')} | {params_str} | {results_str} |"
             )
-        return "\n".join(lines)
+        result_text = "\n".join(lines)
+        result_text, _, _ = truncate_output(result_text, max_tokens=8000)
+        return result_text
 
     @tool
     async def get_devices() -> str:
@@ -187,7 +196,9 @@ def create_data_tools(
                 row_parts.append(str(val))
             lines.append("| " + " | ".join(row_parts) + " |")
 
-        return "\n".join(lines)
+        result_text = "\n".join(lines)
+        result_text, _, _ = truncate_output(result_text, max_tokens=8000)
+        return result_text
 
     @tool
     @with_retry()

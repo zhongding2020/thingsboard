@@ -24,6 +24,7 @@ export function useAgentChat(processType: string = 'injection_molding') {
   const messages: Ref<UIMessage[]> = ref([])
   const status = ref<'submitted' | 'streaming' | 'ready' | 'error'>('ready')
   const error = ref('')
+  const estimatedTokens = ref(0)
   let abort: AbortController | null = null
 
   async function sendMessage(opts: { text: string }) {
@@ -63,6 +64,7 @@ export function useAgentChat(processType: string = 'injection_molding') {
       status.value = 'streaming'
 
       const result = await streamToParts(res.body!)
+      estimatedTokens.value = result.estimatedTokens
       const assistantMsg: UIMessage = {
         id: `msg_asst_${Date.now()}`,
         role: 'assistant',
@@ -83,7 +85,7 @@ export function useAgentChat(processType: string = 'injection_molding') {
     status.value = 'ready'
   }
 
-  return { messages, status, error, sendMessage, stop }
+  return { messages, status, error, estimatedTokens, sendMessage, stop }
 }
 
 export function resetSession(): void {

@@ -8,10 +8,10 @@
       @change="onChange"
     >
       <el-option
-        v-for="opt in options || []"
-        :key="opt.value"
+        v-for="(opt, i) in options || []"
+        :key="opt.value || i"
         :label="opt.label"
-        :value="opt.value"
+        :value="opt.value ?? opt.label ?? ''"
         :disabled="opt.disabled"
       />
     </el-select>
@@ -19,15 +19,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   options?: { label: string; value: string; disabled?: boolean }[]
   modelValue?: string
 }>()
 const emit = defineEmits<{ select: [value: string] }>()
 
-const selected = ref('')
+const selected = computed({
+  get: () => props.modelValue ?? '',
+  set: (val: string) => emit('select', val),
+})
 
 function onChange(val: string) {
   emit('select', val)

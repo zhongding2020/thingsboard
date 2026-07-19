@@ -1,0 +1,10 @@
+# 构建产物
+build/
+downloads/*.zip
+downloads/*.tar.gz
+downloads/get-pip.py
+
+# 不忽略 README 和空目录标记
+!downloads/README.md
+!downloads/.gitkeep
+!build/.gitkeep

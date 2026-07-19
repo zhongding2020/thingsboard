@@ -4,6 +4,8 @@ from typing import Any
 
 from langchain_core.tools import tool
 
+from process_opt.agent.tools.token_utils import truncate_output
+
 
 def create_experiment_tools(experiment_repo: Any) -> list:
     @tool
@@ -29,7 +31,9 @@ def create_experiment_tools(experiment_repo: Any) -> list:
                 f"{p.method} | {status_emoji} {p.status} | "
                 f"{p.created_by} | {created} |"
             )
-        return "\n".join(result)
+        result_text = "\n".join(result)
+        result_text, _, _ = truncate_output(result_text, max_tokens=8000)
+        return result_text
 
     @tool
     async def get_experiment_results(device_id: str, limit: int = 50) -> str:
@@ -77,6 +81,8 @@ def create_experiment_tools(experiment_repo: Any) -> list:
                     f"均值 {avg:.4f}, 最小 {min(values):.4f}, 最大 {max(values):.4f}"
                 )
 
-        return "\n".join(lines)
+        result_text = "\n".join(lines)
+        result_text, _, _ = truncate_output(result_text, max_tokens=8000)
+        return result_text
 
     return [list_experiment_plans, get_experiment_results]

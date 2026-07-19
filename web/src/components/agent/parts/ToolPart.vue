@@ -5,10 +5,10 @@
       :class="stateClass"
       @click="expanded = !expanded"
     >
-      <span class="tool-icon">{{ icon }}</span>
+      <span class="tool-icon" v-html="icon"></span>
       <span class="tool-name">{{ part.toolName || part.type }}</span>
       <span class="tool-badge">{{ stateLabel }}</span>
-      <span class="expand-arrow">{{ expanded ? '▼' : '▶' }}</span>
+      <span class="expand-arrow" v-html="expanded ? arrowUp : arrowDown"></span>
     </div>
     <div v-if="expanded" class="tool-body">
       <template v-if="isAskUser">
@@ -65,6 +65,9 @@ const emit = defineEmits<{ output: [toolCallId: string, output: unknown] }>()
 
 const expanded = ref(true)
 
+const arrowDown = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>'
+const arrowUp = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>'
+
 const isAskUser = computed(() => props.part.type === 'tool-ask_user')
 const userAction = computed(() => {
   if (!isAskUser.value) return null
@@ -89,10 +92,10 @@ const stateClass = computed(() => {
 })
 
 const icon = computed(() => {
-  if (isAskUser.value) return '🔘'
-  if (props.part.state === 'output-available') return '✅'
-  if (props.part.state === 'output-error') return '❌'
-  return '⚙️'
+  if (isAskUser.value) return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>'
+  if (props.part.state === 'output-available') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>'
+  if (props.part.state === 'output-error') return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>'
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>'
 })
 
 const stateLabel = computed(() => {
@@ -128,33 +131,105 @@ function handleCascader(values: Record<string, string>) {
 
 <style scoped>
 .tool-part {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--el-border-color, #e2e8f0);
   border-radius: 8px;
   margin: 6px 0;
   overflow: hidden;
+  background: var(--el-fill-color-blank, #fff);
 }
+
 .tool-header {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: #f9fafb;
+  background: var(--el-fill-color-lighter, #f8fafc);
   cursor: pointer;
   font-size: 12px;
   user-select: none;
+  color: var(--el-text-color-regular, #334155);
 }
-.tool-name { font-weight: 600; flex: 1; }
-.tool-badge { font-size: 10px; padding: 1px 6px; border-radius: 10px; }
-.state-pending .tool-badge { background: #fef3c7; color: #92400e; }
-.state-running .tool-badge { background: #dbeafe; color: #1e40af; }
-.state-done .tool-badge { background: #d1fae5; color: #065f46; }
-.state-error .tool-badge { background: #fee2e2; color: #991b1b; }
-.expand-arrow { font-size: 9px; color: #9ca3af; }
-.tool-body { padding: 8px 12px; font-size: 13px; border-top: 1px solid #e5e7eb; }
+
+.tool-name {
+  font-weight: 600;
+  flex: 1;
+  color: var(--el-text-color-primary, #0f172a);
+}
+
+.tool-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.state-pending .tool-badge {
+  background: var(--el-color-warning-light-9, #fffbeb);
+  color: var(--el-color-warning-dark-2, #b45309);
+}
+
+.state-running .tool-badge {
+  background: var(--el-color-primary-light-9, #eff6ff);
+  color: var(--el-color-primary-dark-2, #1d4ed8);
+}
+
+.state-done .tool-badge {
+  background: var(--el-color-success-light-9, #ecfdf5);
+  color: var(--el-color-success-dark-2, #047857);
+}
+
+.state-error .tool-badge {
+  background: var(--el-color-danger-light-9, #fef2f2);
+  color: var(--el-color-danger-dark-2, #b91c1c);
+}
+
+.expand-arrow {
+  display: flex;
+  align-items: center;
+  color: var(--el-text-color-disabled, #94a3b8);
+  flex-shrink: 0;
+}
+
+.tool-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.state-pending .tool-icon { color: var(--el-color-warning, #d97706); }
+.state-running .tool-icon { color: var(--el-color-primary, #2563eb); }
+.state-done .tool-icon { color: var(--el-color-success, #059669); }
+.state-error .tool-icon { color: var(--el-color-danger, #dc2626); }
+
+.tool-body {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-top: 1px solid var(--el-border-color, #e2e8f0);
+  color: var(--el-text-color-regular, #334155);
+}
+
 .ask-user-wrapper {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.ask-user-title { font-size: 13px; font-weight: 500; margin: 0; color: #374151; }
+
+.ask-user-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+  color: var(--el-text-color-primary, #0f172a);
+}
+
+.tool-result :deep(p) {
+  margin: 0.3em 0;
+}
+
+.tool-result :deep(code) {
+  background: var(--el-fill-color-light, #f1f5f9);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: 'Fira Code', monospace;
+}
 </style>

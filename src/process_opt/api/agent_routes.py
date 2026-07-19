@@ -6,9 +6,10 @@ Single endpoint:
         Response: text/event-stream (UI Message Stream v1)
 
 Design:
-    - Stateless per-request; frontend sends full message history each time
     - Session ID maps 1:1 to LangGraph thread_id (checkpointer continuity)
-    - Process type auto-inferred from first user message on session creation
+    - Only the last user message is sent to LangGraph — checkpointer already
+      persists full conversation history per thread_id. Sending all frontend
+      messages would cause duplication since checkpointer appends them again.
     - Agent cache keyed by (sessionId, processType) so we don't rebuild every request
 """
 
@@ -92,8 +93,18 @@ def register_agent_routes(
             thread_id = f"thread_{uuid.uuid4().hex[:20]}"
             _agent_cache[cache_key] = (agent, thread_id, process_type)
 
-        # Convert UIMessage[] → LangGraph messages format
-        lg_messages = [_ui_message_to_langgraph(m) for m in req.messages]
+        # Send only the last user message to LangGraph.
+        # LangGraph checkpointer persists all history per thread_id.
+        # Sending all frontend messages would cause duplication.
+        last_user_msg = None
+        for m in reversed(req.messages):
+            if m.role == "user":
+                last_user_msg = _ui_message_to_langgraph(m)
+                break
+        if last_user_msg is None:
+            raise HTTPException(status_code=422, detail="No user message found in request")
+
+        lg_messages = [last_user_msg]
 
         return StreamingResponse(
             stream_langgraph_as_ui(agent, lg_messages, thread_id),
